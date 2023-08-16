@@ -10,14 +10,14 @@ async (props: {
   token: string;
 }) => {
   const { pathname, token } = props;
-  const { FUNCTIONS_DIR, FILE_LOADER } = modules.env;
+  const { FUNCTIONS_DIR, FILE_LOADER, GIT_OWNER, GIT_REPO } = modules.env;
   let file;
   if (FILE_LOADER === "github") {
     file = await githubLoader()({
-      owner: "AxionCompany",
-      repo: "aion-ui",
-      path: pathname,
+      pathname: `/${FUNCTIONS_DIR}${pathname}`,
       token,
+      owner:GIT_OWNER,
+      repo:GIT_REPO
     });
   } else {
     file = await localFileloader()({

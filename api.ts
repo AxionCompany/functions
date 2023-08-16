@@ -8,7 +8,7 @@ let v: any = {};
 Deno.serve({ port: PORT }, async (req) => {
   try {
     const pathname = new URL(req.url).pathname;
-    const body = await req.json();
+    const body = await req.json().then(res=>res).catch(err=>{});
     const params: any = {};
     new URL(req.url).searchParams.forEach((value, key) => {
       params[key] = value;
