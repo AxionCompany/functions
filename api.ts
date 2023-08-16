@@ -1,19 +1,16 @@
-import { load } from "https://deno.land/std/dotenv/mod.ts";
 import functionExec from "./functions/function-exec.ts";
 
-const env = await load();
+const env = Deno.env.toObject();
 const PORT = Number(env["API_PORT"] || env["PORT"] || 8001);
 let v: any = {};
 
 Deno.serve({ port: PORT }, async (req) => {
   try {
     const pathname = new URL(req.url).pathname;
-    const body = await req.json().then(res=>res).catch(err=>{});
-    const params: any = {};
-    new URL(req.url).searchParams.forEach((value, key) => {
-      params[key] = value;
-    });
-    const res: any = await functionExec({ env })({ pathname, params: {...params, ...body}, v });
+    const body = await req.json().then(res=>res).catch(err=>({}));
+    const params: any = { ...body };
+    new URL(req.url).searchParams.forEach((value, key) => params[key] = value);
+    const res: any = await functionExec({ env })({ pathname, params, v });
     return new Response(res);
   } catch (err) {
     console.log(err);
