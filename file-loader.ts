@@ -9,6 +9,6 @@ Deno.serve({ port: PORT }, async (req) => {
   const token: string = new URL(req.url).searchParams.get("token") || "";
   const res = await fileLoader({ env })({ pathname, url, token });
   return new Response(res, {
-    headers: { "content-type": "application/text" },
+    headers: { "content-type": "text/plain" },
   });
 });
