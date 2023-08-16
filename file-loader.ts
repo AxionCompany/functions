@@ -1,6 +1,8 @@
 import fileLoader from "./functions/file-loader.ts";
+import { config } from "https://deno.land/x/dotenv/mod.ts";
 
-const env = Deno.env.toObject();
+const env = { ...Deno.env.toObject(), ...config() };
+
 const PORT = Number(env["FILE_LOADER_PORT"] || env["PORT"] || 8000);
 
 Deno.serve({ port: PORT }, async (req) => {
