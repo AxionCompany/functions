@@ -18,7 +18,9 @@ async (props: {
     v[pathname] = Date.now();
   }
   // create url
+  console.log('3', pathname, FILE_LOADER_URL)
   const url: URL = new URL(pathname, FILE_LOADER_URL);
+  console.log('4')
   // add cache busting
   url.searchParams.set("v", v[pathname]);
   // add token
