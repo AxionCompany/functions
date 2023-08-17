@@ -26,6 +26,7 @@ async (props: {
   // import module
   console.log(`importing ${url.href}`);
   const mod = await importModule(url.href);
+  console.log(JSON.stringify(mod))
   // run module
   const res = await mod?.default(modules)(params);
   // return response
