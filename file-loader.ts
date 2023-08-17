@@ -1,4 +1,4 @@
-import fileLoader from "./functions/file-loader.ts";
+import fileLoader from "./functions/file-loader.tsv?=1";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
 const env = { ...Deno.env.toObject(), ...config() };
