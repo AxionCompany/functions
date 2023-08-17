@@ -22,10 +22,8 @@ async (props: {
   // add cache busting
   url.searchParams.set("v", v[pathname]);
   // add token
-  console.log('GIT TOKEN', GIT_TOKEN)
   if (GIT_TOKEN) url.searchParams.set("token", GIT_TOKEN);
   // import module
-  console.log(`importing ${url.href}`);
   const mod = await importModule(url.href);
   // run module
   const res = await mod?.default(modules)(params);
