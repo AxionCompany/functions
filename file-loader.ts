@@ -1,4 +1,4 @@
-import fileLoader from "./functions/file-loader.tsv?=1";
+import fileLoader from "./functions/file-loader.tsv?=2";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
 const env = { ...Deno.env.toObject(), ...config() };
@@ -11,6 +11,6 @@ Deno.serve({ port: PORT }, async (req) => {
   const token: string = new URL(req.url).searchParams.get("token") || "";
   const res = await fileLoader({ env })({ pathname, url, token });
   return new Response(res, {
-    headers: { "content-type": "application/javascript" },
+    headers: { "content-type": "text/plain" },
   });
 });

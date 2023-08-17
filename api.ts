@@ -1,4 +1,4 @@
-import functionExec from "./functions/function-exec.ts?v=2";
+import functionExec from "./functions/function-exec.ts?v=3";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
 const env = { ...Deno.env.toObject(), ...config() };
