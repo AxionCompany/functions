@@ -1,3 +1,3 @@
-export default (modules) => (props)=> {
+export default (props)=> {
     return JSON.stringify(props)
 }
