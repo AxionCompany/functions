@@ -1,17 +1,16 @@
-import { importModule } from "https://esm.sh/gh/vfssantos/deno-dynamic-import/mod.ts?v=2";
+import { importModule } from "https://esm.sh/gh/vfssantos/deno-dynamic-import/mod.ts";
 
-export default (modules: {
-  env: any;
-}) =>
+export default 
 async (props: {
   v: any;
   pathname: string;
   params: any;
+  env:any;
 }) => {
   // get props
-  let { pathname, v, params } = props;
+  let { pathname, v, params, env } = props;
   // get env
-  const { FILE_LOADER_URL, GIT_TOKEN } = modules.env;
+  const { FILE_LOADER_URL, GIT_TOKEN } = env;
   // cache busting
   if (!v[pathname] || pathname.endsWith("/___cacheBust___")) {
     pathname = pathname.replace("/___cacheBust___", "");
@@ -26,7 +25,7 @@ async (props: {
   // import module
   const mod = await importModule(url.href);
   // run module
-  const res = await mod?.default(modules)(params);
+  const res = await mod?.default(params);
   // return response
   return res;
 };

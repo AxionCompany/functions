@@ -1,4 +1,5 @@
-export default (modules) => async ({ pathname, owner, repo, token }) => {
+export default async ({ pathname, token, owner, repo }) => {
+
   const dirPath = pathname.substring(0, pathname.lastIndexOf("/"));
   const baseFileName = pathname.substring(pathname.lastIndexOf("/") + 1);
 
