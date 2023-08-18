@@ -12,7 +12,6 @@ Deno.serve({ port: PORT }, async (req) => {
     const params: any = { ...body };
     new URL(req.url).searchParams.forEach((value, key) => params[key] = value);
     const res: any = await functionExec({ env })({ pathname, params, v });
-    console.log(JSON.stringify(res));
     return new Response(JSON.stringify(res),{headers: {'Content-Type': 'application/json'}});
   } catch (err) {
     console.log(err);
