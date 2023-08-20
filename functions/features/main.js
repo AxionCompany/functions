@@ -1,3 +1,3 @@
-export default (props)=> {
-    return JSON.stringify(props)
-}
+export default (adapters) => (props) => {
+  return JSON.stringify(props);
+};

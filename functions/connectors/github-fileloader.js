@@ -1,5 +1,7 @@
-export default async ({ pathname, token, owner, repo }) => {
+export default ({ config }) => async function githubFileLoader({ pathname }) {
 
+  const { token, owner, repo, functionsDir } = config;
+  if( functionsDir) pathname = functionsDir + pathname;
   const dirPath = pathname.substring(0, pathname.lastIndexOf("/"));
   const baseFileName = pathname.substring(pathname.lastIndexOf("/") + 1);
 
@@ -14,10 +16,17 @@ export default async ({ pathname, token, owner, repo }) => {
     if (!dirRes.ok) {
       throw new Error(`HTTP error! status: ${dirRes.status}`);
     }
-    const files = await dirRes.json();
+    let files = await dirRes.json();
 
     for (let file of files) {
+
       if (file.name.startsWith(baseFileName)) {
+
+        if (file.type === "dir") {
+          const content = await githubFileLoader({ pathname: `${pathname.slice(functionsDir?.length || 0)}/${config?.dirEntrypoint || "index"}` });
+          return content;
+        }
+        
         const fileRes = await fetch(
           `https://api.github.com/repos/${owner}/${repo}/contents${dirPath}/${file.name}`,
           { headers },
