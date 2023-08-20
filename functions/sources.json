@@ -1,0 +1,20 @@
+[
+    {
+        "name":"functions-file-loader",
+        "type":"github",
+        "config":{
+            "repo":"functions",
+            "owner":"AxionCompany",
+            "functionsDir":"functions",
+            "dirEntrypoint":"main"
+        }
+    },
+    {
+        "name":"functions-file-loader",
+        "type":"local",
+        "config":{
+            "functionsDir":"functions",
+            "dirEntrypoint":"main"
+        }
+    }
+]
