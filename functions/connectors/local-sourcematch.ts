@@ -5,7 +5,7 @@ export default ({ config }: any) => async ({ pathname }: any) => {
 
   // read sources.json file from root of project
   
-  const sources = await Deno.readTextFile(`${config.functionsDir}/sources.json`).then(res=>JSON.parse(res)).catch(err=>null);
+  const sources = await Deno.readTextFile(`${config.functionsDir}/sources.json`).then(res=>JSON.parse(res)).catch(err=>{return []});
 
   const source: any = sources.find((src: any) => (
     src.name === loaderName && src.type === loaderType
