@@ -64,7 +64,7 @@ Deno.serve({ port: PORT }, async (req) => {
             sentResponse = true;
           } catch (err) {
             console.log('erro 1', err);
-            if (!sentResponse) resolve(err);
+            if (!sentResponse) resolve(err.message);
           }
         };
         send = (data: any) => {
@@ -74,7 +74,7 @@ Deno.serve({ port: PORT }, async (req) => {
             controller.close();
           } catch (err) {
             console.log('erro 2', err);
-            if (!sentResponse) resolve(err);
+            if (!sentResponse) resolve(err.message);
           }
         };
       },
@@ -88,7 +88,7 @@ Deno.serve({ port: PORT }, async (req) => {
       .then(send)
       .catch((err) => {
         console.log('erro 3', err);
-        return !sentResponse ? resolve(err) : null
+        return !sentResponse ? resolve(err.message) : null
       });
   });
 
