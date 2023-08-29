@@ -15,14 +15,14 @@ const LocalAdapters = await remoteAdapters.moduleLoader({
 const localAdapters = LocalAdapters ? LocalAdapters(remoteAdapters) : {};
 console.log("Local adapters loaded.");
 
-const adapters = {...remoteAdapters, ...localAdapters };
+const adapters = { ...remoteAdapters, ...localAdapters };
 
 const { env } = adapters;
 
 const PORT = Number(env["API_PORT"] || env["PORT"] || 8001);
 
 Deno.serve({ port: PORT }, async (req) => {
-  let responseHeaders;
+  let responseHeaders = {};
   // Get Body
   const body = await req.json().then((res: any) => res).catch((
     err: Error,
@@ -63,7 +63,7 @@ Deno.serve({ port: PORT }, async (req) => {
             if (!sentResponse) resolve(response);
             sentResponse = true;
           } catch (err) {
-            console.log('erro 1', err);
+            console.log("erro 1", err);
             if (!sentResponse) resolve(err.message);
           }
         };
@@ -73,7 +73,7 @@ Deno.serve({ port: PORT }, async (req) => {
             if (!sentResponse) resolve(data);
             controller.close();
           } catch (err) {
-            console.log('erro 2', err);
+            console.log("erro 2", err);
             if (!sentResponse) resolve(err.message);
           }
         };
@@ -87,10 +87,17 @@ Deno.serve({ port: PORT }, async (req) => {
     })
       .then(send)
       .catch((err) => {
-        console.log('erro 3', err);
-        return !sentResponse ? resolve(err.message) : null
+        console.log("erro 3", err);
+        return !sentResponse ? resolve(err.message) : null;
       });
   });
 
-  return new Response(JSON.stringify(res), { headers: responseHeaders });
+  return new Response(JSON.stringify(res), {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers":
+        "authorization, x-client-info, apikey, content-type",
+      ...responseHeaders,
+    },
+  });
 });
