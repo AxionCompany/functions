@@ -6,6 +6,8 @@ export default ({ config }) => async ({ pathname }) => {
   let dirPath;
   let baseFileName;
 
+  console.log(pathname)
+
   const fileInfo = await Deno.stat(pathname)
     .then((res) => res)
     .catch((err) => {

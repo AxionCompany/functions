@@ -1,0 +1,6 @@
+{
+    "tasks": {
+        "file-loader": "deno run -A -r file-loader.ts",
+        "api": "deno run -A -r api.ts"
+    }
+}
