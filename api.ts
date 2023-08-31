@@ -87,7 +87,6 @@ Deno.serve({ port: PORT }, async (req) => {
     })
       .then(send)
       .catch((err) => {
-        console.log("erro 3", err);
         return !sentResponse ? resolve(err.message) : null;
       });
   });
