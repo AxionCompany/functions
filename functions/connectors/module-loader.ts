@@ -1,6 +1,6 @@
-import { importModule } from "https://esm.sh/gh/vfssantos/deno-dynamic-import/mod.ts";
+import { importModule } from "https://raw.githubusercontent.com/vfssantos/deno-dynamic-import/main/mod.ts";
 
-export default ({ config, adapters }: any) =>
+export default ({ config }: any) =>
 async (props: {
   v?: any;
   pathname: string;
