@@ -1,6 +1,4 @@
-// import { importModule } from "https://raw.githubusercontent.com/vfssantos/deno-dynamic-import/main/mod.ts";
-import { importModule } from "https://raw.githubusercontent.com/vfssantos/deno-dynamic-import/e50d23ecd6c3ec3f58a447d91a3e30eb0cbdc8ee/mod.ts";
-
+import { dynamicImport } from 'https://deno.land/x/import/mod.ts';
 
 export default ({ config }: any) =>
 async (props: {
@@ -32,7 +30,7 @@ async (props: {
   if (password) url.password = password
   // import module
   console.log(`Loading ${url.href}`);
-  const mod = await importModule(url.href);
+  const mod = await dynamicImport(url.href);
   // return module
   return mod;
 };
