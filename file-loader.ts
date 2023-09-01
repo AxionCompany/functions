@@ -30,7 +30,7 @@ Deno.serve({ port: PORT }, async (req) => {
       return auth;
     }
   }
-
+  
   const res = await loadFile(adapters)({ pathname });
   return new Response(res, {
     headers: { "content-type": "text/plain" },

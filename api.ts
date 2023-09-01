@@ -21,6 +21,8 @@ const { env } = adapters;
 
 const PORT = Number(env["API_PORT"] || env["PORT"] || 8001);
 
+adapters.port[env.HTTP_PORT](adapters)
+
 Deno.serve({ port: PORT }, async (req) => {
   let responseHeaders = {};
   // Get Body

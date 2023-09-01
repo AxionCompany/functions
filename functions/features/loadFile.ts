@@ -1,14 +1,12 @@
-export default (modules: any) => async (props: { pathname: string }) => {
+export default ({ connectors }: any) => async (props: { pathname: string }) => {
+  const { fileLoader, sourceMatch } = connectors;
 
-  const { fileLoader, sourceMatch } = modules;
+  const { config, pathname, loaderType } = await sourceMatch.default(props);
 
-  
-  const {config, pathname, loaderType} = await sourceMatch(props);
-  
-  console.log(`Loading file ${pathname} with loader ${loaderType}, config: ${JSON.stringify(config)}`)
-  const file = await fileLoader[loaderType]({ config:config })(
+  console.log(`Loading file ${pathname} with loader ${loaderType}`);
+  const file = await fileLoader[loaderType]({ config: config })(
     {
-      pathname:pathname,
+      pathname: pathname,
     },
   );
 
