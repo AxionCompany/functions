@@ -1,4 +1,6 @@
-import { importModule } from "https://raw.githubusercontent.com/vfssantos/deno-dynamic-import/main/mod.ts";
+// import { importModule } from "https://raw.githubusercontent.com/vfssantos/deno-dynamic-import/main/mod.ts";
+import { importModule } from "https://raw.githubusercontent.com/vfssantos/deno-dynamic-import/e50d23ecd6c3ec3f58a447d91a3e30eb0cbdc8ee/mod.ts";
+
 
 export default ({ config }: any) =>
 async (props: {
