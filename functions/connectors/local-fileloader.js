@@ -1,12 +1,11 @@
 import { walk } from "https://deno.land/std@0.114.0/fs/mod.ts";
 
 export default ({ config }) => async ({ pathname }) => {
-  if (config?.functionsDir) pathname = `${config.functionsDir}/${pathname}`;
+
+  if (config?.functionsDir) pathname = `${config.functionsDir}${pathname}`;
 
   let dirPath;
   let baseFileName;
-
-  console.log(pathname)
 
   const fileInfo = await Deno.stat(pathname)
     .then((res) => res)
