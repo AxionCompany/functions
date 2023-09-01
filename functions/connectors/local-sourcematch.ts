@@ -15,7 +15,7 @@ export default ({ config }: any) => async ({ pathname }: any) => {
   //   });
 
   const sources = await readFile(`${config.functionsDir}/sources.json`)
-    .then((res) => JSON.parse(res))
+    .then((res) => JSON.parse(res.toString()))
     .catch((err) => {
       return [];
     });
