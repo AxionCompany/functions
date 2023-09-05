@@ -1,6 +1,6 @@
-export default async ({ env, ...adapters }: any) => {
+export default async (adapters: any) => {
 
-  const { connectors, features } = adapters;
+  const { connectors, features, env } = adapters;
   const { moduleLoader } = connectors;
   const { functionExec } = features;
 
