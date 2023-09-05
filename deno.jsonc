@@ -1,6 +1,7 @@
 {
     "tasks": {
         "file-loader": "PORT=8000 HANDLER_TYPE=file-loader deno run -A -r --no-lock main.ts",
-        "api": "PORT=8001 HANDLER_TYPE=rpc deno run -A -r --no-lock main.ts"
+        "api": "PORT=8001 HANDLER_TYPE=rpc deno run -A -r --no-lock main.ts",
+        "main": "deno run -A -r --no-lock main.ts"
     }
 }
