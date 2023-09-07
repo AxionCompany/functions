@@ -52,6 +52,8 @@ async function walk(dir) {
 
 export default function ({ config }) {
   return async function({ pathname }) {
+    const isFile = pathname.includes('.')
+
     if (config?.functionsDir) pathname = `${config.functionsDir}${pathname}`
     let dirPath
     let baseFileName
@@ -71,8 +73,13 @@ export default function ({ config }) {
     const files = await walk(dirPath)
     for (const filePath of files) {
       if (basename(filePath).startsWith(baseFileName)) {
-        const content = await readFile(filePath, 'utf-8')
-        return content
+        const content = await readFile(filePath, 'utf-8');
+        if (!isFile) {
+          return {
+            redirect: `${dirPath.slice(config?.functionsDir?.length || 0)}/${basename(filePath)}`
+          }
+        }
+        return {content, filename: filePath}
       }
     }
   }
