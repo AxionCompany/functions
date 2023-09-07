@@ -9,6 +9,7 @@ import fileLoaderHandler from "./handlers/fileLoader.ts";
 import basicAuth from "./middlewares/basicAuth.ts";
 import denoServe from "./ports/denoServe.ts";
 import cloudfare from "./ports/cloudfareWorkers.ts";
+import getMimeType from "./connectors/get-mime-type.js";
 
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
@@ -42,6 +43,37 @@ export default (adapters: any = undefined) => {
         },
       }),
     },
+    getMimeType: getMimeType({
+      config:{
+        lookup:(filename:any)=>{
+          const extensions:any= {
+            '.tsx': 'text/tsx',
+            '.ts': 'text/typescript',
+            '.jsx': 'text/jsx',
+            '.js': 'text/javascript',
+            '.mjs': 'text/javascript',
+            '.json': 'application/json',
+            '.md': 'text/markdown',
+            '.svg': 'image/svg+xml',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.ico': 'image/x-icon',
+            '.txt': 'text/plain',
+            '.sh': 'text/plain',
+            '.css': 'text/css',
+            '.html': 'text/html',
+            '.htm': 'text/html',
+            '.wasm': 'application/wasm',
+            '.webmanifest': 'application/manifest+json',
+            'default': 'application/octet-stream'
+          };
+          const ext = filename.slice(filename.lastIndexOf('.'));
+          return extensions[ext] || extensions['default'];
+        }
+      }
+    }),
   };
 
   const features = {
