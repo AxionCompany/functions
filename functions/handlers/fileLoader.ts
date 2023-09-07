@@ -11,7 +11,7 @@ export default async ({ env, ...adapters }: any) => {
   console.log("Local adapters loaded.");
 
   return async (req: Request) => {
-    let ctx = {};
+    let ctx: any = {};
 
     try {
       for (const key in middlewares) {
@@ -23,11 +23,23 @@ export default async ({ env, ...adapters }: any) => {
       return err;
     }
 
-    const pathname: string = new URL(req.url).pathname;
+    const url: URL = new URL(req.url);
+    console.log(`Loading file ${url.href}`)
+    const { pathname } = url;
 
-    const res = await loadFile(adapters)({ pathname, ...ctx });
-    return new Response(res, {
-      headers: { "content-type": "text/plain" },
+    const { content, redirect } = await loadFile(adapters)({
+      pathname,
+      ...ctx,
+    });
+
+    if (redirect) url.pathname = redirect;
+    if (ctx?.user?.username) url.username = ctx.user.username;
+    if (ctx?.user?.password) url.password = ctx.user.password;
+
+    if (redirect) return Response.redirect(url.href, 301);
+
+    return new Response(content, {
+      headers: { "content-type": ("text/plain") },
     });
   };
 };
