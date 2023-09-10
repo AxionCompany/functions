@@ -3,7 +3,7 @@ export default ({ config }) =>
     const isFile = pathname.includes(".");
 
     const { token, owner, repo, functionsDir } = config;
-    if (functionsDir) pathname = "/"+functionsDir + pathname;
+    if (functionsDir) pathname = functionsDir + pathname;
     const dirPath = pathname.substring(0, pathname.lastIndexOf("/"));
     const baseFileName = pathname.substring(pathname.lastIndexOf("/") + 1);
 
@@ -11,7 +11,7 @@ export default ({ config }) =>
     token && headers.append("Authorization", `Bearer ${token}`);
     headers.append("Accept", "application/vnd.github.v3.raw");
 
-    console.log(headers,  `https://api.github.com/repos/${owner}/${repo}/contents${dirPath}`)
+    console.log(headers,  `https://api.github.com/repos/${owner}/${repo}/contents/${dirPath}`)
 
     try {
       const dirRes = await fetch(
