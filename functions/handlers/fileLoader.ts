@@ -1,6 +1,8 @@
+import loadFile from "../features/loadFile.ts";
+
 export default async ({ env, ...adapters }: any) => {
-  const { features, middlewares } = adapters;
-  const { loadFile } = features;
+  let { features, middlewares } = adapters;
+  features = {...features, loadFile };
 
   console.log("Loading local adapters...");
   const LocalAdapters: any = await import("../adapters.ts")
@@ -36,7 +38,7 @@ export default async ({ env, ...adapters }: any) => {
     if (ctx?.user?.username) url.username = ctx.user.username;
     if (ctx?.user?.password) url.password = ctx.user.password;
 
-    if (redirect) return Response.redirect(url.href, 301);
+    if (redirect) return Response.redirect(url.href, 307);
 
     return new Response(content, {
       headers: { "content-type": ("text/plain") },
