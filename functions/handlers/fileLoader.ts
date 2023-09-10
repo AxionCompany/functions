@@ -37,9 +37,16 @@ export default async (adapters : any) => {
       ...ctx,
     });
 
-    if (redirect) url.pathname = redirect;
-    if (ctx?.user?.username) url.username = ctx.user.username;
-    if (ctx?.user?.password) url.password = ctx.user.password;
+    if (redirect){
+      url.pathname = redirect;
+      console.log('Redirecting...')
+      console.log(ctx)
+      console.log(url)
+      console.log('\n\n')
+      if (ctx?.user?.username) url.username = ctx.user.username;
+      if (ctx?.user?.password) url.password = ctx.user.password;
+    } 
+
 
     if (redirect) return Response.redirect(url.href, 307);
 
