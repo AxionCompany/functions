@@ -46,8 +46,9 @@ const DynamicImport = ({ type, useWorker }: any) =>
       let filePath;
 
       if (type === "file") {
-        const urlObj = new URL(content);
-        filePath = urlObj.href;
+        // const urlObj = new URL(content);
+        // filePath = urlObj.href;
+        filePath=content;
       } else {
         filePath = `data:text/javascript;base64,${btoa(content)}`;
       }
