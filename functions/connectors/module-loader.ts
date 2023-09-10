@@ -30,8 +30,8 @@ export default ({ config }: any) => {
     if (username) url.username = username;
     if (password) url.password = password;
     // import module
-    console.log(`Loading ${url.href}`);
     const mod = await dynamicImport(url.href);
+    console.log(mod)
     // return module
     return mod;
   };
