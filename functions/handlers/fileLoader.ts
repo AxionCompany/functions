@@ -2,11 +2,14 @@ import loadFile from "../features/loadFile.ts";
 
 export default async ({ env, ...adapters }: any) => {
   let { features, middlewares } = adapters;
-  features = {...features, loadFile };
+  features = { ...features, loadFile };
 
   console.log("Loading local adapters...");
   const LocalAdapters: any = await import("../adapters.ts")
-    .then((res) => res.default)
+    .then((res) => {
+      console.log("Local adapters loaded.");
+      return res.default;
+    })
     .catch((err) => console.log("Error loading local adapters", err));
 
   adapters = LocalAdapters ? LocalAdapters(adapters) : adapters;
@@ -26,7 +29,7 @@ export default async ({ env, ...adapters }: any) => {
     }
 
     const url: URL = new URL(req.url);
-    console.log(`Loading file ${url.href}`)
+    console.log(`Loading file ${url.href}`);
     const { pathname } = url;
 
     const { content, redirect } = await loadFile(adapters)({
