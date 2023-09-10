@@ -11,6 +11,8 @@ export default ({ config }) =>
     token && headers.append("Authorization", `Bearer ${token}`);
     headers.append("Accept", "application/vnd.github.v3.raw");
 
+    console.log(headers,  `https://api.github.com/repos/${owner}/${repo}/contents${dirPath}`)
+
     try {
       const dirRes = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/contents${dirPath}`,
