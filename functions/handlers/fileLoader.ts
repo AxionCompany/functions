@@ -1,6 +1,6 @@
 import loadFile from "../features/loadFile.ts";
 
-export default async ({ env, ...adapters }: any) => {
+export default async (adapters : any) => {
   let { features, middlewares } = adapters;
   features = { ...features, loadFile };
 
