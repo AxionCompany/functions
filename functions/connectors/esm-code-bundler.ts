@@ -17,7 +17,7 @@ const DynamicImport = ({ type, useWorker }: any) =>
   async function dynamicImport(content: string) {
     try {
       // if (content.startsWith("node:")) {
-        return await import(content);
+      return await import(content);
       // } else {
       //   throw new Error("Not using regular import");
       // }
@@ -48,7 +48,7 @@ const DynamicImport = ({ type, useWorker }: any) =>
       if (type === "file") {
         // const urlObj = new URL(content);
         // filePath = urlObj.href;
-        filePath=content;
+        filePath = content;
       } else {
         filePath = `data:text/javascript;base64,${btoa(content)}`;
       }
@@ -72,19 +72,41 @@ const DynamicImport = ({ type, useWorker }: any) =>
         _export[item.exportedName] = item.localName;
       });
 
-      for (const item of parsedCode.imports) {
-        try {
-          item.source = `node:${item.source}`; // TODO: this is considering that only node: imports are are left unimported by esbuild
-          const dep: any = await dynamicImport(item.source);
-          item.specifiers?.forEach((i: any) => {
-            dependencies[i.localName] = dep[i.importedName] || dep;
-          });
-        } catch (err) {
-          console.log(
-            `Not possible to load dependency "${item.source}":\n${err.message}`,
-          );
-        }
-      }
+      const dependencyPromises: any[] = [];
+
+      parsedCode.imports.forEach((item: any) => {
+        dependencyPromises.push(
+          dynamicImport(item.source)
+            .then((dep) => {
+              item.specifiers?.forEach((i: any) => {
+                dependencies[i.localName] = dep[i.importedName] || dep;
+              });
+            })
+            .catch((err) => {
+              console.log(
+                `Not possible to load dependency "${item.source}":\n${err.message}`,
+              );
+            }),
+        );
+      });
+
+      await Promise.all(dependencyPromises);
+
+      console.log(dependencies);
+
+      // for (const item of parsedCode.imports) {
+      //   try {
+      //     item.source = `node:${item.source}`; // TODO: this is considering that only node: imports are are left unimported by esbuild
+      //     const dep: any = dynamicImport(item.source);
+      //     item.specifiers?.forEach((i: any) => {
+      //       dependencies[i.localName] = dep[i.importedName] || dep;
+      //     });
+      //   } catch (err) {
+      //     console.log(
+      //       `Not possible to load dependency "${item.source}":\n${err.message}`,
+      //     );
+      //   }
+      // }
 
       const AsyncFunction = async function () {}.constructor;
 
