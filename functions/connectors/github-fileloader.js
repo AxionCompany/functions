@@ -11,11 +11,11 @@ export default ({ config }) =>
     token && headers.append("Authorization", `Bearer ${token}`);
     headers.append("Accept", "application/vnd.github.v3.raw");
 
-    console.log(headers,  `https://api.github.com/repos/${owner}/${repo}/contents/${dirPath}`)
+    console.log('github', `https://api.github.com/repos/${owner}/${repo}/contents/${dirPath}`)
 
     try {
       const dirRes = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/contents${dirPath}`,
+        `https://api.github.com/repos/${owner}/${repo}/contents/${dirPath}`,
         { headers },
       );
       if (!dirRes.ok) {
@@ -42,7 +42,7 @@ export default ({ config }) =>
           }
     
           const fileRes = await fetch(
-            `https://api.github.com/repos/${owner}/${repo}/contents${dirPath}/${file.name}`,
+            `https://api.github.com/repos/${owner}/${repo}/contents/${dirPath}/${file.name}`,
             { headers },
           );
     
