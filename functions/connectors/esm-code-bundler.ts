@@ -76,7 +76,7 @@ const DynamicImport = ({ type, useWorker }: any) =>
 
       parsedCode.imports.forEach((item: any) => {
         dependencyPromises.push(
-          dynamicImport(item.source)
+          dynamicImport(`node:${item.source}`) // TODO: this is considering that only node: imports are are left unimported by esbuild
             .then((dep) => {
               item.specifiers?.forEach((i: any) => {
                 dependencies[i.localName] = dep[i.importedName] || dep;
@@ -91,22 +91,6 @@ const DynamicImport = ({ type, useWorker }: any) =>
       });
 
       await Promise.all(dependencyPromises);
-
-      console.log(dependencies);
-
-      // for (const item of parsedCode.imports) {
-      //   try {
-      //     item.source = `node:${item.source}`; // TODO: this is considering that only node: imports are are left unimported by esbuild
-      //     const dep: any = dynamicImport(item.source);
-      //     item.specifiers?.forEach((i: any) => {
-      //       dependencies[i.localName] = dep[i.importedName] || dep;
-      //     });
-      //   } catch (err) {
-      //     console.log(
-      //       `Not possible to load dependency "${item.source}":\n${err.message}`,
-      //     );
-      //   }
-      // }
 
       const AsyncFunction = async function () {}.constructor;
 
