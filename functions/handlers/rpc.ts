@@ -1,28 +1,13 @@
-import moduleLoader from "../connectors/module-loader.ts";
-import functionExec from "../features/executeModule.ts";
-
 export default async (adapters: any) => {
 
-  let { connectors, env } = adapters;
-
-  connectors = {
-    ...connectors,
-    moduleLoader: {
-      default: moduleLoader({
-        config: {
-          username: env.USERNAME,
-          password: env.PASSWORD,
-          loaderUrl: env.FILE_LOADER_URL,
-          functionsDir: env.FUNCTIONS_DIR,
-        },
-      }),
-    },
-  };
+  const { connectors, features, env } = adapters;
+  const { moduleLoader } = connectors;
+  const { functionExec } = features;
 
   let v: any = {};
 
   console.log("Loading local adapters...");
-  const LocalAdapters = await connectors.moduleLoader.default({
+  const LocalAdapters = await moduleLoader.default({
     pathname: "adapters.ts",
   })
     .then((res: any) => res.default)
@@ -89,7 +74,7 @@ export default async (adapters: any) => {
           };
         },
       });
-      functionExec({ ...adapters, connectors, stream, respond: send })({
+      functionExec({ ...adapters, stream, respond: send })({
         pathname,
         params,
         token,

@@ -31,7 +31,6 @@ export default ({ config }: any) => {
     if (password) url.password = password;
     // import module
     const mod = await dynamicImport(url.href);
-    console.log(mod)
     // return module
     return mod;
   };

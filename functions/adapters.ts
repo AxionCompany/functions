@@ -1,14 +1,53 @@
+import githubFileloader from "./connectors/github-fileloader.js";
+import localFileloader from "./connectors/local-fileloader.js";
+import moduleLoader from "./connectors/module-loader.ts";
+import localSourcematch from "./connectors/local-sourcematch.ts";
+import functionExec from "./features/executeModule.ts";
+import loadFile from "./features/loadFile.ts";
+import apiHandler from "./handlers/rpc.ts";
+import fileLoaderHandler from "./handlers/fileLoader.ts";
 import basicAuth from "./middlewares/basicAuth.ts";
+import denoServe from "./ports/denoServe.ts";
+import cloudfare from "./ports/cloudfareWorkers.ts";
 
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
 export default (adapters: any = undefined) => {
-
   const env = {  ...config(), ...adapters?.env };
 
-  const connectors = {};
+  const connectors = { 
+    sourceMatch: {
+      default: localSourcematch({
+        config: {
+          dirEntrypoint: env.DIR_ENTRYPOINT,
+          functionsDir: env.FUNCTIONS_DIR,
+          loaderType: env.DEFAULT_LOADER_TYPE,
+          owner: env.GIT_OWNER,
+          repo: env.GIT_REPO,
+          token: env.GIT_TOKEN,
+        },
+      }),
+    },
+    fileLoader: {
+      github: githubFileloader,
+      local: localFileloader,
+    },
+    moduleLoader: {
+      default: moduleLoader({
+        config: {
+          username: env.USERNAME,
+          password: env.PASSWORD,
+          loaderUrl: env.FILE_LOADER_URL,
+          functionsDir: env.FUNCTIONS_DIR,
+        },
+      }),
+    },
+  };
 
-  const features = {};
+  const features = {
+    functionExec,
+    loadFile,
+  };
 
   const middlewares = {
     basicAuth: basicAuth({
@@ -24,13 +63,14 @@ export default (adapters: any = undefined) => {
   };
   
   const handlers = {
-    ["rpc"]: async (adapters: any) => (await import('./handlers/rpc.ts')).default({ ...adapters, middlewares:{} }),
-    ["file-loader"]: async (adapters: any) => (await import('./handlers/fileLoader.ts')).default({ ...adapters, middlewares }),
+    ["rpc"]: apiHandler,
+    ["file-loader"]: (adapters: any) =>
+      fileLoaderHandler({ ...adapters, middlewares }),
   };
 
   const ports = {
-    ["deno-serve"]: async (adapters: any)=> (await import ('./ports/denoServe.ts')).default({...adapters, handlers}),
-    ["cloudfare-workers"]: async (adapters: any)=>( await import('./ports/cloudfareWorkers.ts')).default({...adapters, handlers}),
+    ["deno-serve"]: denoServe,
+    ["cloudfare-workers"]: cloudfare,
   };
 
   return {
