@@ -6,15 +6,15 @@ export default async (adapters: any) => {
 
   let v: any = {};
 
-  console.log("Loading local adapters...");
-  const LocalAdapters = await moduleLoader.default({
-    pathname: "adapters.ts",
-  })
-    .then((res: any) => res.default)
-    .catch((err: Error) => console.log("Error loading local adapters", err));
+  // console.log("Loading local adapters...");
+  // const LocalAdapters = await moduleLoader.default({
+  //   pathname: "adapters.ts",
+  // })
+  //   .then((res: any) => res.default)
+  //   .catch((err: Error) => console.log("Error loading local adapters", err));
 
-  adapters = LocalAdapters ? LocalAdapters(adapters) : adapters;
-  console.log("Local adapters loaded.");
+  // adapters = LocalAdapters ? LocalAdapters(adapters) : adapters;
+  // console.log("Local adapters loaded.");
 
   return async (req: Request) => {
     let responseHeaders = {};
