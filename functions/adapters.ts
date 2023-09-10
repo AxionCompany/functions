@@ -52,7 +52,7 @@ export default (adapters: any = undefined) => {
   const middlewares = {
     basicAuth: basicAuth({
       validateAuth: (username: string, password: string) => {
-        if (!env.USERNAME && !env.PASSWORD) return true;
+        if (!env.USERNAME && !env.PASSWORD) return;
         if ((username === env.USERNAME) && (password === env.PASSWORD)) {
           return { username, password };
         } else {

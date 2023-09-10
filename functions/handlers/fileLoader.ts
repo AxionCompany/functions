@@ -18,6 +18,8 @@ export default async (adapters : any) => {
   return async (req: Request) => {
     let ctx: any = {};
 
+    console.log('File Path: ', req.url)
+
     try {
       for (const key in middlewares) {
         const middleware = middlewares[key];
