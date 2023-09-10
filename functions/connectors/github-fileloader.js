@@ -3,7 +3,7 @@ export default ({ config }) =>
     const isFile = pathname.includes(".");
 
     const { token, owner, repo, functionsDir } = config;
-    if (functionsDir) pathname = functionsDir + pathname;
+    if (functionsDir) pathname = "/"+functionsDir + pathname;
     const dirPath = pathname.substring(0, pathname.lastIndexOf("/"));
     const baseFileName = pathname.substring(pathname.lastIndexOf("/") + 1);
 
