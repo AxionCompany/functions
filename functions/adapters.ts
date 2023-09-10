@@ -37,8 +37,8 @@ export default (adapters: any = undefined) => {
     moduleLoader: {
       default: moduleLoader({
         config: {
-          username: env.USERNAME,
-          password: env.PASSWORD,
+          username: env.AUTH_USERNAME,
+          password: env.AUTH_PASSWORD,
           loaderUrl: env.FILE_LOADER_URL,
           functionsDir: env.FUNCTIONS_DIR,
         },
@@ -54,8 +54,8 @@ export default (adapters: any = undefined) => {
   const middlewares = {
     basicAuth: basicAuth({
       validateAuth: (username: string, password: string) => {
-        if (!env.USERNAME && !env.PASSWORD) return;
-        if ((username === env.USERNAME) && (password === env.PASSWORD)) {
+        if (!env.AUHT_USERNAME && !env.AUTH_PASSWORD) return;
+        if ((username === env.AUTH_USERNAME) && (password === env.AUTH_PASSWORD)) {
           return { username, password };
         } else {
           throw new Error("Unauthorized");
