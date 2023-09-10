@@ -15,7 +15,9 @@ import { config } from "https://deno.land/x/dotenv/mod.ts";
 export default (adapters: any = undefined) => {
   const env = {  ...config(), ...Deno.env.toObject(), ...adapters?.env };
 
-  const connectors = { 
+  console.log(env)
+
+  const connectors = {
     sourceMatch: {
       default: localSourcematch({
         config: {
