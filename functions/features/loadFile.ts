@@ -1,5 +1,5 @@
-export default ({ connectors, env }: any) => async (props: { pathname: string }) => {
-  
+export default ({ connectors }: any) => async (props: { pathname: string }) => {
+
   const { fileLoader, sourceMatch } = connectors;
 
   const { config, pathname, loaderType } = await sourceMatch.default(props);
