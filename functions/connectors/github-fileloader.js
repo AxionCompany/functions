@@ -49,7 +49,6 @@ export default ({ config }) =>
           }
     
           const content = await fileRes.text();
-          console.log(content)
     
           return { type: "content", content, filename: file.name };
         }
