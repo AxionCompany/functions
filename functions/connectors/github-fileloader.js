@@ -35,7 +35,7 @@ export default ({ config }) =>
             return {
               redirect: `${
                 dirPath.slice(functionsDir?.length || 0)
-              }/${targetFile.name}`,
+              }/${file.name}`,
             };
           }
     
@@ -49,8 +49,9 @@ export default ({ config }) =>
           }
     
           const content = await fileRes.text();
+          console.log(content)
     
-          return { type: "content", content, filename: targetFile.name };
+          return { type: "content", content, filename: file.name };
         }
       }
 
