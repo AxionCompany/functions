@@ -24,14 +24,11 @@ const DynamicImport = ({ type, useWorker }: any) =>
       console.log(
         `Error trying to import ${content} with regular import... Using dynamic instead.`,
       );
-      console.log('trace 1')
 
       if (!esbuildInitialized) {
         esbuildInitialized = true;
         esbuild.initialize({ worker: useWorker || false });
       }
-
-      console.log('trace 2')
 
       const [denoResolver, denoLoader] = denoPlugins({ loader: "portable" });
 
@@ -45,8 +42,6 @@ const DynamicImport = ({ type, useWorker }: any) =>
         write: false,
       };
 
-      console.log('trace 3')
-
       let filePath;
 
       if (type === "file") {
@@ -57,22 +52,15 @@ const DynamicImport = ({ type, useWorker }: any) =>
         filePath = `data:text/javascript;base64,${btoa(content)}`;
       }
 
-      console.log('trace 4')
-
       config.entryPoints = [filePath];
 
       const result = await esbuild.build(config);
-      console.log('trace 5')
 
       const outputText = result.outputFiles![0].text;
 
       const parsedCode = parseCode(
-        // stripShebang(
         outputText,
-        // )
       );
-
-      console.log('trace 6')
 
       const _export: any = {};
       const dependencies: any = {};
@@ -80,8 +68,6 @@ const DynamicImport = ({ type, useWorker }: any) =>
       parsedCode.exports.forEach((item: any) => {
         _export[item.exportedName] = item.localName;
       });
-
-      console.log('trace 7')
 
       const dependencyPromises: any[] = [];
 
@@ -101,11 +87,7 @@ const DynamicImport = ({ type, useWorker }: any) =>
         );
       });
 
-      console.log('trace 8')
-
       await Promise.all(dependencyPromises);
-
-      console.log('trace 9')
 
       const AsyncFunction = async function () {}.constructor;
 
@@ -119,8 +101,6 @@ const DynamicImport = ({ type, useWorker }: any) =>
             .replace(/"([^(")"]+)"/g, "$1")
         }`,
       )(...Object.values(dependencies));
-
-      console.log('trace 10')
 
       const toStringTaggedExports = Object.assign({
         [Symbol.toStringTag]: "Module",
@@ -138,12 +118,8 @@ const DynamicImport = ({ type, useWorker }: any) =>
       );
       const sealedExports = Object.seal(prototypedExports);
 
-      console.log('trace 11')
-
       isDenoCLI &&
         esbuild.stop();
-
-      console.log('trace 12')
 
       return sealedExports;
     }
