@@ -7,7 +7,12 @@ export default (adapters) => {
     let res;
     const mod = await codeInterpreter({ code: code });
     if (mod.default) {
-      res = await mod.default(props);
+      // check if default is a function
+      if (typeof mod.default !== "function") {
+        res = await mod.default;
+      } else{
+        res = await mod.default(props);
+      }
     } else {
       res = await mod.logs;
     }
