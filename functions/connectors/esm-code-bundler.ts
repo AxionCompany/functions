@@ -123,12 +123,12 @@ const DynamicImport = ({ type, useWorker }: any) =>
 
 const fn = (code: string, exports: any) => `
   try{
-    
+
     let logs='';
     let oldLog = console.log;
   
     console.log = (...args)=> {
-      logs+ = args.join(' ') + '\\n';
+      logs = logs + args.join(' ') + '\\n';
       oldLog(...args)
       );
     };
