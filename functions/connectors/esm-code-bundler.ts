@@ -141,7 +141,7 @@ const fn = (code: string, exports: any) => `
         .replace(/"([^(")"]+)":/g, "$1:")
         // remove quotes from keys
         .replace(/"([^(")"]+)"/g, "$1")
-      },logs: logsArr });
+      },logs: logsArr };
   } catch(err){
     console.log(err)
     return { error: err.message };
