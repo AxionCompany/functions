@@ -1,10 +1,16 @@
 import JSCodeInterpreter from "../connectors/js-code-interpreter.ts";
+// import PyCodeInterpreter from "../connectors/py-code-interpreter.ts";
 
 export default (adapters) => {
   const codeInterpreter = JSCodeInterpreter(adapters);
-  return async (props) => {
-    const mod = await codeInterpreter({ code: props.code });
-    const res = await mod.default(props);
+  return async ({code, ...props}) => {
+    let res;
+    const mod = await codeInterpreter({ code: code });
+    if( Object.keys(props).length){
+      res = await mod.default(props);
+    } else{
+      res = await mod
+    }
     return res;
   };
 };
