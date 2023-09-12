@@ -134,7 +134,7 @@ const fn = (code: string, exports: any) => `
   
     ${code}
 
-    if (logs.slice(0, -2) === '\\n') logs = logs.slice(0, -2);
+    logs = logs.slice(0, -1);
 
     console.log = oldLog;
   
