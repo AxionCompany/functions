@@ -123,19 +123,17 @@ const DynamicImport = ({ type, useWorker }: any) =>
 
 const fn = (code: string, exports: any) => `
   try{
-
     let logsArr = [];
-    let oldConsole = console.log;
+    let oldLog = console.log;
   
     console.log = function (message) {
       logsArr.push(message);
-      oldConsole(message);
+      oldLog.apply(console, arguments);
     };
   
     ${code}
   
-    return {
-      ...${
+    return {...${
       JSON.stringify(exports || {})
         // remove quotes from values
         .replace(/"([^(")"]+)":/g, "$1:")
