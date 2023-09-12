@@ -129,8 +129,7 @@ const fn = (code: string, exports: any) => `
   
     console.log = (...args)=> {
       logs = logs + args.join(' ') + '\\n';
-      oldLog(...args)
-      );
+      oldLog(...args);
     };
   
     ${code}
