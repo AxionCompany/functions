@@ -128,7 +128,7 @@ const fn = (code: string, exports: any) => `
     let oldLog = console.log;
   
     console.log = (...args)=> {
-      logs = logs + '\\n' + args?.map(i=>JSON.stringify(i))?.join(' ');
+      logs = logs + args?.map(i=>JSON.stringify(i))?.join('\\n')+ '\\n';
       // oldLog(...args);
     };
   
