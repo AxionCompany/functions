@@ -134,6 +134,8 @@ const fn = (code: string, exports: any) => `
   
     ${code}
 
+    logs = logs.slice(0, -3);
+
     console.log = oldLog;
   
     return {...${
