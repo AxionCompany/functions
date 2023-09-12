@@ -91,6 +91,8 @@ const DynamicImport = ({ type, useWorker }: any) =>
 
       const AsyncFunction = async function () {}.constructor;
 
+      console.log(fn(parsedCode.code, _export))
+
       const mod = await AsyncFunction(
         ...Object.keys(dependencies),
         fn(parsedCode.code, _export),
