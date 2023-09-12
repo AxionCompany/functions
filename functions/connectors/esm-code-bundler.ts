@@ -91,7 +91,7 @@ const DynamicImport = ({ type, useWorker }: any) =>
 
       const AsyncFunction = async function () {}.constructor;
 
-      console.log(fn(parsedCode.code, _export))
+      console.log(fn(parsedCode.code, _export));
 
       const mod = await AsyncFunction(
         ...Object.keys(dependencies),
@@ -123,23 +123,25 @@ const DynamicImport = ({ type, useWorker }: any) =>
 
 const fn = (code: string, exports: any) => `
   try{
-    let logsArr = [];
+    
+    let logs='';
     let oldLog = console.log;
   
-    console.log = function (message) {
-      logsArr.push(message);
-      oldLog.apply(console, arguments);
+    console.log = (...args)=> {
+      logs+ = args.join(' ') + '\\n';
+      oldLog(...args)
+      );
     };
   
     ${code}
   
     return {...${
-      JSON.stringify(exports || {})
-        // remove quotes from values
-        .replace(/"([^(")"]+)":/g, "$1:")
-        // remove quotes from keys
-        .replace(/"([^(")"]+)"/g, "$1")
-      },logs: logsArr };
+  JSON.stringify(exports || {})
+    // remove quotes from values
+    .replace(/"([^(")"]+)":/g, "$1:")
+    // remove quotes from keys
+    .replace(/"([^(")"]+)"/g, "$1")
+},logs: logsArr };
   } catch(err){
     console.log(err)
     return { error: err.message };
