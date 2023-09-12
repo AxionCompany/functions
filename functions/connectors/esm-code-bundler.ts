@@ -129,10 +129,12 @@ const fn = (code: string, exports: any) => `
   
     console.log = (...args)=> {
       logs = logs + args.join(' ') + '\\n';
-      oldLog(...args);
+      // oldLog(...args);
     };
   
     ${code}
+
+    console.log = oldLog;
   
     return {...${
   JSON.stringify(exports || {})
@@ -140,7 +142,7 @@ const fn = (code: string, exports: any) => `
     .replace(/"([^(")"]+)":/g, "$1:")
     // remove quotes from keys
     .replace(/"([^(")"]+)"/g, "$1")
-},logs: logsArr };
+},logs };
   } catch(err){
     console.log(err)
     return { error: err.message };
