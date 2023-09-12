@@ -93,13 +93,7 @@ const DynamicImport = ({ type, useWorker }: any) =>
 
       const mod = await AsyncFunction(
         ...Object.keys(dependencies),
-        `${parsedCode.code};return ${
-          JSON.stringify(_export)
-            // remove quotes from values
-            .replace(/"([^(")"]+)":/g, "$1:")
-            // remove quotes from keys
-            .replace(/"([^(")"]+)"/g, "$1")
-        }`,
+        fn(parsedCode.code, _export),
       )(...Object.values(dependencies));
 
       const toStringTaggedExports = Object.assign({
@@ -125,7 +119,7 @@ const DynamicImport = ({ type, useWorker }: any) =>
     }
   };
 
-const fn = (code:string, exports:any) => `
+const fn = (code: string, exports: any) => `
   let logsArr: any[] = [];
   let oldConsole: any = { ...console };
 
@@ -136,19 +130,17 @@ const fn = (code:string, exports:any) => `
 
   ${code}
 
-  Object.assign(console, oldConsole);
-
   const res = ${
   JSON.stringify(exports || {})
     // remove quotes from values
     .replace(/"([^(")"]+)":/g, "$1:")
     // remove quotes from keys
     .replace(/"([^(")"]+)"/g, "$1")
-  }
+}
 
   res.logs = logsArr;
 
-  return res
+  return res;
   `;
 
 // dynamicImport(
