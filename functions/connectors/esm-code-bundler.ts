@@ -125,11 +125,11 @@ const fn = (code: string, exports: any) => `
   try{
 
     let logsArr = [];
-    let oldConsole = { ...console };
+    let oldConsole = console.log;
   
     console.log = function (message) {
       logsArr.push(message);
-      oldConsole.apply(console, arguments);
+      oldConsole(message);
     };
   
     ${code}
