@@ -124,8 +124,8 @@ const DynamicImport = ({ type, useWorker }: any) =>
 const fn = (code: string, exports: any) => `
   try{
 
-    let logsArr: any[] = [];
-    let oldConsole: any = { ...console };
+    let logsArr = [];
+    let oldConsole = { ...console };
   
     console.log = function (message) {
       logsArr.push(message);
