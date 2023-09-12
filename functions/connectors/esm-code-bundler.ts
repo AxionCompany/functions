@@ -130,17 +130,15 @@ const fn = (code: string, exports: any) => `
 
   ${code}
 
-  const res = ${
-  JSON.stringify(exports || {})
-    // remove quotes from values
-    .replace(/"([^(")"]+)":/g, "$1:")
-    // remove quotes from keys
-    .replace(/"([^(")"]+)"/g, "$1")
-}
+  return {
+    ...${
+    JSON.stringify(exports || {})
+      // remove quotes from values
+      .replace(/"([^(")"]+)":/g, "$1:")
+      // remove quotes from keys
+      .replace(/"([^(")"]+)"/g, "$1")
+    },logs: logsArr });
 
-  res.logs = logsArr;
-
-  return res;
   `;
 
 // dynamicImport(
