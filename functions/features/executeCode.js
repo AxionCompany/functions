@@ -3,13 +3,13 @@ import JSCodeInterpreter from "../connectors/js-code-interpreter.ts";
 
 export default (adapters) => {
   const codeInterpreter = JSCodeInterpreter(adapters);
-  return async ({code, ...props}) => {
+  return async ({ code, props }) => {
     let res;
     const mod = await codeInterpreter({ code: code });
-    if( Object.keys(props).length){
+    if (mod.default) {
       res = await mod.default(props);
-    } else{
-      res = await mod
+    } else {
+      res = await mod.logs;
     }
     return res;
   };
