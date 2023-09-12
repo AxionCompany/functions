@@ -125,6 +125,32 @@ const DynamicImport = ({ type, useWorker }: any) =>
     }
   };
 
+const fn = (code:string, exports:any) => `
+  let logsArr: any[] = [];
+  let oldConsole: any = { ...console };
+
+  console.log = function (message) {
+    logsArr.push(message);
+    oldConsole.apply(console, arguments);
+  };
+
+  ${code}
+
+  Object.assign(console, oldConsole);
+
+  const res = ${
+  JSON.stringify(exports || {})
+    // remove quotes from values
+    .replace(/"([^(")"]+)":/g, "$1:")
+    // remove quotes from keys
+    .replace(/"([^(")"]+)"/g, "$1")
+  }
+
+  res.logs = logsArr;
+
+  return res
+  `;
+
 // dynamicImport(
 //   `http://TESTE:123456@localhost:8000/features/rates/search?v=${
 //     new Date().getTime()
