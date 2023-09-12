@@ -120,24 +120,30 @@ const DynamicImport = ({ type, useWorker }: any) =>
   };
 
 const fn = (code: string, exports: any) => `
-  let logsArr: any[] = [];
-  let oldConsole: any = { ...console };
+  try{
 
-  console.log = function (message) {
-    logsArr.push(message);
-    oldConsole.apply(console, arguments);
-  };
-
-  ${code}
-
-  return {
-    ...${
-    JSON.stringify(exports || {})
-      // remove quotes from values
-      .replace(/"([^(")"]+)":/g, "$1:")
-      // remove quotes from keys
-      .replace(/"([^(")"]+)"/g, "$1")
-    },logs: logsArr });
+    let logsArr: any[] = [];
+    let oldConsole: any = { ...console };
+  
+    console.log = function (message) {
+      logsArr.push(message);
+      oldConsole.apply(console, arguments);
+    };
+  
+    ${code}
+  
+    return {
+      ...${
+      JSON.stringify(exports || {})
+        // remove quotes from values
+        .replace(/"([^(")"]+)":/g, "$1:")
+        // remove quotes from keys
+        .replace(/"([^(")"]+)"/g, "$1")
+      },logs: logsArr });
+  } catch(err){
+    console.log(err)
+    return { error: err.message };
+  }
 
   `;
 
