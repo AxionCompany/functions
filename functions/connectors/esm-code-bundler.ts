@@ -12,7 +12,7 @@ const DENO_USER_AGENT =
 const isDeno = DENO_USER_AGENT.test(navigator.userAgent);
 const isDenoCLI = isDeno && !!Deno?.run;
 
-const DynamicImport = ({ type, useWorker }: any) =>
+const DynamicImport = ({ type, language, useWorker }: any) =>
   async function dynamicImport(content: string) {
     try {
       // if (content.startsWith("node:")) {
@@ -49,7 +49,7 @@ const DynamicImport = ({ type, useWorker }: any) =>
         // filePath = urlObj.href;
         filePath = content;
       } else {
-        filePath = `data:text/javascript;base64,${btoa(content)}`;
+        filePath = `data:text/${language|| 'tsx'};base64,${btoa(content)}`;
       }
 
       config.entryPoints = [filePath];
