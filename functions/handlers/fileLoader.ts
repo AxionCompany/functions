@@ -1,7 +1,7 @@
 import loadFile from "../features/loadFile.ts";
 
 export default async (adapters : any) => {
-  let { features, middlewares } = adapters;
+  let { features, middlewares, env } = adapters;
   features = { ...features, loadFile };
 
   console.log("Loading local adapters...");
@@ -17,8 +17,6 @@ export default async (adapters : any) => {
 
   return async (req: Request) => {
     let ctx: any = {};
-
-    console.log('File Path: ', req.url)
 
     try {
       for (const key in middlewares) {
@@ -44,9 +42,14 @@ export default async (adapters : any) => {
       console.log('Redirecting...')
       console.log(ctx)
       console.log(url)
+
       console.log('\n\n')
       if (ctx?.user?.username) url.username = ctx.user.username;
       if (ctx?.user?.password) url.password = ctx.user.password;
+      if (env?.SYS_ENV ==='production') url.protocol = 'https';
+      // check request origin
+      const origin = req.headers.get("origin");
+
     } 
 
 
