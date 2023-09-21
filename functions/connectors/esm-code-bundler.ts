@@ -3,6 +3,11 @@
 // permitted, such as Deno Deploy, or when running without `--allow-run`.
 import * as esbuild from "https://deno.land/x/esbuild@v0.17.19/wasm.js";
 import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader@0.8.1/mod.ts";
+// import { wasmLoader } from "https://esm.sh/esbuild-plugin-wasm";
+// import watPlugin from 'https://esm.sh/gh/vfssantos/esbuild-plugin-wat/index.js';
+// import { polyfillNodeForDeno } from "https://esm.sh/esbuild-plugin-polyfill-node";
+
+// import watPlugin from "https://esm.sh/gh/vfssantos/esbuild-plugin-wat/index.js"
 import parseCode from "./esm-code-parser.ts";
 
 let esbuildInitialized = false;
@@ -16,9 +21,9 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
   async function dynamicImport(content: string) {
     try {
       // if (content.startsWith("node:")) {
-      return await import(content);
+        return await import(content);
       // } else {
-      //   throw new Error("Not using regular import");
+        // throw new Error("Not using regular import");
       // }
     } catch (err) {
       console.log(
@@ -35,6 +40,9 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
       const config: any = {
         plugins: [
           denoResolver,
+          // polyfillNodeForDeno({ globals:false, polyfills: {"fs": true , "crypto": true} }),
+          // watPlugin(),
+          // wasmLoader(),
           denoLoader,
         ],
         bundle: true,
@@ -49,7 +57,7 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
         // filePath = urlObj.href;
         filePath = content;
       } else {
-        filePath = `data:text/${language|| 'tsx'};base64,${btoa(content)}`;
+        filePath = `data:text/${language || "tsx"};base64,${btoa(content)}`;
       }
 
       config.entryPoints = [filePath];
@@ -91,11 +99,9 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
 
       const AsyncFunction = async function () {}.constructor;
 
-      console.log(fn(parsedCode.code, _export));
-
       const mod = await AsyncFunction(
         ...Object.keys(dependencies),
-        fn(parsedCode.code, _export),
+        fn(parsedCode.code, _export, filePath),
       )(...Object.values(dependencies));
 
       const toStringTaggedExports = Object.assign({
@@ -121,7 +127,7 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
     }
   };
 
-const fn = (code: string, exports: any) => `
+const fn = (code: string, exports: any, filePath:string) => `
   try{
 
     let logs='';
@@ -132,7 +138,12 @@ const fn = (code: string, exports: any) => `
       // oldLog(...args);
     };
   
-    ${code}
+    ${
+  code.replaceAll(
+    "import.meta",
+    `{ main: false, url: '${filePath}', resolve(specifier) { return new URL(specifier, this.url).href } }`,
+  )
+}
 
     logs = logs.slice(0, -1);
 
