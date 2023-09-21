@@ -28,6 +28,8 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
     } catch (err) {
       console.log(
         `Error trying to import ${content} with regular import... Using dynamic instead.`,
+        err.message,
+        err.stack,
       );
 
       if (!esbuildInitialized) {
@@ -59,6 +61,8 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
       } else {
         filePath = `data:text/${language || "tsx"};base64,${btoa(content)}`;
       }
+
+      console.log('Compiling file: ', filePath)
 
       config.entryPoints = [filePath];
 
