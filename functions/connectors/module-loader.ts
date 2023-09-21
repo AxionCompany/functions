@@ -30,6 +30,7 @@ export default ({ config }: any) => {
     if (username) url.username = username;
     if (password) url.password = password;
     // import module
+
     const mod = await dynamicImport(url.href);
     // return module
     return mod;

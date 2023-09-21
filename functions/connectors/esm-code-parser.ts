@@ -37,6 +37,19 @@ const esmCodeParser = (
 
   // Function to walk through parse tree
   traverse(ast, {
+    CallExpression({ node }: any) {
+        if (node.callee.type === 'Import' && node.arguments && node.arguments[0]) {
+          const newDynamicImport = {
+            source: node.arguments[0].value,
+            specifiers: [{
+              type: 'dynamic',
+              importedName: 'all',
+              localName: 'all'}],
+          };
+          newCode = newCode.replace(code.slice(node.start, node.end), '').trim();
+          imports.push(newDynamicImport);
+        }
+      },
     ImportDeclaration({ node }: any) {
       const specifiers = node.specifiers.map((specifier: any) => {
         const type = specifier.type === "ImportDefaultSpecifier"
