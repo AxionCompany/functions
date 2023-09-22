@@ -10,6 +10,8 @@ export default ({ validateAuth }: any) => {
           const user = await validateAuth(_username, _password);
           return { user };
         }
+      } else{
+        return await validateAuth(null, null);
       }
     } catch (err) {
       error = err.message;
