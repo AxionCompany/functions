@@ -1,3 +1,5 @@
+ /// <reference lib="deno.unstable" />
+ 
 import Adapters from "./functions/adapters.ts";
 
 const { ports, ...adapters }: any = Adapters(null);
