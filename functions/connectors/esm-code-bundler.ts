@@ -10,11 +10,12 @@ import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader@0.8.1/mod.t
 // import watPlugin from "https://esm.sh/gh/vfssantos/esbuild-plugin-wat/index.js"
 import parseCode from "./esm-code-parser.ts";
 
-async function createHash(message:string) {
-  const data = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+async function createHash(path:string) {
+  const pathUint8 = new TextEncoder().encode(path);                           // encode as (utf-8) Uint8Array
+  const hashBuffer = await crypto.subtle.digest('SHA-256', pathUint8);           // hash the message
+  const hashArray = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join(''); // convert bytes to hex string
+
   return hashHex
 }
 
