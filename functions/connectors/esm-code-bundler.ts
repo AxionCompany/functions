@@ -88,8 +88,6 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
           write: false,
         };
   
-        console.log("Compiling file: ", filePath);
-  
         config.entryPoints = [filePath];
   
         const result = await esbuild.build(config);
@@ -164,9 +162,7 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
 
 const createCacheKey = (path: string) => {
   if (path.startsWith("data:") && path.includes("base64,")) {
-    const hash = createHash("sha256");
-    hash.update(path);
-    return hash.toString();
+    return createHash(path);
   } else {
     return path;
   }
