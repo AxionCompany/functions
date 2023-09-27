@@ -10,6 +10,15 @@ import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader@0.8.1/mod.t
 // import watPlugin from "https://esm.sh/gh/vfssantos/esbuild-plugin-wat/index.js"
 import parseCode from "./esm-code-parser.ts";
 
+async function createHash(message:string) {
+  const data = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+  return hashHex
+}
+
+
 let esbuildInitialized = false;
 
 const DENO_USER_AGENT =
@@ -21,9 +30,9 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
   async function dynamicImport(content: string) {
     try {
       // if (content.startsWith("node:")) {
-        return await import(content);
+      // return await import(content);
       // } else {
-        // throw new Error("Not using regular import");
+      throw new Error("Not using regular import");
       // }
     } catch (err) {
       console.log(
@@ -32,28 +41,9 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
         err.stack,
       );
 
-      if (!esbuildInitialized) {
-        esbuildInitialized = true;
-        esbuild.initialize({ worker: useWorker || false });
-      }
-
-      const [denoResolver, denoLoader] = denoPlugins({ loader: "portable" });
-
-      const config: any = {
-        plugins: [
-          denoResolver,
-          // polyfillNodeForDeno({ globals:false, polyfills: {"fs": true , "crypto": true} }),
-          // watPlugin(),
-          // wasmLoader(),
-          denoLoader,
-        ],
-        bundle: true,
-        format: "esm",
-        write: false,
-      };
-
+        
       let filePath;
-
+  
       if (type === "file") {
         // const urlObj = new URL(content);
         // filePath = urlObj.href;
@@ -62,16 +52,57 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
         filePath = `data:text/${language || "tsx"};base64,${btoa(content)}`;
       }
 
-      console.log('Compiling file: ', filePath)
+      // Step 1: Create a unique cache key
+      const cacheKey = createCacheKey(filePath);
 
-      config.entryPoints = [filePath];
+      const kv = await Deno.openKv();
 
-      const result = await esbuild.build(config);
+      // Step 2: Check cache before compilation
+      const moduleData  = await kv.get(['modules', cacheKey]);
+      let moduleCode:any = moduleData?.value;
+      
 
-      const outputText = result.outputFiles![0].text;
+      if (!moduleCode){
+
+        console.log(cacheKey, 'Module not found in cache, compiling module...')
+
+        // Step 3: Proceed to Compile module if not cached
+  
+        if (!esbuildInitialized) {
+          esbuildInitialized = true;
+          esbuild.initialize({ worker: useWorker || false });
+        }
+  
+        const [denoResolver, denoLoader] = denoPlugins({ loader: "portable" });
+  
+        const config: any = {
+          plugins: [
+            denoResolver,
+            // polyfillNodeForDeno({ globals:false, polyfills: {"fs": true , "crypto": true} }),
+            // watPlugin(),
+            // wasmLoader(),
+            denoLoader,
+          ],
+          bundle: true,
+          format: "esm",
+          write: false,
+        };
+  
+        console.log("Compiling file: ", filePath);
+  
+        config.entryPoints = [filePath];
+  
+        const result = await esbuild.build(config);
+  
+        moduleCode = result.outputFiles![0].text;
+
+        kv.set(["modules", cacheKey], moduleCode);
+      } else{
+        console.log(cacheKey, 'Module found in cache, using cached module...')
+      }
 
       const parsedCode = parseCode(
-        outputText,
+        moduleCode,
       );
 
       const _export: any = {};
@@ -131,7 +162,17 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
     }
   };
 
-const fn = (code: string, exports: any, filePath:string) => `
+const createCacheKey = (path: string) => {
+  if (path.startsWith("data:") && path.includes("base64,")) {
+    const hash = createHash("sha256");
+    hash.update(path);
+    return hash.toString();
+  } else {
+    return path;
+  }
+};
+
+const fn = (code: string, exports: any, filePath: string) => `
   try{
 
     let logs='';
