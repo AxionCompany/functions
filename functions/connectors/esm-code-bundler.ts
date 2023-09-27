@@ -3,6 +3,7 @@
 // permitted, such as Deno Deploy, or when running without `--allow-run`.
 import * as esbuild from "https://deno.land/x/esbuild@v0.17.19/wasm.js";
 import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader@0.8.1/mod.ts";
+import { get, set, remove } from "https://deno.land/x/kv_toolbox/blob.ts";
 // import { wasmLoader } from "https://esm.sh/esbuild-plugin-wasm";
 // import watPlugin from 'https://esm.sh/gh/vfssantos/esbuild-plugin-wat/index.js';
 // import { polyfillNodeForDeno } from "https://esm.sh/esbuild-plugin-polyfill-node";
@@ -59,10 +60,10 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
       const kv = await Deno.openKv();
 
       // Step 2: Check cache before compilation
-      const moduleData  = await kv.get(['modules', cacheKey]);
-      let moduleCode:any = moduleData?.value;
+      const moduleData  = await get(kv,[cacheKey]);
+      // Decode Uint8Array to string
+      let moduleCode:any = moduleData ? new TextDecoder().decode(moduleData) : null;
       
-
       if (!moduleCode){
 
         console.log(cacheKey, 'Module not found in cache, compiling module...')
@@ -95,7 +96,10 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
   
         moduleCode = result.outputFiles![0].text;
 
-        kv.set(["modules", cacheKey], moduleCode);
+        // Step 4: Cache compiled module as Uint8Array
+        const moduleData = new TextEncoder().encode(moduleCode);
+        set(kv,[cacheKey], moduleData);
+        console.log(cacheKey, 'Module cached')
       } else{
         console.log(cacheKey, 'Module found in cache, using cached module...')
       }
