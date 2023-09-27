@@ -31,9 +31,9 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
   async function dynamicImport(content: string) {
     try {
       // if (content.startsWith("node:")) {
-      // return await import(content);
+      return await import(content);
       // } else {
-      throw new Error("Not using regular import");
+      // throw new Error("Not using regular import");
       // }
     } catch (err) {
       console.log(
