@@ -54,7 +54,7 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
       }
 
       // Step 1: Create a unique cache key
-      const cacheKey = createCacheKey(filePath);
+      const cacheKey = await createCacheKey(filePath);
 
       const kv = await Deno.openKv();
 
