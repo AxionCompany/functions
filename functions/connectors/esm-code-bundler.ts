@@ -143,7 +143,7 @@ const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
         };
         const encodedModlue = new TextEncoder().encode(JSON.stringify(module));
         set(kv, [cacheKey], encodedModlue, {
-          expireIn: (cacheExpiration || (1000 * 60 * 60 * 24)),
+          expireIn: (cacheExpiration || (1000 * 60 * 60 * 24 * 7)),
         });
         console.log(cacheKey, "Module cached");
       } else {
