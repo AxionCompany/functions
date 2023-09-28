@@ -3,7 +3,7 @@
 // permitted, such as Deno Deploy, or when running without `--allow-run`.
 import * as esbuild from "https://deno.land/x/esbuild@v0.17.19/wasm.js";
 import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader@0.8.1/mod.ts";
-import { get, set, remove } from "https://deno.land/x/kv_toolbox/blob.ts";
+import { get, remove, set } from "https://deno.land/x/kv_toolbox/blob.ts";
 // import { wasmLoader } from "https://esm.sh/esbuild-plugin-wasm";
 // import watPlugin from 'https://esm.sh/gh/vfssantos/esbuild-plugin-wat/index.js';
 // import { polyfillNodeForDeno } from "https://esm.sh/esbuild-plugin-polyfill-node";
@@ -11,15 +11,16 @@ import { get, set, remove } from "https://deno.land/x/kv_toolbox/blob.ts";
 // import watPlugin from "https://esm.sh/gh/vfssantos/esbuild-plugin-wat/index.js"
 import parseCode from "./esm-code-parser.ts";
 
-async function createHash(path:string) {
-  const pathUint8 = new TextEncoder().encode(path);                           // encode as (utf-8) Uint8Array
-  const hashBuffer = await crypto.subtle.digest('SHA-256', pathUint8);           // hash the message
-  const hashArray = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join(''); // convert bytes to hex string
+async function createHash(path: string) {
+  const pathUint8 = new TextEncoder().encode(path); // encode as (utf-8) Uint8Array
+  const hashBuffer = await crypto.subtle.digest("SHA-256", pathUint8); // hash the message
+  const hashArray = Array.from(new Uint8Array(hashBuffer)); // convert buffer to byte array
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join(
+    "",
+  ); // convert bytes to hex string
 
-  return hashHex
+  return hashHex;
 }
-
 
 let esbuildInitialized = false;
 
@@ -28,7 +29,7 @@ const DENO_USER_AGENT =
 const isDeno = DENO_USER_AGENT.test(navigator.userAgent);
 const isDenoCLI = isDeno && !!Deno?.run;
 
-const DynamicImport = ({ type, language, useWorker }: any) =>
+const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
   async function dynamicImport(content: string) {
     try {
       // if (content.startsWith("node:")) {
@@ -43,9 +44,8 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
         err.stack,
       );
 
-        
       let filePath;
-  
+
       if (type === "file") {
         // const urlObj = new URL(content);
         // filePath = urlObj.href;
@@ -60,23 +60,32 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
       const kv = await Deno.openKv();
 
       // Step 2: Check cache before compilation
-      const moduleData  = await get(kv,[cacheKey]);
-      // Decode Uint8Array to string
-      let moduleCode:any = moduleData ? new TextDecoder().decode(moduleData) : null;
-      
-      if (!moduleCode){
+      const moduleData = await get(kv, [cacheKey]);
 
-        console.log(cacheKey, 'Module not found in cache, compiling module...')
+      let module: any;
+      // Decode Uint8Array to string
+      try {
+        module = moduleData
+          ? JSON.parse(new TextDecoder().decode(moduleData))
+          : null;
+      } catch (err) {
+        // Step 2: Check cache before compilation
+        remove(kv, [cacheKey]);
+        module = null;
+      }
+
+      if (!module) {
+        console.log(cacheKey, "Module not found in cache, compiling module...");
 
         // Step 3: Proceed to Compile module if not cached
-  
+
         if (!esbuildInitialized) {
           esbuildInitialized = true;
           esbuild.initialize({ worker: useWorker || false });
         }
-  
+
         const [denoResolver, denoLoader] = denoPlugins({ loader: "portable" });
-  
+
         const config: any = {
           plugins: [
             denoResolver,
@@ -89,57 +98,65 @@ const DynamicImport = ({ type, language, useWorker }: any) =>
           format: "esm",
           write: false,
         };
-  
-        config.entryPoints = [filePath];
-  
-        const result = await esbuild.build(config);
-  
-        moduleCode = result.outputFiles![0].text;
 
+        config.entryPoints = [filePath];
+
+        const result = await esbuild.build(config);
+
+        const moduleCode = result.outputFiles![0].text;
+
+        const parsedCode = parseCode(
+          moduleCode,
+        );
+
+        const _export: any = {};
+        const dependencies: any = {};
+
+        parsedCode.exports.forEach((item: any) => {
+          _export[item.exportedName] = item.localName;
+        });
+
+        const dependencyPromises: any[] = [];
+
+        parsedCode.imports.forEach((item: any) => {
+          dependencyPromises.push(
+            dynamicImport(`node:${item.source}`) // TODO: this is considering that only node: imports are are left unimported by esbuild
+              .then((dep) => {
+                item.specifiers?.forEach((i: any) => {
+                  dependencies[i.localName] = dep[i.importedName] || dep;
+                });
+              })
+              .catch((err) => {
+                console.log(
+                  `Not possible to load dependency "${item.source}":\n${err.message}`,
+                );
+              }),
+          );
+        });
+
+        await Promise.all(dependencyPromises);
         // Step 4: Cache compiled module as Uint8Array
-        const moduleData = new TextEncoder().encode(moduleCode);
-        set(kv,[cacheKey], moduleData);
-        console.log(cacheKey, 'Module cached')
-      } else{
-        console.log(cacheKey, 'Module found in cache, using cached module...')
+        module = {
+          code: parsedCode.code,
+          exports: _export,
+          dependencies: dependencies,
+        };
+        const encodedModlue = new TextEncoder().encode(JSON.stringify(module));
+        set(kv, [cacheKey], encodedModlue, {
+          expireIn: (cacheExpiration || (1000 * 60 * 60 * 24)),
+        });
+        console.log(cacheKey, "Module cached");
+      } else {
+        console.log(cacheKey, "Module found in cache, using cached module...");
       }
 
-      const parsedCode = parseCode(
-        moduleCode,
-      );
-
-      const _export: any = {};
-      const dependencies: any = {};
-
-      parsedCode.exports.forEach((item: any) => {
-        _export[item.exportedName] = item.localName;
-      });
-
-      const dependencyPromises: any[] = [];
-
-      parsedCode.imports.forEach((item: any) => {
-        dependencyPromises.push(
-          dynamicImport(`node:${item.source}`) // TODO: this is considering that only node: imports are are left unimported by esbuild
-            .then((dep) => {
-              item.specifiers?.forEach((i: any) => {
-                dependencies[i.localName] = dep[i.importedName] || dep;
-              });
-            })
-            .catch((err) => {
-              console.log(
-                `Not possible to load dependency "${item.source}":\n${err.message}`,
-              );
-            }),
-        );
-      });
-
-      await Promise.all(dependencyPromises);
+      const { dependencies, exports, code } = module;
 
       const AsyncFunction = async function () {}.constructor;
 
       const mod = await AsyncFunction(
         ...Object.keys(dependencies),
-        fn(parsedCode.code, _export, filePath),
+        fn(code, exports, filePath),
       )(...Object.values(dependencies));
 
       const toStringTaggedExports = Object.assign({
