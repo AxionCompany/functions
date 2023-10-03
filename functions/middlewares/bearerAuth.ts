@@ -4,13 +4,13 @@ export default ({ validateAuth }: any) => {
     try {
       const authorization = req.headers.get("authorization");
       if (authorization) {
-        const match = authorization.match(/^Basic\s+(.*)$/);
+        const match = authorization.match(/^Bearer\s+(.*)$/);
         if (match) {
-          const [_username, _password] = atob(match[1]).split(":");
-          const user = await validateAuth(_username, _password);
-          return { user };
+          const access_token = match[1];
+          const validatedUser = await validateAuth(access_token);
+          return { user: validatedUser };
         }
-      } else{
+      } else {
         return await validateAuth(null, null);
       }
     } catch (err) {
