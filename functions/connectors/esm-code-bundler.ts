@@ -1,14 +1,7 @@
-// import * as esbuild from "https://deno.land/x/esbuild@v0.17.19/mod.js";
-// Import the WASM build on platforms where running subprocesses is not
-// permitted, such as Deno Deploy, or when running without `--allow-run`.
-import * as esbuild from "https://deno.land/x/esbuild@v0.17.19/wasm.js";
-import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader@0.8.1/mod.ts";
+import * as esbuild from "https://deno.land/x/esbuild/wasm.js";
+import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader/mod.ts";
 import { get, remove, set } from "https://deno.land/x/kv_toolbox/blob.ts";
-// import { wasmLoader } from "https://esm.sh/esbuild-plugin-wasm";
-// import watPlugin from 'https://esm.sh/gh/vfssantos/esbuild-plugin-wat/index.js';
-// import { polyfillNodeForDeno } from "https://esm.sh/esbuild-plugin-polyfill-node";
-
-// import watPlugin from "https://esm.sh/gh/vfssantos/esbuild-plugin-wat/index.js"
+import { h, Fragment } from "https://esm.sh/preact";
 import parseCode from "./esm-code-parser.ts";
 
 async function createHash(path: string) {
@@ -32,23 +25,11 @@ const isDenoCLI = isDeno && !!Deno?.run;
 const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
   async function dynamicImport(content: string) {
     try {
-      // if (content.startsWith("node:")) {
       return await import(content);
-      // } else {
-      // throw new Error("Not using regular import");
-      // }
     } catch (err) {
-      console.log(
-        `Error trying to import ${content} with regular import... Using dynamic instead.`,
-        err.message,
-        err.stack,
-      );
-
       let filePath;
 
       if (type === "file") {
-        // const urlObj = new URL(content);
-        // filePath = urlObj.href;
         filePath = content;
       } else {
         filePath = `data:text/${language || "tsx"};base64,${btoa(content)}`;
@@ -57,28 +38,40 @@ const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
       // Step 1: Create a unique cache key
       const cacheKey = await createCacheKey(filePath);
 
+      console.log(
+        `Error trying to import ${cacheKey} with regular import... Using dynamic instead.`,
+      );
+
       const kv = await Deno.openKv();
+
+      // await remove(kv, ["c3a556b7edd3be748d4335a02dc1510f9a6eb2535bf8a5a5412149e164005b0f"]);
+
+      const startFetchCache = new Date().getTime();
 
       // Step 2: Check cache before compilation
       const moduleData = await get(kv, [cacheKey]);
 
       let module: any;
+
       // Decode Uint8Array to string
       try {
         module = moduleData
           ? JSON.parse(new TextDecoder().decode(moduleData))
           : null;
       } catch (err) {
-        // Step 2: Check cache before compilation
         remove(kv, [cacheKey]);
         module = null;
       }
 
+      const endFetchCache = new Date().getTime();
+
+      console.log(cacheKey, "Cache Checked", endFetchCache - startFetchCache, "ms")
+
       if (!module) {
         console.log(cacheKey, "Module not found in cache, compiling module...");
+        const start = new Date().getTime();
 
         // Step 3: Proceed to Compile module if not cached
-
         if (!esbuildInitialized) {
           esbuildInitialized = true;
           esbuild.initialize({ worker: useWorker || false });
@@ -89,14 +82,14 @@ const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
         const config: any = {
           plugins: [
             denoResolver,
-            // polyfillNodeForDeno({ globals:false, polyfills: {"fs": true , "crypto": true} }),
-            // watPlugin(),
-            // wasmLoader(),
             denoLoader,
           ],
           bundle: true,
           format: "esm",
           write: false,
+          jsxFactory: "h",
+          jsxFragment: "Fragment",
+          jsx: "transform",
         };
 
         config.entryPoints = [filePath];
@@ -141,23 +134,29 @@ const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
           exports: _export,
           dependencies: dependencies,
         };
+        console.log(module.dependencies);
         const encodedModlue = new TextEncoder().encode(JSON.stringify(module));
         set(kv, [cacheKey], encodedModlue, {
           expireIn: (cacheExpiration || (1000 * 60 * 60 * 24 * 7)),
         });
-        console.log(cacheKey, "Module cached");
+        const endDate = new Date().getTime();
+        console.log(cacheKey, "Module cached", endDate - start, "ms");
       } else {
         console.log(cacheKey, "Module found in cache, using cached module...");
       }
 
+      const startMod = new Date().getTime();
       const { dependencies, exports, code } = module;
+
+      dependencies["h"] = h;
+      dependencies["Fragment"] = Fragment;
 
       const AsyncFunction = async function () {}.constructor;
 
       const mod = await AsyncFunction(
         ...Object.keys(dependencies),
         fn(code, exports, filePath),
-      )(...Object.values(dependencies));
+      )(...Object.values(dependencies)).then((m: any) => m).catch(console.log);
 
       const toStringTaggedExports = Object.assign({
         [Symbol.toStringTag]: "Module",
@@ -177,6 +176,10 @@ const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
 
       isDenoCLI &&
         esbuild.stop();
+
+      const endMod = new Date().getTime();
+
+      console.log(cacheKey, "Module loaded", endMod - startMod, "ms");
 
       return sealedExports;
     }
@@ -218,21 +221,11 @@ const fn = (code: string, exports: any, filePath: string) => `
     .replace(/"([^(")"]+)":/g, "$1:")
     // remove quotes from keys
     .replace(/"([^(")"]+)"/g, "$1")
-},logs };
+},logs};
   } catch(err){
     console.log(err)
     return { error: err.message };
   }
-
-  `;
-
-// dynamicImport(
-//   `http://TESTE:123456@localhost:8000/features/rates/search?v=${
-//     new Date().getTime()
-//   }`,
-// ).then(async (mod: { default: Function }) => {
-//   const result = await mod.default();
-//   console.log(result)
-// }).catch(console.log);
+`;
 
 export default DynamicImport;
