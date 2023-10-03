@@ -1,20 +1,20 @@
 export default async (adapters: any) => {
 
-  const { connectors, features, env } = adapters;
+  const { connectors, features, middlewares, env } = adapters;
   const { moduleLoader } = connectors;
   const { functionExec } = features;
 
   let v: any = {};
 
-  // console.log("Loading local adapters...");
-  // const LocalAdapters = await moduleLoader.default({
-  //   pathname: "adapters.ts",
-  // })
-  //   .then((res: any) => res.default)
-  //   .catch((err: Error) => console.log("Error loading local adapters", err));
+  console.log("Loading local adapters...");
+  const LocalAdapters = await moduleLoader.default({
+    pathname: "adapters.ts",
+  })
+    .then((res: any) => res.default)
+    .catch((err: Error) => console.log("Error loading local adapters", err));
 
-  // adapters = LocalAdapters ? LocalAdapters(adapters) : adapters;
-  // console.log("Local adapters loaded.");
+  adapters = LocalAdapters ? LocalAdapters(adapters) : adapters;
+  console.log("Local adapters loaded.");
 
   return async (req: Request) => {
     let responseHeaders = {};
@@ -37,7 +37,18 @@ export default async (adapters: any) => {
     const token = headers.get("Authorization")?.split(" ")?.[1] || env.TOKEN;
 
     const params: any = { ...body, ...queryParams };
-
+    let ctx: any = {};
+    // Adding Middlewares
+    try {
+      for (const key in middlewares) {
+        const middleware = middlewares[key];
+        const addedContext = await middleware(req);
+        ctx = { ...ctx, ...addedContext };
+      }
+    } catch (err) {
+      return err;
+    }
+    
     const res: any = await new Promise((resolve, reject) => {
       let response: any;
       let stream;
@@ -88,6 +99,7 @@ export default async (adapters: any) => {
     });
 
     return new Response(JSON.stringify(res), {
+      // return new Response(res, {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers":
