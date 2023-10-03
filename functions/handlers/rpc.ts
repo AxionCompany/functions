@@ -1,5 +1,4 @@
 export default async (adapters: any) => {
-
   const { connectors, features, middlewares, env } = adapters;
   const { moduleLoader } = connectors;
   const { functionExec } = features;
@@ -48,7 +47,7 @@ export default async (adapters: any) => {
     } catch (err) {
       return err;
     }
-    
+
     const res: any = await new Promise((resolve, reject) => {
       let response: any;
       let stream;
@@ -69,7 +68,7 @@ export default async (adapters: any) => {
               if (!sentResponse) resolve(response);
               sentResponse = true;
             } catch (err) {
-              console.log('error 1', err.message);
+              console.log("error 1", err.message);
               if (!sentResponse) resolve(err.message);
             }
           };
@@ -79,21 +78,22 @@ export default async (adapters: any) => {
               if (!sentResponse) resolve(data);
               controller.close();
             } catch (err) {
-              console.log('error 2', err.message);
+              console.log("error 2", err.message);
               if (!sentResponse) resolve(err.message);
             }
           };
         },
       });
+      
       functionExec({ ...adapters, stream, respond: send })({
         pathname,
-        params,
+        params: { ...params, ...ctx },
         token,
         v,
       })
         .then(send)
         .catch((err: any) => {
-          console.log('error 3', err.message);
+          console.log("error 3", err.message);
           return !sentResponse ? resolve(err.message) : null;
         });
     });
