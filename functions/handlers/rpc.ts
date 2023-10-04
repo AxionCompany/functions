@@ -75,7 +75,7 @@ export default async (adapters: any) => {
                 sentResponse = true;
               } catch (err) {
                 console.log("error 1", err.message);
-                if (!sentResponse) reject(err.message);
+                if (!sentResponse) reject(err);
               }
             };
             send = (data: any) => {
@@ -85,7 +85,7 @@ export default async (adapters: any) => {
                 controller.close();
               } catch (err) {
                 console.log("error 2", err.message);
-                if (!sentResponse) reject(err.message);
+                if (!sentResponse) reject(err);
               }
             };
           },
@@ -100,12 +100,11 @@ export default async (adapters: any) => {
           .then(send)
           .catch((err: any) => {
             console.log("error 3", err.message);
-            return !sentResponse ? reject(err.message) : null;
+            return !sentResponse ? reject(err) : null;
           });
       });
 
       return new Response(JSON.stringify(res), {
-        // return new Response(res, {
         headers: {
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Headers":
@@ -115,15 +114,14 @@ export default async (adapters: any) => {
       });
     } catch (err) {
       return new Response(JSON.stringify(err), {
-        // return new Response(res, {
         headers: {
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Headers":
             "authorization, x-client-info, apikey, content-type",
           ...responseHeaders,
         },
-        status: 400,
-        statusText: err.message,
+        status: err.status || 400,
+        statusText: err.message || 'Bad Request',
       });
     }
   };
