@@ -1,7 +1,11 @@
-export default ({ validateAuth }: any) => {
+export default ({ validateAuth, publicPaths, }: any) => {
   return async (req: any) => {
     let error;
     try {
+      const pathName = new URL(req.url).pathname;
+      if (publicPaths?.includes(pathName)) {
+        return await validateAuth(null, null);
+      }
       const authorization = req.headers.get("authorization");
       if (authorization) {
         const match = authorization.match(/^Bearer\s+(.*)$/);
