@@ -11,11 +11,14 @@ import denoServe from "./ports/denoServe.ts";
 import cloudfare from "./ports/cloudfareWorkers.ts";
 
 import { config } from "https://deno.land/x/dotenv/mod.ts";
+import bearerAuth from "./middlewares/bearerAuth.ts";
+
+import { verify } from "https://esm.sh/jsonwebtoken";
 
 export default (adapters: any = undefined) => {
-  const env = {  ...config(), ...Deno.env.toObject(), ...adapters?.env };
+  const env = { ...config(), ...Deno.env.toObject(), ...adapters?.env };
 
-  console.log(env)
+  console.log(env);
 
   const connectors = {
     sourceMatch: {
@@ -55,15 +58,29 @@ export default (adapters: any = undefined) => {
     basicAuth: basicAuth({
       validateAuth: (username: string, password: string) => {
         if (!env.AUHT_USERNAME && !env.AUTH_PASSWORD) return;
-        if ((username === env.AUTH_USERNAME) && (password === env.AUTH_PASSWORD)) {
+        if (
+          (username === env.AUTH_USERNAME) && (password === env.AUTH_PASSWORD)
+        ) {
           return { username, password };
         } else {
           throw new Error("Unauthorized");
         }
       },
     }),
+    bearerAuth: bearerAuth({
+      validateAuth: (accessToken: string) => {
+        if (!env.AUTH_SECRET) return;
+        if (accessToken) {
+            const user = verify(accessToken, env.AUTH_SECRET);
+            const dbUser = env.DB_USERS.find(user._id); // function to get user from DB
+            return dbUser
+        } else {
+          throw new Error("Unauthorized");
+        }
+      },
+    }),
   };
-  
+
   const handlers = {
     ["rpc"]: apiHandler,
     ["file-loader"]: (adapters: any) =>
