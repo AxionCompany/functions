@@ -6,7 +6,7 @@ export default async (adapters: any) => {
 
   console.log("Loading local adapters...");
   const LocalAdapters = await moduleLoader.default({
-    pathname: "adapters.ts",
+    pathname: "adapters",
   })
     .then((res: any) => res.default)
     .catch((err: Error) => console.log("Error loading local adapters", err));
