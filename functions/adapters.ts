@@ -73,7 +73,10 @@ export default (adapters: any = undefined) => {
   const handlers = {
     ["rpc"]: apiHandler,
     ["file-loader"]: (adapters: any) =>
-      fileLoaderHandler({ ...adapters, middlewares }),
+      fileLoaderHandler({
+        ...adapters,
+        middlewares: { basicAuth: middlewares.basicAuth },
+      }),
   };
 
   const ports = {
