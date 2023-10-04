@@ -1,7 +1,6 @@
 export default async (adapters: any) => {
-  const { connectors, features, middlewares, env } = adapters;
+  const { connectors } = adapters;
   const { moduleLoader } = connectors;
-  const { functionExec } = features;
 
   let v: any = {};
 
@@ -14,6 +13,12 @@ export default async (adapters: any) => {
 
   adapters = LocalAdapters ? LocalAdapters(adapters) : adapters;
   console.log("Local adapters loaded.");
+
+  const { features, env, middlewares } = adapters;
+
+  console.log(middlewares);
+
+  const { functionExec } = features;
 
   return async (req: Request) => {
     let responseHeaders = {};
@@ -84,7 +89,7 @@ export default async (adapters: any) => {
           };
         },
       });
-      
+
       functionExec({ ...adapters, stream, respond: send })({
         pathname,
         params: { ...params, ...ctx },
