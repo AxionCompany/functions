@@ -88,6 +88,7 @@ export default (adapters: any = undefined) => {
     env,
     connectors,
     features,
+    middlewares,
     handlers,
     ports,
   };
