@@ -134,7 +134,7 @@ const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
           exports: _export,
           dependencies: dependencies,
         };
-        console.log(module.dependencies);
+
         const encodedModlue = new TextEncoder().encode(JSON.stringify(module));
         set(kv, [cacheKey], encodedModlue, {
           expireIn: (cacheExpiration || (1000 * 60 * 60 * 24 * 7)),

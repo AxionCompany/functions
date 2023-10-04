@@ -7,11 +7,11 @@ import loadFile from "./features/loadFile.ts";
 import apiHandler from "./handlers/rpc.ts";
 import fileLoaderHandler from "./handlers/fileLoader.ts";
 import basicAuth from "./middlewares/basicAuth.ts";
+import bearerAuth from "./middlewares/bearerAuth.ts";
 import denoServe from "./ports/denoServe.ts";
 import cloudfare from "./ports/cloudfareWorkers.ts";
 
 import { config } from "https://deno.land/x/dotenv/mod.ts";
-import bearerAuth from "./middlewares/bearerAuth.ts";
 
 import { verify } from "https://esm.sh/jsonwebtoken";
 
@@ -67,18 +67,7 @@ export default (adapters: any = undefined) => {
         }
       },
     }),
-    bearerAuth: bearerAuth({
-      validateAuth: (accessToken: string) => {
-        if (!env.AUTH_SECRET) return;
-        if (accessToken) {
-            const user = verify(accessToken, env.AUTH_SECRET);
-            const dbUser = env.DB_USERS.find(user._id); // function to get user from DB
-            return dbUser
-        } else {
-          throw new Error("Unauthorized");
-        }
-      },
-    }),
+    bearerAuth,
   };
 
   const handlers = {
