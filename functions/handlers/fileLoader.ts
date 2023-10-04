@@ -18,6 +18,7 @@ export default async (adapters : any) => {
   return async (req: Request) => {
     let ctx: any = {};
 
+    // Adding Middlewares
     try {
       for (const key in middlewares) {
         const middleware = middlewares[key];
@@ -44,7 +45,7 @@ export default async (adapters : any) => {
       if (ctx?.user?.password) url.password = ctx.user.password;
       if (env?.SYS_ENV ==='production') url.protocol = 'https';
     } 
-    console.log(url)
+
     if (redirect) return Response.redirect(url.href, 307);
 
     return new Response(content, {

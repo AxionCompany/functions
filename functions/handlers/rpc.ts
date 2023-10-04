@@ -14,9 +14,7 @@ export default async (adapters: any) => {
   adapters = LocalAdapters ? LocalAdapters(adapters) : adapters;
   console.log("Local adapters loaded.");
 
-  const { features, env, middlewares } = adapters;
-
-  console.log(middlewares);
+  const { features, middlewares } = adapters;
 
   const { functionExec } = features;
 
@@ -35,10 +33,6 @@ export default async (adapters: any) => {
 
     // Get Path parameters
     const pathParams = url.pathname.split("/").filter((v) => v); // assuming url path is like /path/:param
-
-    // Get Headers
-    const headers = req.headers;
-    const token = headers.get("Authorization")?.split(" ")?.[1] || env.TOKEN;
 
     const params: any = { ...body, ...queryParams };
     let ctx: any = {};
@@ -94,7 +88,6 @@ export default async (adapters: any) => {
         functionExec({ ...adapters, stream, respond: send })({
           pathname,
           params: { ...params, ...ctx },
-          token,
           v,
         })
           .then(send)
