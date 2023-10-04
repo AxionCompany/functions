@@ -1,4 +1,4 @@
-export default ({ validateAuth, publicPaths, }: any) => {
+export default ({ validateAuth, publicPaths }: any) => {
   return async (req: any) => {
     let error;
     try {
@@ -15,7 +15,8 @@ export default ({ validateAuth, publicPaths, }: any) => {
           return { user: validatedUser };
         }
       } else {
-        return {};
+        const validatedUser = await validateAuth(null);
+        return { user: validatedUser };
       }
     } catch (err) {
       error = err.message;
