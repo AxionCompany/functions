@@ -3,7 +3,6 @@ async (props: {
   v: any;
   pathname: string;
   params: any;
-  token: string | undefined;
 }) => {
   // get params
   const { params } = props;
