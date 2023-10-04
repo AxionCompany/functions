@@ -13,12 +13,8 @@ import cloudfare from "./ports/cloudfareWorkers.ts";
 
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
-import { verify } from "https://esm.sh/jsonwebtoken";
-
 export default (adapters: any = undefined) => {
   const env = { ...config(), ...Deno.env.toObject(), ...adapters?.env };
-
-  console.log(env);
 
   const connectors = {
     sourceMatch: {
