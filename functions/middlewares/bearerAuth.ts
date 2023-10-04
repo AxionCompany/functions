@@ -4,7 +4,7 @@ export default ({ validateAuth, publicPaths, }: any) => {
     try {
       const pathName = new URL(req.url).pathname;
       if (publicPaths?.includes(pathName)) {
-        return await validateAuth(null, null);
+        return {};
       }
       const authorization = req.headers.get("authorization");
       if (authorization) {
@@ -15,7 +15,7 @@ export default ({ validateAuth, publicPaths, }: any) => {
           return { user: validatedUser };
         }
       } else {
-        return await validateAuth(null, null);
+        return {};
       }
     } catch (err) {
       error = err.message;
