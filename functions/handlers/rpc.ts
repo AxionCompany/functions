@@ -53,64 +53,78 @@ export default async (adapters: any) => {
       return err;
     }
 
-    const res: any = await new Promise((resolve, reject) => {
-      let response: any;
-      let stream;
-      let send;
-      let responseType = "send";
-      let sentResponse = false;
+    try {
+      const res: any = await new Promise((resolve, reject) => {
+        let response: any;
+        let stream;
+        let send;
+        let responseType = "send";
+        let sentResponse = false;
 
-      response = new ReadableStream({
-        start: (controller) => {
-          stream = (data: any) => {
-            try {
-              responseType = "stream";
-              controller.enqueue(new TextEncoder().encode(data));
-              responseHeaders = {
-                "content-type": "text/plain",
-                "x-content-type-options": "nosniff",
-              };
-              if (!sentResponse) resolve(response);
-              sentResponse = true;
-            } catch (err) {
-              console.log("error 1", err.message);
-              if (!sentResponse) resolve(err.message);
-            }
-          };
-          send = (data: any) => {
-            try {
-              responseHeaders = { "content-type": "application/json" };
-              if (!sentResponse) resolve(data);
-              controller.close();
-            } catch (err) {
-              console.log("error 2", err.message);
-              if (!sentResponse) resolve(err.message);
-            }
-          };
-        },
+        response = new ReadableStream({
+          start: (controller) => {
+            stream = (data: any) => {
+              try {
+                responseType = "stream";
+                controller.enqueue(new TextEncoder().encode(data));
+                responseHeaders = {
+                  "content-type": "text/plain",
+                  "x-content-type-options": "nosniff",
+                };
+                if (!sentResponse) resolve(response);
+                sentResponse = true;
+              } catch (err) {
+                console.log("error 1", err.message);
+                if (!sentResponse) reject(err.message);
+              }
+            };
+            send = (data: any) => {
+              try {
+                responseHeaders = { "content-type": "application/json" };
+                if (!sentResponse) resolve(data);
+                controller.close();
+              } catch (err) {
+                console.log("error 2", err.message);
+                if (!sentResponse) reject(err.message);
+              }
+            };
+          },
+        });
+
+        functionExec({ ...adapters, stream, respond: send })({
+          pathname,
+          params: { ...params, ...ctx },
+          token,
+          v,
+        })
+          .then(send)
+          .catch((err: any) => {
+            console.log("error 3", err.message);
+            return !sentResponse ? reject(err.message) : null;
+          });
       });
 
-      functionExec({ ...adapters, stream, respond: send })({
-        pathname,
-        params: { ...params, ...ctx },
-        token,
-        v,
-      })
-        .then(send)
-        .catch((err: any) => {
-          console.log("error 3", err.message);
-          return !sentResponse ? resolve(err.message) : null;
-        });
-    });
-
-    return new Response(JSON.stringify(res), {
-      // return new Response(res, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers":
-          "authorization, x-client-info, apikey, content-type",
-        ...responseHeaders,
-      },
-    });
+      return new Response(JSON.stringify(res), {
+        // return new Response(res, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers":
+            "authorization, x-client-info, apikey, content-type",
+          ...responseHeaders,
+        },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify(err), {
+        // return new Response(res, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers":
+            "authorization, x-client-info, apikey, content-type",
+          ...responseHeaders,
+        },
+        status: 400,
+        statusText: err.message,
+      });
+    }
   };
 };
