@@ -11,7 +11,12 @@ export default async (adapters: any) => {
     .then((res: any) => res.default)
     .catch((err: Error) => console.log("Error loading local adapters", err));
 
-  adapters = LocalAdapters ? LocalAdapters(adapters) : adapters;
+  if (LocalAdapters) {
+    adapters = LocalAdapters(adapters);
+  } else {
+    adapters.middlewares = {};
+  }
+
   console.log("Local adapters loaded.");
 
   const { features, middlewares } = adapters;
@@ -31,15 +36,17 @@ export default async (adapters: any) => {
     // Get Path name
     const pathname = new URL(req.url).pathname;
 
-
     // Handle OPTIONS request
-    if (req.method === "OPTIONS") return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
-      },
-    });
+    if (req.method === "OPTIONS") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers":
+            "authorization, x-client-info, apikey, content-type",
+          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
+        },
+      });
+    }
 
     // Get Path parameters
     const pathParams = url.pathname.split("/").filter((v) => v); // assuming url path is like /path/:param
@@ -58,7 +65,6 @@ export default async (adapters: any) => {
     }
 
     try {
-
       const res: any = await new Promise((resolve, reject) => {
         let response: any;
         let stream;
@@ -111,7 +117,8 @@ export default async (adapters: any) => {
       return new Response(JSON.stringify(res), {
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+          "Access-Control-Allow-Headers":
+            "authorization, x-client-info, apikey, content-type",
           "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
           ...responseHeaders,
         },
@@ -120,12 +127,13 @@ export default async (adapters: any) => {
       return new Response(JSON.stringify(err), {
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type",
+          "Access-Control-Allow-Headers":
+            "authorization, x-client-info, apikey, content-type",
           "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
           ...responseHeaders,
         },
         status: err.status || 400,
-        statusText: err.message || 'Bad Request',
+        statusText: err.message || "Bad Request",
       });
     }
   };
