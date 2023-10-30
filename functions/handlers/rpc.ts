@@ -124,7 +124,14 @@ export default async (adapters: any) => {
         },
       });
     } catch (err) {
-      return new Response(JSON.stringify(err), {
+      console.log(err);
+      let res;
+      if (typeof err === "object") {
+        res = err;
+      } else {
+        res = { message: err };
+      }
+      return new Response(JSON.stringify(res), {
         headers: {
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Headers":
