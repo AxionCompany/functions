@@ -14,7 +14,16 @@ import cloudfare from "./ports/cloudfareWorkers.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
 export default (adapters: any = undefined) => {
-  const env = { ...config(), ...Deno.env.toObject(), ...adapters?.env };
+  let dotEnv;
+
+  try {
+    dotEnv = config();
+  } catch (err) {
+    console.log(err);
+    dotEnv = {};
+  }
+
+  const env = { ...dotEnv, ...Deno.env.toObject(), ...adapters?.env };
 
   const connectors = {
     sourceMatch: {
