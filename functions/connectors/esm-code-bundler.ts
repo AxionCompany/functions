@@ -19,7 +19,6 @@ const isDenoCLI = isDeno && !!Deno?.run;
 const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
   async function dynamicImport(content: string) {
     try {
-      if (!content.startsWith("node:")) throw "error";
       return await import(content);
     } catch (err) {
       // DYNAMIC IMPORTS
