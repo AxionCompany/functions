@@ -9,9 +9,9 @@ async (props: {
   // get connectors
   const { connectors } = adapters || {};
   // get moduleLoader
-  const { moduleLoader } = connectors || {};
+  const { moduleLoader } = await connectors || {};
   // get module
-  const mod = await moduleLoader.default(props);
+  const mod = await (await moduleLoader.default)(props);
   // run module
   const res = await mod.default(adapters)(params);
   // return response

@@ -1,15 +1,29 @@
-import githubFileloader from "./connectors/github-fileloader.js";
-import localFileloader from "./connectors/local-fileloader.js";
-import moduleLoader from "./connectors/module-loader.ts";
-import localSourcematch from "./connectors/local-sourcematch.ts";
-import functionExec from "./features/executeModule.ts";
-import loadFile from "./features/loadFile.ts";
-import apiHandler from "./handlers/rpc.ts";
-import fileLoaderHandler from "./handlers/fileLoader.ts";
-import basicAuth from "./middlewares/basicAuth.ts";
-import bearerAuth from "./middlewares/bearerAuth.ts";
-import denoServe from "./ports/denoServe.ts";
-import cloudfare from "./ports/cloudfareWorkers.ts";
+
+const githubFileloader = async (adapters: any) =>
+  await import("./connectors/github-fileloader.js").then((m) => m.default(adapters));
+const localFileloader = async (adapters: any) =>
+  await import("./connectors/local-fileloader.js").then((m) => m.default(adapters));
+const moduleLoader = async (adapters: any) =>
+  await import("./connectors/module-loader.ts").then((m) => m.default(adapters));
+const localSourcematch = async (adapters: any) =>
+  await import("./connectors/local-sourcematch.ts").then((m) => m.default(adapters));
+const functionExec = async (adapters: any) =>
+  await import("./features/executeModule.ts").then((m) => m.default(adapters));
+const loadFile = async (adapters: any) =>
+  await import("./features/loadFile.ts").then((m) => m.default(adapters));
+const apiHandler = async (adapters: any) =>
+  await import("./handlers/rpc.ts").then((m) => m.default(adapters));
+const fileLoaderHandler = async (adapters: any) =>
+  await import("./handlers/fileLoader.ts").then((m) => m.default(adapters));
+const basicAuth = async (adapters: any) =>
+  await import("./middlewares/basicAuth.ts").then((m) => m.default(adapters));
+const bearerAuth = async (adapters: any) =>
+  await import("./middlewares/bearerAuth.ts").then((m) => m.default(adapters));
+const denoServe = async (adapters: any) =>
+  await import("./ports/denoServe.ts").then((m) => m.default(adapters));
+const cloudfare = async (adapters: any) =>
+  await import("./ports/cloudfareWorkers.ts").then((m) => m.default(adapters));
+
 
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
