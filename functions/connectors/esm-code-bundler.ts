@@ -1,9 +1,3 @@
-import * as esbuild from "https://deno.land/x/esbuild/wasm.js";
-import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader/mod.ts";
-import { get, remove, set } from "https://deno.land/x/kv_toolbox/blob.ts";
-import { h, Fragment } from "https://esm.sh/preact";
-import parseCode from "./esm-code-parser.ts";
-
 async function createHash(path: string) {
   const pathUint8 = new TextEncoder().encode(path); // encode as (utf-8) Uint8Array
   const hashBuffer = await crypto.subtle.digest("SHA-256", pathUint8); // hash the message
@@ -25,8 +19,21 @@ const isDenoCLI = isDeno && !!Deno?.run;
 const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
   async function dynamicImport(content: string) {
     try {
+      if (!content.startsWith("node:")) throw "error";
       return await import(content);
     } catch (err) {
+      // DYNAMIC IMPORTS
+      const esbuild = await import("https://deno.land/x/esbuild/wasm.js");
+      const { denoPlugins } = await import(
+        "https://deno.land/x/esbuild_deno_loader/mod.ts"
+      );
+      const { get, remove, set } = await import(
+        "https://deno.land/x/kv_toolbox/blob.ts"
+      );
+      const { h, Fragment } = await import("https://esm.sh/preact");
+      const parseCode = await import("./esm-code-parser.ts").then((m) =>
+        m.default
+      );
       let filePath;
 
       if (type === "file") {
@@ -44,12 +51,10 @@ const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
 
       const kv = await Deno.openKv();
 
-      // await remove(kv, ["c3a556b7edd3be748d4335a02dc1510f9a6eb2535bf8a5a5412149e164005b0f"]);
-
       const startFetchCache = new Date().getTime();
 
       // Step 2: Check cache before compilation
-      const moduleData = await get(kv, [cacheKey]);
+      const moduleData = await get(kv, ["modules", cacheKey]);
 
       let module: any;
 
@@ -59,13 +64,18 @@ const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
           ? JSON.parse(new TextDecoder().decode(moduleData))
           : null;
       } catch (err) {
-        remove(kv, [cacheKey]);
+        await remove(kv, ["modules", cacheKey]);
         module = null;
       }
 
       const endFetchCache = new Date().getTime();
 
-      console.log(cacheKey, "Cache Checked", endFetchCache - startFetchCache, "ms")
+      console.log(
+        cacheKey,
+        "Cache Checked",
+        endFetchCache - startFetchCache,
+        "ms",
+      );
 
       if (!module) {
         console.log(cacheKey, "Module not found in cache, compiling module...");
@@ -112,7 +122,7 @@ const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
         const dependencyPromises: any[] = [];
 
         parsedCode.imports.forEach((item: any) => {
-          dependencyPromises.push(
+          item.source && dependencyPromises.push(
             dynamicImport(`node:${item.source}`) // TODO: this is considering that only node: imports are are left unimported by esbuild
               .then((dep) => {
                 item.specifiers?.forEach((i: any) => {
@@ -136,12 +146,13 @@ const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
         };
 
         const encodedModlue = new TextEncoder().encode(JSON.stringify(module));
-        set(kv, [cacheKey], encodedModlue, {
+        set(kv, ["modules", cacheKey], encodedModlue, {
           expireIn: (cacheExpiration || (1000 * 60 * 60 * 24 * 7)),
         });
         const endDate = new Date().getTime();
         console.log(cacheKey, "Module cached", endDate - start, "ms");
       } else {
+        console.log(filePath,cacheKey )
         console.log(cacheKey, "Module found in cache, using cached module...");
       }
 

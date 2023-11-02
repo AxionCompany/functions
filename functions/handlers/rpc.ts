@@ -2,6 +2,8 @@ export default async (adapters: any) => {
   const { connectors } = adapters;
   const { moduleLoader } = connectors;
 
+  moduleLoader.default = await moduleLoader.default;
+
   let v: any = {};
 
   console.log("Loading local adapters...");
@@ -21,7 +23,7 @@ export default async (adapters: any) => {
 
   const { features, middlewares } = adapters;
 
-  const { functionExec } = features;
+  const { functionExec } = await features;
 
   return async (req: Request) => {
     let responseHeaders = {};
@@ -57,7 +59,7 @@ export default async (adapters: any) => {
     try {
       for (const key in middlewares) {
         const middleware = middlewares[key];
-        const addedContext = await middleware(req);
+        const addedContext = await (await middleware)(req);
         ctx = { ...ctx, ...addedContext };
       }
     } catch (err) {
@@ -67,8 +69,8 @@ export default async (adapters: any) => {
     try {
       const res: any = await new Promise((resolve, reject) => {
         let response: any;
-        let stream;
-        let send;
+        let stream: any;
+        let send: any;
         let responseType = "send";
         let sentResponse = false;
 
@@ -101,17 +103,18 @@ export default async (adapters: any) => {
             };
           },
         });
-
-        functionExec({ ...adapters, stream, respond: send })({
-          pathname,
-          params: { ...params, ...ctx },
-          v,
-        })
-          .then(send)
-          .catch((err: any) => {
-            console.log("error 3", err.message);
-            return !sentResponse ? reject(err) : null;
-          });
+        functionExec({ ...adapters, stream, respond: send }).then((m: any) =>
+          m({
+            pathname,
+            params: { ...params, ...ctx },
+            v,
+          })
+            .then(send)
+            .catch((err: any) => {
+              console.log("error 3", err.message);
+              return !sentResponse ? reject(err) : null;
+            })
+        );
       });
 
       return new Response(JSON.stringify(res), {
