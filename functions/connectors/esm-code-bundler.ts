@@ -151,7 +151,7 @@ const DynamicImport = ({ type, language, useWorker, cacheExpiration }: any) =>
         const endDate = new Date().getTime();
         console.log(cacheKey, "Module cached", endDate - start, "ms");
       } else {
-        console.log(filePath,cacheKey )
+        console.log(filePath, cacheKey);
         console.log(cacheKey, "Module found in cache, using cached module...");
       }
 
@@ -209,9 +209,8 @@ const fn = (code: string, exports: any, filePath: string) => `
     let logs='';
     let oldLog = console.log;
   
-    console.log = (...args)=> {
+    console.log = (...args) => {
       logs = logs + args?.map(i=>JSON.stringify(i))?.join('\\n')+ '\\n';
-      // oldLog(...args);
     };
   
     ${
