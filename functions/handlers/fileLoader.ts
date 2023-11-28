@@ -23,28 +23,38 @@ export default async (adapters: any) => {
       return err;
     }
 
+    try {
+      const url: URL = new URL(req.url);
+      console.log(`Loading file ${url.href}`);
+      const { pathname } = url;
 
-    const url: URL = new URL(req.url);
-    console.log(`Loading file ${url.href}`);
-    const { pathname } = url;
+      const { content, redirect } = await (await features.loadFile(adapters))({
+        pathname,
+        ...ctx,
+      });
 
-    const { content, redirect } = await (await features.loadFile(adapters))({
-      pathname,
-      ...ctx,
-    });
+      if (redirect) {
+        url.pathname = redirect;
+        console.log("Redirecting...");
+        if (ctx?.user?.username) url.username = ctx.user.username;
+        if (ctx?.user?.password) url.password = ctx.user.password;
+        if (env?.SYS_ENV === "production") url.protocol = "https";
+      }
 
-    if (redirect) {
-      url.pathname = redirect;
-      console.log("Redirecting...");
-      if (ctx?.user?.username) url.username = ctx.user.username;
-      if (ctx?.user?.password) url.password = ctx.user.password;
-      if (env?.SYS_ENV === "production") url.protocol = "https";
+      if (redirect) return Response.redirect(url.href, 307);
+
+      return new Response(content, {
+        headers: { "content-type": ("text/plain") },
+      });
+    } catch (err) {
+      console.log(err);
+      return new Response(err.message, {
+        status: 404,
+        statusText: "Not Found",
+        headers: {
+          "content-type": ("text/plain"),
+        },
+      });
     }
-
-    if (redirect) return Response.redirect(url.href, 307);
-
-    return new Response(content, {
-      headers: { "content-type": ("text/plain") },
-    });
   };
 };
