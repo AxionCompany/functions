@@ -3,6 +3,7 @@
 import RequestHandler from "./functions/handlers/main.ts";
 import FileLoader from "./functions/features/file-loader/main.ts";
 import DynamicImport from "./functions/features/dynamic-import/main.ts";
+import BearerAuth from "./functions/middlewares/bearerAuth.ts";
 
 const server = (
   { env, handlers, middlewares, pipes, serializers, dependencies, config }: any,
@@ -48,12 +49,16 @@ server({
     "http://localhost:8000";
 
   const adapters = await import(`${fileLoaderUrl}/adapters`)
-    .then((m: any) => {console.log(m);return m.default})
+    .then((m: any) => {
+      console.log(m);
+      return m.default;
+    })
     .catch((err: any) => console.log(err));
 
-
   let config = {
-    middlewares: {}, // default to no middlewares
+    middlewares: {
+      "bearerAuth": BearerAuth,
+    }, 
     pipes: {}, // default to no pipes
     handlers: {
       "/(.*)+": DynamicImport({
@@ -74,5 +79,4 @@ server({
   config = { ...config, ...(await adapters(config)) };
 
   server(config);
-
 })();
