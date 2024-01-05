@@ -4,6 +4,7 @@ import RequestHandler from "./functions/handlers/main.ts";
 import FileLoader from "./functions/features/file-loader/main.ts";
 import DynamicImport from "./functions/features/dynamic-import/main.ts";
 import BearerAuth from "./functions/middlewares/bearerAuth.ts";
+import server from "./functions/servers/main.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
 let dotEnv;
@@ -17,44 +18,25 @@ try {
 
 const env = { ...dotEnv, ...Deno.env.toObject() };
 
-const server = (
-  { env, handlers, middlewares, pipes, serializers, dependencies, config }: any,
-) => {
-  const requestHandler = RequestHandler({
-    handlers,
-    middlewares,
-    pipes,
-    serializers,
-    dependencies,
-    env,
-    config,
-  });
-  const server = Deno.serve(
-    { port: config?.PORT || 8000 },
-    async (req: Request) => {
-      return await requestHandler(req);
-    },
-  );
-  return server.finished;
-};
-
 server({
-  middlewares: {},
-  pipes: {},
-  handlers: {
-    "/(.*)+": FileLoader({
-      config: {
-        functionsDir: "functions",
-        dirEntrypoint: "main",
-        loaderType: "github",
-        gitOwner: "AxionCompany",
-        gitRepo: "functions",
-        gitToken: env.GIT_TOKEN,
-        gitRef: "homolog",
-      },
-    }),
-  },
-  serializers: {},
+  requestHandler: RequestHandler({
+    middlewares: {},
+    pipes: {},
+    handlers: {
+      "/(.*)+": FileLoader({
+        config: {
+          functionsDir: "functions",
+          dirEntrypoint: "main",
+          loaderType: "github",
+          gitOwner: "AxionCompany",
+          gitRepo: "functions",
+          gitToken: env.GIT_TOKEN,
+          gitRef: "homolog",
+        },
+      }),
+    },
+    serializers: {},
+  }),
   config: {
     PORT: env.FILE_LOADER_PORT || 9000,
   },
@@ -89,10 +71,13 @@ server({
     config: {
       PORT: env.PORT || 9002,
     },
-    env
+    env,
   };
 
-  config = { ...config, ...(await adapters(config)) };
+  const { config: _config, ..._adapters }: any = {
+    ...config,
+    ...(await adapters(config)),
+  };
 
-  server(config);
+  server({ requestHandler: RequestHandler(_adapters), config: _config });
 })();

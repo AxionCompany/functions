@@ -1,7 +1,7 @@
 // import DynamicImport from "./adapters/module-bundler.ts";
 const v: any = {};
 
-import WorkerManager from "./adapters/workerManager.ts";
+import WorkerManager from "./adapters/worker-manager.ts";
 import ModuleExecution from "./adapters/module-execution.ts";
 
 export default ({ config, ...dependencies }: any) =>
@@ -41,7 +41,7 @@ async ({ pathname, data, params, queryParams, __requestId__ }: {
       __requestId__,
     }, response);
   } else {
-    res= await ModuleExecution({ loader, dependencies })({
+    res = await ModuleExecution({ loader, dependencies })({
       ...data,
       ...queryParams,
       ...pathParams,
