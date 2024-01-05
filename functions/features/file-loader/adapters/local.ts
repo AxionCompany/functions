@@ -40,7 +40,7 @@ export default ({ config }: any) =>
     if (pathFileExists || indexFileExists) {
       return {
         content: await Deno.readTextFile(pathFile),
-        matchPath: pathFileExists ? pathFile : indexFile,
+        matchPath: (pathFileExists ? pathFile : indexFile).split(`${config.functionsDir}/`).join(''),
         path: pathFileExists ? fullPathFile : fullPathIndex,
         params,
       };
