@@ -19,6 +19,7 @@ export default ({ validateAuth, publicPaths }: any) => {
         return { user: validatedUser };
       }
     } catch (err) {
+      console.log(err);
       error = err.message;
     }
     throw new Response(error || "401 Unauthorized", {

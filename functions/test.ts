@@ -1,9 +1,9 @@
 /// <reference lib="deno.unstable" />
 
-import RequestHandler from "./functions/handlers/main.ts";
-import FileLoader from "./functions/features/file-loader/main.ts";
-import DynamicImport from "./functions/features/dynamic-import/main.ts";
-import BearerAuth from "./functions/middlewares/bearerAuth.ts";
+import RequestHandler from "./handlers/main.ts";
+import FileLoader from "./features/file-loader/main.ts";
+import DynamicImport from "./features/dynamic-import/main.ts";
+import BearerAuth from "./middlewares/bearerAuth.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
 let dotEnv;
@@ -15,7 +15,7 @@ try {
   dotEnv = {};
 }
 
-const env = { ...dotEnv, ...Deno.env.toObject() };
+const env = {...dotEnv, ...Deno.env.toObject() };
 
 const server = (
   { env, handlers, middlewares, pipes, serializers, dependencies, config }: any,
@@ -44,19 +44,14 @@ server({
   handlers: {
     "/(.*)+": FileLoader({
       config: {
-        functionsDir: "functions",
-        dirEntrypoint: "main",
-        loaderType: "github",
-        gitOwner: "AxionCompany",
-        gitRepo: "functions",
-        gitToken: env.GIT_TOKEN,
-        gitRef: "homolog",
+        "functionsDir": "functions",
+        "dirEntrypoint": "main",
       },
     }),
   },
   serializers: {},
   config: {
-    PORT: env.FILE_LOADER_PORT || 9000,
+    PORT: env.FILE_LOADER_PORT ||  9000 ,
   },
 });
 
@@ -73,7 +68,7 @@ server({
   let config = {
     middlewares: {
       "bearerAuth": BearerAuth,
-    },
+    }, 
     pipes: {}, // default to no pipes
     handlers: {
       "/(.*)+": DynamicImport({

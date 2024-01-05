@@ -49,7 +49,7 @@ export default ({ config }: any) =>
     for await (const entry of Deno.readDir(currentPath)) {
       // Check for an index file in the directory
       if (segments.length === 0 && entry.isFile) {
-          const _currentPath = join(currentPath, entry.name);
+        const _currentPath = join(currentPath, entry.name);
         if (
           (extname(entry.name) && (
             pathFile.split(extname(entry.name))[0] ===

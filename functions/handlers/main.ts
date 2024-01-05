@@ -98,7 +98,9 @@ async (req: Request) => {
                   serializedResponse,
                 );
               }
-              if (typeof serializedResponse === "object") {
+              if (
+                serializedResponse && typeof serializedResponse === "object"
+              ) {
                 serializedResponse = JSON.stringify(serializedResponse);
               }
               if (
@@ -123,6 +125,11 @@ async (req: Request) => {
 
               resolve(responseData);
             } catch (err) {
+              options = {
+                ...options,
+                status: err.status || 500,
+                statusText: err.message || "Internal Server Error",
+              };
               controller.enqueue(
                 new TextEncoder().encode(
                   JSON.stringify({
@@ -137,7 +144,17 @@ async (req: Request) => {
         },
       });
 
-      handler({ url, pathname, pathParams, pathMatch, queryParams, data, headers, ctx }, {
+      handler({
+        url,
+        pathname,
+        pathParams,
+        pathMatch,
+        queryParams,
+        data,
+        headers,
+        ctx,
+        __requestId__: crypto.randomUUID(),
+      }, {
         stream,
         send: (e: any) => {
           stream(e).then((_: any) => stream("__END__"));
@@ -174,23 +191,32 @@ async (req: Request) => {
         .then(stream)
         .then((_: null) => stream("__END__"))
         .catch((err: any) => {
+          stream(
+            "__OPTIONS__" + JSON.stringify({
+              statusText: err.message || "Internal Server Error",
+              status: err.status || 500,
+            }),
+          );
           stream({
             message: err.message || "Internal Server Error",
             error: err,
             status: err.status || 500,
           });
-          stream("__END__")
+          stream("__END__");
         });
     });
 
     return new Response(responseStream, options);
   } catch (err) {
+    console.log("ERRO", err);
+    let res;
+    if (typeof err === "object") {
+      res = err;
+    } else {
+      res = { message: err };
+    }
     return new Response(
-      JSON.stringify({
-        message: err.message || "Internal Server Error",
-        error: err,
-        status: err.status || 500,
-      }),
+      JSON.stringify(res),
       {
         headers: {
           "Access-Control-Allow-Origin": "*",
@@ -198,6 +224,8 @@ async (req: Request) => {
             "authorization, x-client-info, apikey, content-type",
           "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
         },
+        status: err.status || 400,
+        statusText: err.message || "Bad Request",
       },
     );
   }
