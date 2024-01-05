@@ -1,18 +1,19 @@
 // import DynamicImport from "./adapters/module-bundler.ts";
 const v: any = {};
 
-import Isolate from "./adapters/isolate.ts";
+import WorkerManager from "./adapters/workerManager.ts";
+import ModuleExecution from "./adapters/module-execution.ts";
 
 export default ({ config, ...dependencies }: any) =>
-async ({ pathname, data, params, queryParams }: {
+async ({ pathname, data, params, queryParams, __requestId__ }: {
   pathname: string;
   params: any | null;
   data: any | null;
   queryParams: any | null;
+  __requestId__: string;
 }, response: any | null) => {
   // get module
-  const { loaderUrl, username, password, customLoader, useIsolate = true } =
-    config;
+  const { loaderUrl, username, password, loader, useWebWorker = true } = config;
 
   // cache busting
   if (v && !v[pathname] || pathname.endsWith("/___cacheBust___")) {
@@ -28,39 +29,24 @@ async ({ pathname, data, params, queryParams }: {
   if (username) url.username = username;
   if (password) url.password = password;
 
-  // import module
-  let mod: any;
+  let res: any;
   let pathParams: any;
 
-  if (useIsolate) {
-    return await Isolate({ config })({
+  if (useWebWorker) {
+    res = await WorkerManager({ config })({
       url,
       pathParams: params,
       queryParams,
       data,
-    });
-  }
-  if (customLoader) {
-    const { default: _mod, _pathParams, _matchedPath } = await customLoader(
-      url.href,
-    );
-    mod = _mod;
-    pathParams = _pathParams;
-    matchedPath = _matchedPath;
+      __requestId__,
+    }, response);
   } else {
-    const { default: _mod, _pathParams, _matchedPath } = await import(url.href);
-    mod = _mod;
-    pathParams = _pathParams;
-    matchedPath = _matchedPath;
+    res= await ModuleExecution({ loader, dependencies })({
+      ...data,
+      ...queryParams,
+      ...pathParams,
+    }, response);
   }
-  if (typeof mod !== "function") {
-    throw { message: "Module Not Found", status: 404 };
-  }
-  const res = await (await mod(dependencies))({
-    ...data,
-    ...queryParams,
-    ...pathParams,
-  });
 
   return res;
 };

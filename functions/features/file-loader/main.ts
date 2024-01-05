@@ -4,6 +4,7 @@ const fileLoaders: any = { ...FileLoaders };
 
 export default ({ config }: any) =>
 async ({ pathname, pathParams, url, headers }: any, res: any) => {
+
   // check if headers type is application/json
   const contentTypeHeaders = headers["content-type"];
 
@@ -11,8 +12,7 @@ async ({ pathname, pathParams, url, headers }: any, res: any) => {
     !(contentTypeHeaders && contentTypeHeaders?.includes("application/json"));
 
   url = new URL(`${url.origin}/${config.functionsDir}${pathname}`);
-  let { loaderType } = pathParams || {};
-  loaderType = loaderType || "local";
+  const { loaderType } = config || { loaderType: "local" };
 
   console.log(
     `Loading file ${pathname} with loader ${loaderType}`,
