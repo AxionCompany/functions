@@ -29,7 +29,7 @@ export default (config: any) => {
 
       let workerRes;
       // check if mod() is a function
-      if (typeof (await mod()) !== "function") {
+      if (typeof (await mod(deps)) !== "function") {
         context.deps = deps;
         workerRes = await mod({
           matchedPath,
