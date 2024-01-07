@@ -1,16 +1,14 @@
 import moduleLoader from "./module-loader.ts";
 
-
 const tryParseJSON = (str: any) => {
-    try {
-      return JSON.parse(str);
-    } catch (err) {
-      return str;
-    }
-  };
+  try {
+    return JSON.parse(str);
+  } catch (err) {
+    return str;
+  }
+};
 
-
-export default (config:any) => {
+export default (config: any) => {
   let { loader, dependencies } = config || {};
   if (!loader) loader = moduleLoader;
   return async (
@@ -27,11 +25,11 @@ export default (config:any) => {
         { url, dependencies },
       );
 
-      console.log('Total Load Time', Date.now() - startTime, 'ms')
+      console.log("Total Load Time", Date.now() - startTime, "ms");
 
       let workerRes;
       // check if mod() is a function
-      if (typeof mod() !== "function") {
+      if (typeof (await mod()) !== "function") {
         context.deps = deps;
         workerRes = await mod({
           matchedPath,
@@ -55,5 +53,4 @@ export default (config:any) => {
       throw err;
     }
   };
-
 };
