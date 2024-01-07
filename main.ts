@@ -25,10 +25,10 @@ server({
     handlers: {
       "/(.*)+": FileLoader({
         config: {
-          functionsDir: "functions",
+          functionsDir: env.FUNCTIONS_DIR || ".",
           dirEntrypoint: "main",
-        //   loaderType: "local",
-          loaderType: "github",
+          loaderType: "local",
+          //   loaderType: "github",
           gitOwner: "AxionCompany",
           gitRepo: "functions",
           gitToken: env.GIT_TOKEN,
@@ -51,7 +51,7 @@ server({
     .then((m: any) => {
       return m.default;
     })
-    .catch((err: any) => console.log(err));
+    .catch((err: any) => console.log(err)) || ((e: any) => e);
 
   let config = {
     middlewares: {
