@@ -39,7 +39,7 @@ export default (config:any) => {
           ...params,
         }, response);
       } else {
-        const workerInstance = mod(deps);
+        const workerInstance = await mod(deps);
         workerRes = await workerInstance({
           matchedPath,
           ...pathParams,
