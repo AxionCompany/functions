@@ -35,13 +35,12 @@ export default ({ config }: any) =>
     const matches: any = [];
 
     const pathFileExists = await fileExists(pathFile);
-    const indexFileExists = await fileExists(indexFile);
 
-    if (pathFileExists || indexFileExists) {
+    if (pathFileExists) {
       return {
         content: await Deno.readTextFile(pathFile),
-        matchPath: (pathFileExists ? pathFile : indexFile).split(`${config.functionsDir}/`).join(''),
-        path: pathFileExists ? fullPathFile : fullPathIndex,
+        matchPath: pathFile.split(`${config.functionsDir}/`).join(''),
+        path:  fullPathFile,
         params,
       };
     }

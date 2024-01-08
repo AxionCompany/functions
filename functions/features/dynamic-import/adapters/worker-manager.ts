@@ -9,6 +9,7 @@ export default (config: any) => async (params: any, response: any) => {
   const { url, pathParams, queryParams, data, __requestId__ } = params;
 
   let urlMetadata;
+  let isJSX = false;
 
   for (const key in urlMetadatas) {
     const regexp = match(key, { decode: decodeURIComponent });
@@ -25,18 +26,21 @@ export default (config: any) => async (params: any, response: any) => {
         "Content-Type": "application/json",
       },
     }).then((res) => res.json());
-    let match = urlMetadata.matchPath.split(".")[0];
-    if (!match.startsWith("/")) match = "/" + match;
+    let match = urlMetadata?.matchPath?.split(".")?.[0];
+    if (!match?.startsWith("/")) match = "/" + match;
     urlMetadata.matchPath = match;
     urlMetadatas[match] = urlMetadata;
   }
+
+  isJSX = urlMetadata?.path?.endsWith(".jsx") ||
+    urlMetadata?.path?.endsWith(".tsx");
 
   const workerId = urlMetadata.matchPath;
 
   if (!workers[workerId]) {
     console.log("Instantiating worker", workerId);
     workers[workerId] = new Worker(
-      new URL("./worker.js", import.meta.url),
+      new URL(isJSX ? "./jsx-worker.js" : "./worker.js", import.meta.url),
       {
         type: "module",
         deno: {
@@ -62,6 +66,7 @@ export default (config: any) => async (params: any, response: any) => {
     __requestId__: __requestId__,
     url: new URL(urlMetadata.matchPath, url.origin).href,
     params: { ...pathParams, ...urlMetadata.params, ...queryParams, ...data },
+    isJSX,
   });
 
   // Global onmessage handler
@@ -79,15 +84,21 @@ export default (config: any) => async (params: any, response: any) => {
           delete resolver[event.data.__requestId__];
           return;
         }
+        if (event.data.options) {
+          responseHandlers[workerId][event.data.__requestId__].options(
+            event.data.options,
+          );
+        }
+        event.data.chunk &&
+          responseHandlers[workerId][event.data.__requestId__].stream(
+            event.data.chunk,
+          );
         if (event.data.__done__) {
-          resolver[event.data.__requestId__].resolve(event.data.chunk);
+          resolver[event.data.__requestId__].resolve();
           delete responseHandlers[workerId][event.data.__requestId__];
           delete resolver[event.data.__requestId__];
           return;
         }
-        responseHandlers[workerId][event.data.__requestId__].stream(
-          event.data.chunk,
-        );
       }
     };
 
