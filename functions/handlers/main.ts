@@ -1,4 +1,5 @@
 import { match } from "npm:path-to-regexp";
+import responseCallback from "../utils/responseCallback.ts";
 
 export default (
   { handlers, middlewares, pipes, serializers, dependencies }: any,
@@ -80,135 +81,125 @@ async (req: Request) => {
       },
     };
 
-    // Execute Handler
-    const responseStream: any = await new Promise((resolve) => {
-      let stream: any;
+    let controller: any;
+    let resolver: any;
 
-      const responseData = new ReadableStream({
-        start: async (controller) => {
-          stream = async (response: any) => {
-            if (response === "__END__") return controller.close();
-            try {
-              let serializedResponse = response;
-              for (const key in serializers) {
-                const serializer = serializers[key];
-                serializedResponse = await serializer(
-                  data,
-                  ctx,
-                  serializedResponse,
-                );
-              }
-              if (
-                serializedResponse && typeof serializedResponse === "object"
-              ) {
-                serializedResponse = JSON.stringify(serializedResponse);
-              }
-              if (
-                response?.startsWith && response?.startsWith("__OPTIONS__")
-              ) {
-                const newOptions = JSON.parse(
-                  response.replace("__OPTIONS__", ""),
-                );
-                return options = {
-                  ...options,
-                  ...newOptions,
-                  headers: {
-                    ...options.headers,
-                    ...newOptions.headers,
-                  },
-                };
-              }
-
-              controller.enqueue(
-                new TextEncoder().encode(serializedResponse),
-              );
-
-              resolve(responseData);
-            } catch (err) {
-              options = {
-                ...options,
-                status: err.status || 500,
-                statusText: err.message || "Internal Server Error",
-              };
-              controller.enqueue(
-                new TextEncoder().encode(
-                  JSON.stringify({
-                    message: err.message || "Internal Server Error",
-                    error: err,
-                    status: err.status || 500,
-                  }),
-                ),
-              );
-            }
-          };
+    const responseStream: any = new Promise((resolve) => {
+      const _responseStream = new ReadableStream({
+        start: (ctlr) => {
+          controller = ctlr;
+        },
+        cancel: () => {
+          controller.close();
         },
       });
+      resolver = () => resolve(_responseStream);
+    });
 
-      handler({
+    const streamCallback = async (streamData: any) => {
+      try {
+        if (controller.desiredSize <= 0) {
+          (streamData.chunk || streamData.options) &&
+            console.log("Response Already Sent", streamData.requestId);
+          return;
+        }
+        if (streamData.options) {
+          options = {
+            ...options,
+            ...streamData.options,
+            headers: {
+              ...options.headers,
+              ...streamData.options.headers,
+            },
+          };
+        }
+
+        let serializedResponse = streamData?.chunk;
+
+        for (const key in serializers) {
+          const serializer = serializers[key];
+          serializedResponse = await serializer(
+            data,
+            ctx,
+            serializedResponse,
+          );
+        }
+
+        if (
+          serializedResponse &&
+          typeof serializedResponse === "object"
+        ) {
+          serializedResponse = JSON.stringify(serializedResponse);
+          options.headers = {
+            ...options.headers,
+            "content-type": "application/json",
+          };
+        }
+
+        serializedResponse && controller.enqueue(
+          new TextEncoder().encode(serializedResponse),
+        );
+
+        if (streamData.__done__) {
+          controller.close();
+        }
+
+        resolver();
+      } catch (err) {
+        console.log("streamCallback error", err);
+        options = {
+          ...options,
+          status: err.status || 500,
+          statusText: err.message || "Internal Server Error",
+          headers: {
+            ...options.headers,
+            "content-type": "application/json",
+          },
+        };
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(err)));
+        controller.close();
+        resolver();
+      }
+    };
+
+    const __requestId__ = crypto.randomUUID();
+
+    handler(
+      {
         url,
         pathname,
         pathParams,
-        pathMatch,
         queryParams,
         data,
         headers,
         ctx,
-        __requestId__: crypto.randomUUID(),
-      }, {
-        stream,
-        send: (e: any) => {
-          stream(e).then((_: any) => stream("__END__"));
-        },
-        redirect: (url: string) => {
-          stream(
-            "__OPTIONS__" + JSON.stringify({
-              status: 307,
-              statusText: "Temporary Redirect",
-              headers: {
-                "location": url,
-              },
-            }),
-          );
-        },
-        status: (status: number) => {
-          stream(
-            "__OPTIONS__" + JSON.stringify({
-              status,
-            }),
-          );
-        },
-        statusText: (statusText: string) => {
-          stream(
-            "__OPTIONS__" + JSON.stringify({
-              statusText,
-            }),
-          );
-        },
-        options: (config: any) => {
-          stream("__OPTIONS__" + JSON.stringify(config));
-        },
-      })
-        .then(stream)
-        .then((_: null) => stream("__END__"))
-        .catch((err: any) => {
-          stream(
-            "__OPTIONS__" + JSON.stringify({
-              statusText: err.message || "Internal Server Error",
-              status: err.status || 500,
-            }),
-          );
-          stream({
+        __requestId__,
+      },
+      responseCallback(__requestId__, streamCallback),
+    )
+      .then(async (data: any) =>
+        await streamCallback({ chunk: data, __done__: true })
+      )
+      .catch((err: any) =>
+        streamCallback({
+          chunk: {
             message: err.message || "Internal Server Error",
             error: err,
             status: err.status || 500,
-          });
-          stream("__END__");
-        });
-    });
+          },
+          options: {
+            status: err.status || 500,
+            statusText: err.message || "Internal Server Error",
+          },
+          __done__: true,
+        })
+      );
+    const resolvedResponseStream: ReadableStream = await responseStream
+      .then((res: any) => res)
+      .catch(console.log);
 
-    return new Response(responseStream, options);
+    return new Response(resolvedResponseStream, options);
   } catch (err) {
-    console.log("ERRO", err);
     let res;
     if (typeof err === "object") {
       res = err;

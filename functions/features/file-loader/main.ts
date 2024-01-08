@@ -4,7 +4,6 @@ const fileLoaders: any = { ...FileLoaders };
 
 export default ({ config }: any) =>
 async ({ pathname, pathParams, url, headers }: any, res: any) => {
-
   // check if headers type is application/json
   const contentTypeHeaders = headers["content-type"];
 
@@ -38,7 +37,7 @@ async ({ pathname, pathParams, url, headers }: any, res: any) => {
   }
 
   if (!isImport) {
-    return { content, redirect, error, params, path, matchPath };
+    return { content, redirect, error, params, path, matchPath } ;
   }
 
   if (params) { // add export for params in content
@@ -46,5 +45,5 @@ async ({ pathname, pathParams, url, headers }: any, res: any) => {
   }
   content += `\n\nexport const _matchPath="${matchPath}"`;
 
-  return content;
+  return  content;
 };
