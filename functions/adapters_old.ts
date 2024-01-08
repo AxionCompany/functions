@@ -1,3 +1,5 @@
+import { config } from "https://deno.land/x/dotenv/mod.ts";
+
 let dotEnv;
 
 try {
@@ -100,7 +102,7 @@ const cloudfare = async (adapters: any) =>
 // const cloudfare = async (adapters: any) =>
 //   await import("./ports/cloudfareWorkers.ts").then((m) => m.default(adapters));
 
-import { config } from "https://deno.land/x/dotenv/mod.ts";
+
 
 export default (adapters: any = undefined) => {
   const connectors = {
