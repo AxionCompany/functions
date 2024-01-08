@@ -17,7 +17,7 @@ export default (config: any) => {
     context: any = globalThis,
   ) => {
     try {
-      const { url, params } = data;
+      const { url, params, isJSX } = data;
 
       const startTime = Date.now();
 
@@ -29,20 +29,50 @@ export default (config: any) => {
 
       let workerRes;
       // check if mod() is a function
-      if (typeof (await mod(deps)) !== "function") {
+      if (typeof (await mod({ ...deps })) !== "function") {
         context.deps = deps;
-        workerRes = await mod({
-          matchedPath,
-          ...pathParams,
-          ...params,
-        }, response);
+        if (isJSX) {
+          response.headers({
+            "Content-Type": "text/html",
+          });
+
+          // Create a React element from the component
+          workerRes = dependencies?.React.createElement(mod, {
+            matchedPath,
+            ...pathParams,
+            ...params,
+          });
+
+          workerRes = dependencies?.ReactDOMServer.renderToString(workerRes);
+        } else {
+          workerRes = await mod({
+            matchedPath,
+            ...pathParams,
+            ...params,
+          }, response);
+        }
       } else {
         const workerInstance = await mod(deps);
-        workerRes = await workerInstance({
-          matchedPath,
-          ...pathParams,
-          ...params,
-        }, response);
+        if (isJSX) {
+          response.headers({
+            "Content-Type": "text/html",
+          });
+
+          // Create a React element from the component
+          workerRes = dependencies?.React.createElement(workerInstance, {
+            matchedPath,
+            ...pathParams,
+            ...params,
+          });
+
+          workerRes = dependencies?.ReactDOMServer.renderToString(workerRes);
+        } else {
+          workerRes = await workerInstance({
+            matchedPath,
+            ...pathParams,
+            ...params,
+          }, response);
+        }
       }
       // try parsing the response as JSON
       const chunk = tryParseJSON(workerRes);
