@@ -40,7 +40,7 @@ export default (config: any) => async (params: any, response: any) => {
   if (!workers[workerId]) {
     console.log("Instantiating worker", workerId);
     workers[workerId] = new Worker(
-      new URL(isJSX ? "./jsx-worker.js" : "./worker.js", import.meta.url),
+      new URL(`./${isJSX ? 'jsx-': ''}worker.js`, import.meta.url),
       {
         type: "module",
         deno: {
