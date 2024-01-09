@@ -76,6 +76,7 @@ export default (
         status: 200,
         statusText: "OK",
         headers: {
+          "Access-Control-Allow-Origin": "*",
           "content-type": "text/plain",
           "x-content-type-options": "nosniff",
         },
