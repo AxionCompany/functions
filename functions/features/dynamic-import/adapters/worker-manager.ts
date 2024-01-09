@@ -89,12 +89,12 @@ export default (config: any) => async (params: any, response: any) => {
             event.data.options,
           );
         }
-        event.data.chunk &&
+        !event.data.__done__ && event.data.chunk && 
           responseHandlers[workerId][event.data.__requestId__].stream(
             event.data.chunk,
           );
         if (event.data.__done__) {
-          resolver[event.data.__requestId__].resolve();
+          resolver[event.data.__requestId__].resolve(event.data.chunk);
           delete responseHandlers[workerId][event.data.__requestId__];
           delete resolver[event.data.__requestId__];
           return;
