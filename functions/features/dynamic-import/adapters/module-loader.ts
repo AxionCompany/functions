@@ -1,9 +1,7 @@
-// worker.js
-import { config } from "https://deno.land/x/dotenv/mod.ts";
-const dotEnv = config();
+
 
 export default async ({ url, dependencies }: any) => {
-  const sharedModulesUrl = new URL("./shared", dotEnv.FILE_LOADER_URL).href;
+  const sharedModulesUrl = new URL("./shared", new URL(url).origin).href;
 
   let startTime = Date.now();
 
