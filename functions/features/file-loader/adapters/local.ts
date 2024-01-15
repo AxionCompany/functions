@@ -108,7 +108,7 @@ export default ({ config }: any) =>
       }
 
       const result = await findFile({
-        path: segments.join("/"),
+        path: join(...segments),
         currentPath: newPath,
         params: newParams,
         fullPath: fullPath || path,

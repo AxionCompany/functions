@@ -2,7 +2,7 @@
 const v: any = {};
 
 import WorkerManager from "./adapters/worker-manager.ts";
-import ModuleExecution from "./adapters/module-execution.ts";
+import ModuleExecution from "./adapters/module-execution.tsx";
 
 export default ({ config, ...dependencies }: any) =>
 async ({ pathname, data, params, queryParams, __requestId__ }: {
