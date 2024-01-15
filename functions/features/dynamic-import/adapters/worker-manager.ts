@@ -105,8 +105,8 @@ export default (config: any) => async (params: any, response: any) => {
     workers[workerId].onerror = (event: any) => {
       console.error("Worker error:", event.message);
       // Reject all pending promises
-      Object.values(responseHandlers[workerId]).forEach(({ reject }: any) =>
-        reject(event.message)
+      Object.values(responseHandlers[workerId]).forEach(({ reject, ...rest }: any) =>
+        console.log(rest, reject) // reject && reject(event.message)
       );
       responseHandlers[workerId] = {}; // Clear the handlers
       delete workers[workerId];
