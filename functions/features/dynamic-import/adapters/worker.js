@@ -1,5 +1,5 @@
 // worker.js
-import ModuleExecution from "./module-execution.ts";
+import ModuleExecution from "./module-execution.tsx";
 import responseCallback from "../../../utils/responseCallback.ts";
 
 // let fs;
