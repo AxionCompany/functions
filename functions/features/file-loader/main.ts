@@ -43,7 +43,8 @@ async ({ pathname, pathParams, url, headers }: any, res: any) => {
   if (params) { // add export for params in content
     content += `\n\nexport const _pathParams = ${JSON.stringify(params)};`;
   }
-  content += `\n\nexport const _matchPath="${matchPath}"`;
+
+  content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\','/')}"`;
 
   return  content;
 };
