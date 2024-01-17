@@ -9,18 +9,25 @@ const tryParseJSON = (str: any) => {
   }
 };
 
-const isInstantiable = async (func: any, props: any = {}) => {
+const getModuleType = async (mod: any, props: any = {},) => {
   try {
-
-    const instance = await func(props);
-    if (typeof instance === "function") {
-      return true;
+    if (typeof mod === "function") {
+      const instance = await mod(props);
+      if (typeof instance === "function") {
+        return 'instance';
+      }
+      if (typeof instance.type === "function") {
+        return 'jsx';
+      }
+      return 'function';
+    } else {
+      return typeof mod;
     }
-  } catch (err) {
-    return false;
-  }
-  return true;
 
+  } catch (err) {
+    console.log(err);
+    return typeof mod;
+  }
 }
 
 const htmlToRenderWithHydrateScript = (html: any, customTags: any, component: any, props: any) => {
@@ -69,7 +76,9 @@ export default (config: any) => {
 
       let workerRes;
       // check if mod() is a function
-      if (!(await isInstantiable(mod, deps))) {
+      const modType = await getModuleType(mod, deps);
+
+      if (modType === 'function' || modType === 'jsx') {
         context.deps = deps;
         if (isJSX) {
           // instantiate twind;
