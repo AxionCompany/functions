@@ -67,6 +67,7 @@ export default ({ config }: any) =>
             ),
           };
         }
+        
         const _currentIndexPath = join(currentPath, path, entry.name);
         if (
           (extname(entry.name) && (
