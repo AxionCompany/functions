@@ -12,8 +12,9 @@ import responseCallback from "../../../utils/responseCallback.ts";
 // }
 
 self.onmessage = async (e) => {
-  const { __requestId__ } = e.data;
+  const { __requestId__ , currentUrl} = e.data;
   try {
+    self.currentUrl = currentUrl;
     const response = responseCallback(__requestId__, postMessage);
     const moduleExecutor = ModuleExecution();
     const chunk = await moduleExecutor(e.data, response, self);

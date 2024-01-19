@@ -9,6 +9,8 @@ export default (
       // Get Headers
       const headers = Object.fromEntries(req.headers.entries());
 
+      console.log(req.url)
+
       // Get Body
       const body = await req
         .text()
