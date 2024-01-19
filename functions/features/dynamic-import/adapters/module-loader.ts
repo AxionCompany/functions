@@ -1,7 +1,7 @@
 
 
-export default async ({ url, dependencies }: any) => {
-  const sharedModulesUrl = new URL("./shared", new URL(url).origin).href;
+export default async ({ importUrl, dependencies }: any) => {
+  const sharedModulesUrl = new URL("./shared", new URL(importUrl).origin).href;
 
   let startTime = Date.now();
 
@@ -19,7 +19,7 @@ export default async ({ url, dependencies }: any) => {
   try {
     startTime = Date.now();
     const { default: mod, _pathParams: pathParams, _matchedPath: matchedPath } =
-      await import(url);
+      await import(importUrl);
     console.log("Loaded Module in", Date.now() - startTime, "ms");
 
     if (typeof mod !== "function") {

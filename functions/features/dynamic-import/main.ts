@@ -5,7 +5,8 @@ import WorkerManager from "./adapters/worker-manager.ts";
 import ModuleExecution from "./adapters/module-execution.tsx";
 
 export default ({ config, ...dependencies }: any) =>
-async ({ pathname, data, params, queryParams, __requestId__ }: {
+async ({ url, pathname, data, params, queryParams, __requestId__ }: {
+  url: URL;
   pathname: string;
   params: any | null;
   data: any | null;
@@ -21,8 +22,10 @@ async ({ pathname, data, params, queryParams, __requestId__ }: {
     v[pathname] = Date.now();
   }
 
-  // create url
-  const url: URL = new URL(pathname, loaderUrl);
+  // create urls
+  const importUrl: URL = new URL(pathname, loaderUrl);
+  const currentUrl: URL = url;
+
   // add cache busting
   if (v) url.searchParams.set("v", v[pathname]);
   // add auth
@@ -34,7 +37,8 @@ async ({ pathname, data, params, queryParams, __requestId__ }: {
 
   if (useWebWorker) {
     res = await WorkerManager({ config })({
-      url,
+      importUrl,
+      currentUrl,
       pathParams: params,
       queryParams,
       data,
@@ -42,6 +46,8 @@ async ({ pathname, data, params, queryParams, __requestId__ }: {
     }, response);
   } else {
     res = await ModuleExecution({ loader, dependencies })({
+      importUrl,
+      currentUrl,
       ...data,
       ...queryParams,
       ...pathParams,

@@ -64,12 +64,12 @@ export default (config: any) => {
     context: any = globalThis,
   ) => {
     try {
-      const { url, params, isJSX } = data;
+      const { importUrl, params, isJSX } = data;
 
       const startTime = Date.now();
 
       const { mod, pathParams, matchedPath, dependencies: deps } = await loader(
-        { url, dependencies },
+        { importUrl, dependencies },
       );
 
       console.log("Total Load Time", Date.now() - startTime, "ms");
@@ -91,11 +91,13 @@ export default (config: any) => {
           // Create a React element from the component
           const Component = mod;
           const React = dependencies.React;
-          workerRes = await <Component matchedPath={matchedPath} {...pathParams} {...params} />;
+          workerRes = await mod({ matchedPath, ...pathParams, ...params }, response);
+          // workerRes = await <Component matchedPath={matchedPath} {...pathParams} {...params} />;
           workerRes = dependencies?.ReactDOMServer.renderToString(workerRes);
           const body = dependencies?.shim(workerRes);
           const styleTag = dependencies?.getStyleTag(dependencies.sheet);
-          workerRes = htmlToRenderWithHydrateScript(body, [styleTag], mod.toString(), {
+          const bundle = await dependencies.bundle(importUrl);
+          workerRes = htmlToRenderWithHydrateScript(body, [styleTag], bundle, {
             matchedPath,
             ...pathParams,
             ...params,
@@ -109,7 +111,7 @@ export default (config: any) => {
           }, response);
         }
       } else {
-        const workerInstance = await mod(deps);
+        const workerInstance = await mod({ ...deps, ...params });
         if (isJSX) {
           // instantiate twind;
           dependencies.twindSetup(deps?.tailwind);
@@ -127,8 +129,8 @@ export default (config: any) => {
 
           const body = dependencies?.shim(workerRes);
           const styleTag = dependencies?.getStyleTag(dependencies.sheet);
-
-          workerRes = htmlToRenderWithHydrateScript(body, [styleTag], workerInstance.toString(), {
+          const bundle = await dependencies.bundle(importUrl);
+          workerRes = htmlToRenderWithHydrateScript(body, [styleTag], bundle, {
             matchedPath,
             ...pathParams,
             ...params,
