@@ -1,8 +1,9 @@
 
-export default (props) => {
+export default async (props) => {
   const [count, setCount] = React.useState(0);
   const [inputValue, setInputValue] = React.useState("");
-
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  await sleep(1000);
   React.useEffect(() => {
     console.log('effect started');
   }, [count])
