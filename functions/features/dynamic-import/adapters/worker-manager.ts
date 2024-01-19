@@ -6,21 +6,21 @@ const resolver: any = {};
 const urlMetadatas: any = {};
 
 export default (config: any) => async (params: any, response: any) => {
-  const { url, pathParams, queryParams, data, __requestId__ } = params;
+  const { currentUrl, importUrl, pathParams, queryParams, data, __requestId__ } = params;
 
   let urlMetadata;
   let isJSX = false;
 
   for (const key in urlMetadatas) {
     const regexp = match(key, { decode: decodeURIComponent });
-    const matched = regexp(url.pathname);
+    const matched = regexp(importUrl.pathname);
     if (matched) {
       urlMetadata = { ...urlMetadatas[key], params: matched.params };
     }
   }
 
   if (!urlMetadata) {
-    urlMetadata = await fetch(url.href, {
+    urlMetadata = await fetch(importUrl.href, {
       redirect: "follow",
       headers: {
         "Content-Type": "application/json",
@@ -65,7 +65,8 @@ export default (config: any) => async (params: any, response: any) => {
 
   workers[workerId].postMessage({
     __requestId__: __requestId__,
-    url: new URL(urlMetadata.matchPath, url.origin).href,
+    importUrl: new URL(urlMetadata.matchPath, importUrl.origin).href,
+    currentUrl:currentUrl.href,
     params: { ...pathParams, ...urlMetadata.params, ...queryParams, ...data },
     isJSX,
   });
