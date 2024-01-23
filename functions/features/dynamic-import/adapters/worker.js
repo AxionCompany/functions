@@ -12,7 +12,7 @@ import responseCallback from "../../../utils/responseCallback.ts";
 // }
 
 self.onmessage = async (e) => {
-  const { __requestId__ , currentUrl} = e.data;
+  const { __requestId__, currentUrl } = e.data;
   try {
     self.currentUrl = currentUrl;
     const response = responseCallback(__requestId__, postMessage);
@@ -20,7 +20,12 @@ self.onmessage = async (e) => {
     const chunk = await moduleExecutor(e.data, response, self);
     self.postMessage({ chunk, __requestId__, __done__: true });
   } catch (err) {
-    console.log(err);
-    self.postMessage({ __error__: true, ...err, __requestId__ });
+    let errorObject = {};
+    if (typeof err === "string") {
+      errorObject = { message: err };
+    } else {
+      errorObject = err;
+    }
+    self.postMessage({ __error__: true, ...errorObject, __requestId__ });
   }
 };

@@ -11,7 +11,7 @@ export default (__requestId__: string, cb: Function) => {
             location: url,
           },
         },
-        __done__: true,
+        chunk: ""
       }),
     stream: (chunk: string) => cb({ __requestId__, chunk }),
     status: (code: string) => cb({ __requestId__, options: { status: code } }),
