@@ -25,7 +25,6 @@ const getModuleType = async (mod: any, props: any = {},) => {
     }
 
   } catch (err) {
-    console.log(err);
     return typeof mod;
   }
 }
@@ -76,7 +75,7 @@ export default (config: any) => {
 
       let workerRes;
       // check if mod() is a function
-      const modType = await getModuleType(mod, deps);
+      const modType = await getModuleType(mod, { ...deps, ...params });
 
       if (modType === 'function' || modType === 'jsx') {
         context.deps = deps;
@@ -92,7 +91,6 @@ export default (config: any) => {
           const Component = mod;
           const React = dependencies.React;
           workerRes = await mod({ matchedPath, ...pathParams, ...params }, response);
-          // workerRes = await <Component matchedPath={matchedPath} {...pathParams} {...params} />;
           workerRes = dependencies?.ReactDOMServer.renderToString(workerRes);
           const body = dependencies?.shim(workerRes);
           const styleTag = dependencies?.getStyleTag(dependencies.sheet);
@@ -111,6 +109,7 @@ export default (config: any) => {
           }, response);
         }
       } else {
+
         const workerInstance = await mod({ ...deps, ...params });
         if (isJSX) {
           // instantiate twind;

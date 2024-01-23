@@ -1,4 +1,4 @@
-
+import { config } from "https://deno.land/x/dotenv@v3.2.2/mod.ts";
 
 export default async ({ importUrl, dependencies }: any) => {
   const sharedModulesUrl = new URL("./shared", new URL(importUrl).origin).href;
@@ -12,9 +12,11 @@ export default async ({ importUrl, dependencies }: any) => {
   console.log("Loaded Dependencies in", Date.now() - startTime, "ms");
 
   dependencies = Dependencies({
-    env: Deno.env.toObject(),
+    env: {...Deno.env.toObject(), ...config()},
     ...dependencies,
   });
+
+  
 
   try {
     startTime = Date.now();

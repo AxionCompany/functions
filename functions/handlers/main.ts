@@ -8,8 +8,7 @@ export default (
     try {
       // Get Headers
       const headers = Object.fromEntries(req.headers.entries());
-
-      console.log(req.url)
+      const __requestId__ = crypto.randomUUID();
 
       // Get Body
       const body = await req
@@ -79,36 +78,36 @@ export default (
         statusText: "OK",
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "content-type": "text/plain",
+          "content-type": "text/plain; charset=utf-8",
           "x-content-type-options": "nosniff",
         },
       };
 
-      let controller: any;
-      let resolver: any;
-      let responseSent = false;
 
-      const responseStream: any = new Promise((resolve) => {
-        const _responseStream = new ReadableStream({
-          start: (ctlr) => {
-            controller = ctlr;
-          },
-          cancel: () => {
+      let controller: any;
+      let responseSent = false;
+      let resolveResponseHeaders: any;
+
+      const responseHeadersPromise = new Promise((resolve) => {
+        resolveResponseHeaders = resolve;
+      });
+
+
+      const responseStream = new ReadableStream({
+        start: (ctlr) => {
+          controller = ctlr;
+        },
+        cancel: () => {
+          console.log('Stream cancelled', __requestId__);
+          if (!responseSent) {
             controller.close();
-          },
-        });
-        resolver = () => {
-          responseSent = true;
-          return resolve(_responseStream)
-        };
+          }
+        }
       });
 
       const streamCallback = async (streamData: any) => {
         try {
-          if (controller.desiredSize <= 0) {
-            if(responseSent) console.log("Response Already Sent", streamData);
-            return;
-          }
+
           if (streamData.options) {
             options = {
               ...options,
@@ -142,15 +141,18 @@ export default (
             };
           }
 
-          serializedResponse && controller.enqueue(
-            new TextEncoder().encode(serializedResponse),
-          );
+          if (serializedResponse) {
+            controller.enqueue(new TextEncoder().encode(serializedResponse));
+          }
 
-          if (streamData.__done__) {
+          // Close the stream if done
+          if (streamData.__done__ && !responseSent) {
+            responseSent = true;
             controller.close();
           }
 
-          resolver();
+          resolveResponseHeaders();
+
         } catch (err) {
           console.log("streamCallback error", err);
           options = {
@@ -162,13 +164,15 @@ export default (
               "content-type": "application/json",
             },
           };
-          controller.enqueue(new TextEncoder().encode(JSON.stringify(err)));
-          controller.close();
-          resolver();
+          if (!responseSent) {
+            controller.enqueue(new TextEncoder().encode(JSON.stringify(err)));
+            controller.close();
+          }
+          resolveResponseHeaders();
         }
       };
 
-      const __requestId__ = crypto.randomUUID();
+
 
       handler(
         {
@@ -183,9 +187,7 @@ export default (
         },
         responseCallback(__requestId__, streamCallback),
       )
-        .then(async (data: any) =>
-          await streamCallback({ chunk: data, __done__: true })
-        )
+        .then((data: any) => streamCallback({ chunk: data, __done__: true }))
         .catch((err: any) =>
           streamCallback({
             chunk: {
@@ -200,11 +202,10 @@ export default (
             __done__: true,
           })
         );
-      const resolvedResponseStream: ReadableStream = await responseStream
-        .then((res: any) => res)
-        .catch(console.log);
 
-      return new Response(resolvedResponseStream, options);
+      await responseHeadersPromise;
+
+      return new Response(responseStream, options);
     } catch (err) {
       let res;
       if (typeof err === "object") {
