@@ -40,7 +40,7 @@ export default (config: any) => async (params: any, response: any) => {
   if (!workers[workerId]) {
     console.log("Instantiating worker", workerId);
     workers[workerId] = new Worker(
-      new URL(`./${isJSX ? 'jsx-': ''}worker.js`, import.meta.url),
+      new URL(`./${isJSX ? 'jsx-' : ''}worker.js`, import.meta.url),
       {
         type: "module",
         deno: {
@@ -49,7 +49,7 @@ export default (config: any) => async (params: any, response: any) => {
             env: true,
             read: true,
             write: true,
-            run:true,
+            run: true,
             ...config.permissions,
           },
         },
@@ -66,7 +66,7 @@ export default (config: any) => async (params: any, response: any) => {
   workers[workerId].postMessage({
     __requestId__: __requestId__,
     importUrl: new URL(urlMetadata.matchPath, importUrl.origin).href,
-    currentUrl:currentUrl.href,
+    currentUrl: currentUrl.href,
     params: { ...pathParams, ...urlMetadata.params, ...queryParams, ...data },
     isJSX,
   });
@@ -76,22 +76,12 @@ export default (config: any) => async (params: any, response: any) => {
     workers[workerId].onmessage = (event: any) => {
       const handler = responseHandlers[workerId][event.data.__requestId__];
       if (handler) {
-        if (event.data.__error__) {
-          console.log(
-            "Error from worker for request",
-            event.data.__requestId__,
-          );
-          resolver[event.data.__requestId__].reject(event.data);
-          delete responseHandlers[workerId][event.data.__requestId__];
-          delete resolver[event.data.__requestId__];
-          return;
-        }
         if (event.data.options) {
           responseHandlers[workerId][event.data.__requestId__].options(
             event.data.options,
           );
         }
-        !event.data.__done__ && event.data.chunk && 
+        !event.data.__done__ && event.data.chunk &&
           responseHandlers[workerId][event.data.__requestId__].stream(
             event.data.chunk,
           );
@@ -107,8 +97,8 @@ export default (config: any) => async (params: any, response: any) => {
     workers[workerId].onerror = (event: any) => {
       console.error("Worker error:", event.message);
       // Reject all pending promises
-      Object.values(responseHandlers[workerId]).forEach(({ reject, ...rest }: any) =>
-        console.log(rest, reject) // reject && reject(event.message)
+      Object.values(responseHandlers[workerId]).forEach(({ reject }: any) =>
+        reject(event.message)
       );
       responseHandlers[workerId] = {}; // Clear the handlers
       delete workers[workerId];
