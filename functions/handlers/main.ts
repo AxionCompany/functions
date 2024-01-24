@@ -106,115 +106,66 @@ export default (
       });
 
       const streamCallback = async (streamData: any) => {
-        try {
 
-          if (streamData.options) {
-            options = {
-              ...options,
-              ...streamData.options,
-              headers: {
-                ...options.headers,
-                ...streamData.options.headers,
-              },
-            };
-          }
-
-          let serializedResponse = streamData?.chunk;
-
-          for (const key in serializers) {
-            const serializer = serializers[key];
-            serializedResponse = await serializer(
-              data,
-              ctx,
-              serializedResponse,
-            );
-          }
-
-          if (
-            serializedResponse &&
-            typeof serializedResponse === "object"
-          ) {
-            serializedResponse = JSON.stringify(serializedResponse);
-            options.headers = {
-              ...options.headers,
-              "content-type": "application/json",
-            };
-          }
-
-          if (serializedResponse) {
-            controller.enqueue(new TextEncoder().encode(serializedResponse));
-          }
-
-          // Close the stream if done
-          if (streamData.__done__ && !responseSent) {
-            responseSent = true;
-            controller.close();
-          }
-
-          resolveResponseHeaders();
-
-        } catch (err) {
-          console.log("streamCallback error", err);
+        if (streamData.options) {
           options = {
             ...options,
-            status: err.status || 500,
-            statusText: err.message || "Internal Server Error",
+            ...streamData.options,
             headers: {
               ...options.headers,
-              "content-type": "application/json",
+              ...streamData.options.headers,
             },
           };
-          if (!responseSent) {
-            controller.enqueue(new TextEncoder().encode(JSON.stringify(err)));
-            controller.close();
-          }
-          resolveResponseHeaders();
         }
-      };
 
+        let serializedResponse = streamData?.chunk;
 
+        for (const key in serializers) {
+          const serializer = serializers[key];
+          serializedResponse = await serializer(
+            data,
+            ctx,
+            serializedResponse,
+          );
+        }
+
+        if (
+          serializedResponse &&
+          typeof serializedResponse === "object"
+        ) {
+          serializedResponse = JSON.stringify(serializedResponse);
+          options.headers = {
+            ...options.headers,
+            "content-type": "application/json",
+          };
+        }
+
+        if (serializedResponse) {
+          controller.enqueue(new TextEncoder().encode(serializedResponse));
+        }
+
+        // Close the stream if done
+        if (streamData.__done__ && !responseSent) {
+          responseSent = true;
+          controller.close();
+        }
+
+        resolveResponseHeaders();
+      }
 
       handler(
-        {
-          url,
-          pathname,
-          pathParams,
-          queryParams,
-          data,
-          headers,
-          ctx,
-          __requestId__,
-        },
+        { url, pathname, pathParams, queryParams, data, headers, ctx, __requestId__ },
         responseCallback(__requestId__, streamCallback),
       )
         .then((data: any) => streamCallback({ chunk: data, __done__: true }))
-        .catch((err: any) =>
-          streamCallback({
-            chunk: {
-              message: err.message || "Internal Server Error",
-              error: err,
-              status: err.status || 500,
-            },
-            options: {
-              status: err.status || 500,
-              statusText: err.message || "Internal Server Error",
-            },
-            __done__: true,
-          })
-        );
+        .catch(responseCallback(__requestId__, streamCallback).error);
 
       await responseHeadersPromise;
 
       return new Response(responseStream, options);
     } catch (err) {
-      let res;
-      if (typeof err === "object") {
-        res = err;
-      } else {
-        res = { message: err };
-      }
       return new Response(
-        JSON.stringify(res),
+        JSON.stringify(err),
         {
           headers: {
             "Access-Control-Allow-Origin": "*",
@@ -222,8 +173,8 @@ export default (
               "authorization, x-client-info, apikey, content-type",
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
           },
-          status: err.status || 400,
-          statusText: err.message || "Bad Request",
+          status: 500,
+          statusText: "Internal Server Error",
         },
       );
     }
