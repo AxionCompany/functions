@@ -1,6 +1,5 @@
 import moduleLoader from "./module-loader.ts";
 
-
 const tryParseJSON = (str: any) => {
   try {
     return JSON.parse(str);

@@ -38,7 +38,7 @@ export default (config: any) => async (params: any, response: any) => {
   const workerId = urlMetadata.matchPath;
 
   if (!workers[workerId]) {
-    console.log("Instantiating worker", workerId);
+    console.log("Instantiating worker", workerId, "for", import.meta.url);
     workers[workerId] = new Worker(
       new URL(`./${isJSX ? 'jsx-' : ''}worker.js`, import.meta.url),
       {
@@ -76,16 +76,16 @@ export default (config: any) => async (params: any, response: any) => {
     workers[workerId].onmessage = (event: any) => {
       const handler = responseHandlers[workerId][event.data.__requestId__];
       if (handler) {
-        if (event.data.options) {
+        if (event?.data?.options) {
           responseHandlers[workerId][event.data.__requestId__].options(
             event.data.options,
           );
         }
-        !event.data.__done__ && event.data.chunk &&
+        !event?.data?.__done__ && event?.data?.chunk &&
           responseHandlers[workerId][event.data.__requestId__].stream(
             event.data.chunk,
           );
-        if (event.data.__done__) {
+        if (event?.data?.__done__) {
           resolver[event.data.__requestId__].resolve(event.data.chunk);
           delete responseHandlers[workerId][event.data.__requestId__];
           delete resolver[event.data.__requestId__];
@@ -98,17 +98,17 @@ export default (config: any) => async (params: any, response: any) => {
       console.error("Worker error:", event.message);
       // Reject all pending promises
       Object.values(responseHandlers[workerId]).forEach(({ reject }: any) =>
-        reject(event.message)
+        reject(event?.message)
       );
       responseHandlers[workerId] = {}; // Clear the handlers
       delete workers[workerId];
     };
 
     workers[workerId].onmessageerror = (event: any) => {
-      console.error("Message error:", event.data);
+      console.error("Message error:", event?.data);
       // Handle message errors similarly
       Object.values(responseHandlers[workerId]).forEach(({ reject }: any) =>
-        reject(event.data)
+        reject(event?.data)
       );
       responseHandlers[workerId] = {}; // Clear the handlers
       delete workers[workerId];
