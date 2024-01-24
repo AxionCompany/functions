@@ -12,11 +12,11 @@ export default async ({ importUrl, dependencies }: any) => {
   console.log("Loaded Dependencies in", Date.now() - startTime, "ms");
 
   dependencies = Dependencies({
-    env: {...Deno.env.toObject(), ...config()},
+    env: { ...Deno.env.toObject(), ...config() },
     ...dependencies,
   });
 
-  
+
 
   try {
     startTime = Date.now();
