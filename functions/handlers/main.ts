@@ -141,7 +141,7 @@ export default (
           };
         }
 
-        if (serializedResponse) {
+        if (serializedResponse && !responseSent) {
           controller.enqueue(new TextEncoder().encode(serializedResponse));
         }
 
