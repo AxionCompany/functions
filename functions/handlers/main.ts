@@ -100,6 +100,7 @@ export default (
         cancel: () => {
           console.log('Stream cancelled', __requestId__);
           if (!responseSent) {
+            responseSent=true;
             controller.close();
           }
         }
