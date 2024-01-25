@@ -38,9 +38,14 @@ export default (__requestId__: string, cb: Function) => {
         options.statusText = chunk.message || options.statusText;
       }
 
-      const error = {
-        message: chunk.message,
-        stack: chunk.stack,
+      let error: any = {}
+      if (typeof chunk === "string") {
+        error.message = chunk
+      } else {
+        error = {
+          message: chunk.message,
+          stack: chunk.stack,
+        }
       }
 
       return cb({ chunk: { error }, __requestId__, __error__: true, options, __done__: true });
