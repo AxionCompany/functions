@@ -64,13 +64,9 @@ export default (config: any) => {
     try {
       const { importUrl, params, isJSX } = data;
 
-      const startTime = Date.now();
-
       const { mod, pathParams, matchedPath, dependencies: deps } = await loader(
         { importUrl, dependencies },
       );
-
-      console.log("Total Load Time", Date.now() - startTime, "ms");
 
       let workerRes;
       // check if mod() is a function
