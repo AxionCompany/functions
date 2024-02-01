@@ -13,7 +13,7 @@ async ({ pathname, pathParams, url, headers }: any, res: any) => {
   url = new URL(`${url.origin}/${config.functionsDir}${pathname}`);
   const { loaderType } = config || { loaderType: "local" };
 
-  console.log(
+  config.verbose && console.log(
     `Loading file ${pathname} with loader ${loaderType}`,
   );
 
@@ -32,7 +32,7 @@ async ({ pathname, pathParams, url, headers }: any, res: any) => {
   if (redirect) {
     const baseUrl = url.origin;
     const redirectUrl = new URL(path, baseUrl);
-    console.log(`Redirecting to ${redirectUrl.href}`);
+    config.verbose && console.log(`Redirecting to ${redirectUrl.href}`);
     return res.redirect(redirectUrl.href);
   }
 
