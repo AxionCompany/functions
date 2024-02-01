@@ -38,5 +38,6 @@ server({
   }),
   config: {
     PORT: env.FILE_LOADER_PORT || 9000,
+    verbose:false
   },
 });
