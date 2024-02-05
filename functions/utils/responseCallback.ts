@@ -20,7 +20,6 @@ export default (__requestId__: string, cb: Function) => {
     options: (options: any) => cb({ __requestId__, options }),
     headers: (headers: any) => cb({ __requestId__, options: { headers } }),
     error: (chunk: any) => {
-      console.log("ERROR", chunk.message)
       const options: any = {
         status: 500,
         statusText: "Internal Server Error",
