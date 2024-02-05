@@ -100,7 +100,7 @@ export default (
         cancel: () => {
           console.log('Stream cancelled', __requestId__);
           if (!responseSent) {
-            responseSent=true;
+            responseSent = true;
             controller.close();
           }
         }
@@ -147,6 +147,7 @@ export default (
 
         // Close the stream if done
         if (streamData.__done__ && !responseSent) {
+
           responseSent = true;
           controller.close();
         }
@@ -162,6 +163,7 @@ export default (
         .catch(responseCallback(__requestId__, streamCallback).error);
 
       await responseHeadersPromise;
+
 
       return new Response(responseStream, options);
     } catch (err) {

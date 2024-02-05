@@ -60,7 +60,9 @@ export default (config: any) => async (params: any, response: any) => {
   const promiseResult = new Promise((resolve, reject) => {
     responseHandlers[workerId] = { ...responseHandlers?.[workerId] };
     responseHandlers[workerId][__requestId__] = response;
-    return (resolver[__requestId__] = { resolve, reject });
+    resolver[workerId] = { ...resolver?.[workerId] };
+    resolver[workerId][__requestId__] = { resolve, reject };
+    return resolver[workerId][__requestId__]
   });
 
   workers[workerId].postMessage({
@@ -86,31 +88,35 @@ export default (config: any) => async (params: any, response: any) => {
             event.data.chunk,
           );
         if (event?.data?.__done__) {
-          resolver[event.data.__requestId__].resolve(event.data.chunk);
-          delete responseHandlers[workerId][event.data.__requestId__];
-          delete resolver[event.data.__requestId__];
-          return;
+          resolver[workerId][event.data.__requestId__].resolve(event.data.chunk);
+          // delete responseHandlers[workerId][event.data.__requestId__];
+          // delete resolver[workerId][event.data.__requestId__];
+          // return;
         }
+        return 
       }
     };
 
     workers[workerId].onerror = (event: any) => {
-      console.error("Worker error:", event.message);
-      // Reject all pending promises
-      Object.values(responseHandlers[workerId]).forEach(({ reject }: any) =>
-        reject(event?.message)
-      );
-      responseHandlers[workerId] = {}; // Clear the handlers
-      delete workers[workerId];
+      console.error("Worker error AQUIIIIIIII:", event.message);
+
+      // Object.values(resolver[workerId]).forEach(({ reject }: any) => {
+      //   console.log(reject)
+      //   return reject(event?.message)
+      // });
+      // responseHandlers[workerId] = {};
+      // resolver[workerId] = {};
+      // delete workers[workerId];
     };
 
     workers[workerId].onmessageerror = (event: any) => {
       console.error("Message error:", event?.data);
-      // Handle message errors similarly
-      Object.values(responseHandlers[workerId]).forEach(({ reject }: any) =>
-        reject(event?.data)
-      );
-      responseHandlers[workerId] = {}; // Clear the handlers
+
+      Object.values(resolver[workerId]).forEach(({ reject }: any) => {
+        return reject(event?.message)
+      });
+      responseHandlers[workerId] = {};
+      resolver[workerId] = {};
       delete workers[workerId];
     };
   }
