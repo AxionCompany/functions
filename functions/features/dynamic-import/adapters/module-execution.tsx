@@ -8,7 +8,7 @@ const tryParseJSON = (str: any) => {
   }
 };
 
-const htmlToRenderWithHydrateScript = (html: any, customTags: any, component: any, props: any) => `
+const htmlToRenderWithHydrateScript = (html: any, customTags: any, component: any, props: any, defaultDeclaration) => `
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -27,7 +27,7 @@ const htmlToRenderWithHydrateScript = (html: any, customTags: any, component: an
 
     const recursiveReactElement = ${recursiveReactElement.toString()};
 
-    const { Component, iter } = await recursiveReactElement(__default, ${JSON.stringify(props)}, {React});
+    const { Component, iter } = await recursiveReactElement(${defaultDeclaration}, ${JSON.stringify(props)}, {React});
     ReactDOMClient.hydrateRoot(
       document.getElementById("root"),
       Component
@@ -86,8 +86,9 @@ const moduleInstance: any = async (mod: any, params: any = {}, dependencies: any
       const html = remoteDependencies.ReactDOMServer.renderToString(Component);
       const css = await remoteDependencies.getCss(localDependencies?.tailwind, html, localDependencies?.globalsCss)
       const bundle = (await remoteDependencies.bundle(importUrl));
+      const defaultDeclaration = remoteDependencies.findDefaultExportedVariable(bundle.code);
 
-      workerRes = htmlToRenderWithHydrateScript(html, [`<style>\n${css}\n</style>`], bundle.code, params);
+      workerRes = htmlToRenderWithHydrateScript(html, [`<style>\n${css}\n</style>`], bundle.code, params,defaultDeclaration);
 
       // stream workerRes response
       workerRes.split("\n").forEach((line: any) => {
