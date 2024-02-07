@@ -52,6 +52,7 @@ export default (config: any) => async (params: any, response: any) => {
             read: true,
             write: true,
             run: true,
+            sys: true,
             ...config.permissions,
           },
         },
