@@ -1,7 +1,8 @@
 import { config } from "https://deno.land/x/dotenv@v3.2.2/mod.ts";
 
 export default async ({ importUrl, dependencies }: any) => {
-  const sharedModulesUrl = new URL("./shared", new URL(importUrl).origin).href;
+  const searchParams = importUrl.split("?")[1];
+  const sharedModulesUrl = new URL(`./shared?${searchParams}`, new URL(importUrl).origin).href;
 
   let startTime = Date.now();
 
