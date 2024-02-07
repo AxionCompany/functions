@@ -8,6 +8,8 @@ const urlMetadatas: any = {};
 export default (config: any) => async (params: any, response: any) => {
   const { currentUrl, importUrl, pathParams, queryParams, data, __requestId__ } = params;
 
+  const importSearchParams = new URL(importUrl).searchParams.toString();
+
   let urlMetadata;
   let isJSX = false;
 
@@ -38,7 +40,7 @@ export default (config: any) => async (params: any, response: any) => {
   const workerId = urlMetadata.matchPath;
 
   if (!workers[workerId]) {
-    console.log("Instantiating worker", workerId, "for", import.meta.url);
+    console.log("Instantiating worker", workerId);
     workers[workerId] = new Worker(
       new URL(`./${isJSX ? 'jsx-' : ''}worker.js`, import.meta.url),
       {
@@ -67,7 +69,7 @@ export default (config: any) => async (params: any, response: any) => {
 
   workers[workerId].postMessage({
     __requestId__: __requestId__,
-    importUrl: new URL(urlMetadata.matchPath, importUrl.origin).href,
+    importUrl: new URL(`${urlMetadata.matchPath}?${importSearchParams}`, importUrl.origin).href,
     currentUrl: currentUrl.href,
     params: { ...pathParams, ...urlMetadata.params, ...queryParams, ...data },
     isJSX,
@@ -89,24 +91,22 @@ export default (config: any) => async (params: any, response: any) => {
           );
         if (event?.data?.__done__) {
           resolver[workerId][event.data.__requestId__].resolve(event.data.chunk);
-          // delete responseHandlers[workerId][event.data.__requestId__];
-          // delete resolver[workerId][event.data.__requestId__];
-          // return;
+          delete responseHandlers[workerId][event.data.__requestId__];
+          delete resolver[workerId][event.data.__requestId__];
+          return;
         }
         return 
       }
     };
 
     workers[workerId].onerror = (event: any) => {
-      console.error("Worker error AQUIIIIIIII:", event.message);
-
-      // Object.values(resolver[workerId]).forEach(({ reject }: any) => {
-      //   console.log(reject)
-      //   return reject(event?.message)
-      // });
-      // responseHandlers[workerId] = {};
-      // resolver[workerId] = {};
-      // delete workers[workerId];
+      Object.values(resolver[workerId]).forEach(({ reject }: any) => {
+        console.log(reject)
+        return reject(event?.message)
+      });
+      responseHandlers[workerId] = {};
+      resolver[workerId] = {};
+      delete workers[workerId];
     };
 
     workers[workerId].onmessageerror = (event: any) => {

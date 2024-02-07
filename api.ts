@@ -1,5 +1,16 @@
 /// <reference lib="deno.unstable" />
 
+self.addEventListener("unhandledrejection", event => {
+  // Prevent this being reported (Firefox doesn't currently respect this)
+  event.preventDefault();
+
+  self.postMessage({
+    message: event.reason.message,
+    stack: event.reason.stack,
+  });
+});
+
+
 import RequestHandler from "./functions/handlers/main.ts";
 import DynamicImport from "./functions/features/dynamic-import/main.ts";
 import BearerAuth from "./functions/middlewares/bearerAuth.ts";
@@ -54,5 +65,24 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
     ...(await adapters(config)),
   };
 
+
+  Deno.env.get('WATCH') && watchFiles(env);
+
   server({ requestHandler: RequestHandler(_adapters), config: _config });
 })();
+
+async function watchFiles(env: any) {
+
+  for await (const event of Deno.watchFs("./", { recursive: true })) {
+    if (event.kind === "modify" && event.paths.some(path => /\.(html|js|jsx|tsx|ts)$/.test(path))) {
+      const dir = Deno.cwd();
+      const files = event.paths.map(path => path.split(dir).join(''));
+      event.paths.forEach(path => {
+        self.postMessage({ message: `Files modified: ${files}` });
+      })
+    }
+  }
+}
+
+
+

@@ -20,8 +20,8 @@ const htmlToRenderWithHydrateScript = (html: any, customTags: any, component: an
     <div id="root">${html}</div>
   </body>
   <script type="module">
-    import ReactDOMClient from 'https://dev.jspm.io/react-dom/client';
-    import React from 'https://dev.jspm.io/react';
+    import ReactDOMClient from 'https://esm.sh/react-dom/client';
+    import React from 'https://esm.sh/react';
 
     ${component}
 
@@ -82,18 +82,19 @@ const moduleInstance: any = async (mod: any, params: any = {}, dependencies: any
         "Content-Type": "text/html",
       });
 
-      const { Component, iter: iterJSX } = await recursiveReactElement(mod, params, self.deps);
-
-      remoteDependencies.twindSetup(localDependencies?.tailwind);
-      workerRes = remoteDependencies.ReactDOMServer.renderToString(Component);
-
-      const body = remoteDependencies?.shim(workerRes);
-      const styleTag = remoteDependencies?.getStyleTag(remoteDependencies.sheet);
+      const { Component } = await recursiveReactElement(mod, params, self.deps);
+      const html = remoteDependencies.ReactDOMServer.renderToString(Component);
+      const css = await remoteDependencies.getCss(localDependencies?.tailwind, html, localDependencies?.globalsCss)
       const bundle = (await remoteDependencies.bundle(importUrl));
 
-      workerRes = htmlToRenderWithHydrateScript(body, [styleTag], bundle.code, params);
-    }
+      workerRes = htmlToRenderWithHydrateScript(html, [`<style>\n${css}\n</style>`], bundle.code, params);
 
+      // stream workerRes response
+      workerRes.split("\n").forEach((line: any) => {
+        response.stream(line);
+      });
+      return;
+    }
     else {
       workerRes = await mod({
         ...localDependencies,

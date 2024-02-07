@@ -27,10 +27,10 @@ export default ({ config, ...dependencies }: any) =>
     const currentUrl: URL = url;
 
     // add cache busting
-    if (v) url.searchParams.set("v", v[pathname]);
+    if (v) importUrl.searchParams.set("v", v[pathname]);
     // add auth
-    if (username) url.username = username;
-    if (password) url.password = password;
+    if (username) importUrl.username = username;
+    if (password) importUrl.password = password;
 
     let res: any;
     let pathParams: any;
