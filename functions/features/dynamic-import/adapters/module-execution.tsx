@@ -8,7 +8,7 @@ const tryParseJSON = (str: any) => {
   }
 };
 
-const htmlToRenderWithHydrateScript = (html: any, customTags: any, component: any, props: any, defaultDeclaration) => `
+const htmlToRenderWithHydrateScript = (html: any, customTags: any, component: any, props: any, defaultDeclaration: string) => `
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -81,14 +81,13 @@ const moduleInstance: any = async (mod: any, params: any = {}, dependencies: any
       response.headers({
         "Content-Type": "text/html",
       });
-
       const { Component } = await recursiveReactElement(mod, params, self.deps);
       const html = remoteDependencies.ReactDOMServer.renderToString(Component);
       const css = await remoteDependencies.getCss(localDependencies?.tailwind, html, localDependencies?.globalsCss)
       const bundle = (await remoteDependencies.bundle(importUrl));
       const defaultDeclaration = remoteDependencies.findDefaultExportedVariable(bundle.code);
 
-      workerRes = htmlToRenderWithHydrateScript(html, [`<style>\n${css}\n</style>`], bundle.code, params,defaultDeclaration);
+      workerRes = htmlToRenderWithHydrateScript(html, [`<style>\n${css}\n</style>`], bundle.code, params, defaultDeclaration);
 
       // stream workerRes response
       workerRes.split("\n").forEach((line: any) => {
