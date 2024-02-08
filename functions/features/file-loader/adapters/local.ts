@@ -1,4 +1,4 @@
-import { SEP, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
+import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 
 const fileExists = async (path: string) => {
   try {
@@ -19,7 +19,7 @@ export default ({ config }: any) =>
         fullPath: string | undefined;
       },
   ): Promise<any> {
-    const segments: Array<string> = path.split(SEP).filter(Boolean);
+    const segments: Array<string> = path.split(SEPARATOR).filter(Boolean);
 
     const mainEntrypoint = config?.dirEntrypoint || "index";
 
@@ -39,7 +39,7 @@ export default ({ config }: any) =>
     if (pathFileExists) {
       return {
         content: await Deno.readTextFile(pathFile),
-        matchPath: pathFile.split(`${config.functionsDir}${SEP}`).join(''),
+        matchPath: pathFile.split(`${config.functionsDir}${SEPARATOR}`).join(''),
         path: fullPathFile,
         params,
       };
