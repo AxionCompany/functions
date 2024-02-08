@@ -16,8 +16,6 @@ export default async ({ importUrl, dependencies }: any) => {
     sharedModulesUrls.push(`${accPath}/shared?${searchParams}`);
   });
 
-  console.log(sharedModulesUrls)
-
 
   let startTime = Date.now();
 
@@ -37,21 +35,10 @@ export default async ({ importUrl, dependencies }: any) => {
   dependencies = SharedModules.reduce(
     (acc, Dependencies, index) => {
       if (!Dependencies) return acc
-      // console.log(index, Dependencies.toString(), acc.toString())
       return Dependencies({ ...acc })
     },
     { env: { ...Deno.env.toObject(), ...config(), ...dependencies } }
   );
-
-
-  // const Dependencies =
-  //   await import(sharedModulesUrl).then((mod) => mod.default) ||
-  //   ((e: any) => e);
-
-  // dependencies = Dependencies({
-  //   env: { ...Deno.env.toObject(), ...config() },
-  //   ...dependencies,
-  // });
 
   try {
     startTime = Date.now();
