@@ -31,7 +31,7 @@ export default async ({ importUrl, dependencies }: any) => {
         console.log(url,_matchPath, isShared)
       if (!isShared) return (e: any) => e
       return mod.default
-    }).catch(_ => (e: any) => console.log(e))
+    }).catch((e: any) => console.log('ERRO AQUI', url, e))
   );
 
   const SharedModules = await Promise.all(dependenciesPromises);
