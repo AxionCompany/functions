@@ -5,13 +5,21 @@ import responseCallback from "../../../utils/responseCallback.ts";
 // Flag to check if overrides have been applied
 let overridesApplied = false;
 
+const checkOrCreateDir = async (path) => {
+  try {
+    await Deno.stat(path);
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) {
+      await Deno.mkdir(path, { recursive: true });
+    }
+  }
+};
+
 const denoOverrides = {
-  "openKv": ({ currentUrl, originalModule }) => (data) => {
-    return originalModule(
-      `./${
-        new URL(currentUrl)?.pathname?.split("/")?.filter(Boolean)?.[0]
-      }${data ? "-" + data : ""}`,
-    );
+  "openKv": ({ currentUrl, originalModule }) => async (data) => {
+    const basePath = new URL(currentUrl).pathname.split("/").filter(Boolean)[0];
+    await checkOrCreateDir(`./${basePath}/${data ? data : "data"}`);
+    return originalModule(basePath);
   },
 };
 
