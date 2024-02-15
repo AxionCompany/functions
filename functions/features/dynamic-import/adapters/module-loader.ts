@@ -10,12 +10,13 @@ export default async ({ importUrl, dependencies }: any) => {
 
   const sharedModulesUrls = [`./shared?${searchParams}`];
 
-  
+
   pathParts.forEach((part) => {
+    if (!part) return
     accPath = `${accPath}/${part}`;
     sharedModulesUrls.push(`${accPath}/shared?${searchParams}`);
   });
-  
+
   console.log("SHARED MODULES URLS", sharedModulesUrls)
 
 
@@ -23,15 +24,15 @@ export default async ({ importUrl, dependencies }: any) => {
 
   const dependenciesPromises = sharedModulesUrls.map((url) =>
     import(new URL(url, new URL(importUrl).origin).href)
-    .then((mod) => {
-      console.log("IMPORT URL", url)
-      const { _matchPath } = mod;
-      const isShared = ['shared.js', 'shared.ts', 'shared.jsx', 'shared.tsx']
-        .some(i => _matchPath.includes(i))
-        console.log(url,_matchPath, isShared)
-      if (!isShared) return (e: any) => e
-      return mod.default
-    }).catch((e: any) => console.log('ERRO AQUI', url, e))
+      .then((mod) => {
+        console.log("IMPORT URL", url)
+        const { _matchPath } = mod;
+        const isShared = ['shared.js', 'shared.ts', 'shared.jsx', 'shared.tsx']
+          .some(i => _matchPath.includes(i))
+        console.log(url, _matchPath, isShared)
+        if (!isShared) return (e: any) => e
+        return mod.default
+      }).catch((e: any) => console.log('ERRO AQUI', url, e))
   );
 
   const SharedModules = await Promise.all(dependenciesPromises);
