@@ -22,7 +22,8 @@ export default async ({ importUrl, dependencies }: any) => {
   let startTime = Date.now();
 
   const dependenciesPromises = sharedModulesUrls.map((url) =>
-    import(new URL(url, new URL(importUrl).origin).href).then((mod) => {
+    import(new URL(url, new URL(importUrl).origin).href)
+    .then((mod) => {
       console.log("IMPORT URL", url)
       const { _matchPath } = mod;
       const isShared = ['shared.js', 'shared.ts', 'shared.jsx', 'shared.tsx']
@@ -30,7 +31,7 @@ export default async ({ importUrl, dependencies }: any) => {
         console.log(url,_matchPath, isShared)
       if (!isShared) return (e: any) => e
       return mod.default
-    }).catch(_ => (e: any) => e)
+    }).catch(_ => (e: any) => console.log(e))
   );
 
   const SharedModules = await Promise.all(dependenciesPromises);
