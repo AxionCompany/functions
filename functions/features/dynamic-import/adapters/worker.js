@@ -17,9 +17,10 @@ const checkOrCreateDir = async (path) => {
 
 const denoOverrides = {
   "openKv": ({ currentUrl, originalModule }) => async (data) => {
-    const basePath = new URL(currentUrl).pathname.split("/").filter(Boolean)[0];
-    await checkOrCreateDir(`./${basePath}/${data ? data : "data"}`);
-    return originalModule(basePath);
+      const basePath = new URL(currentUrl).pathname.split("/").filter(Boolean)[0];
+      const kvDir = `data/${basePath}`;
+      await checkOrCreateDir(kvDir);
+      return originalModule(kvDir+'/kv');
   },
 };
 
