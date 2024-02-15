@@ -29,7 +29,7 @@ export default async ({ importUrl, dependencies }: any) => {
           .some(i => _matchPath.includes(i))
         if (!isShared) return (e: any) => e
         return mod.default
-      })
+      }).catch((_) => { })
   );
 
   const SharedModules = await Promise.all(dependenciesPromises);
