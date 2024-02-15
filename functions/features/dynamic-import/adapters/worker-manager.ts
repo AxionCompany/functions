@@ -45,17 +45,17 @@ export default (config: any) => async (params: any, response: any) => {
       new URL(`./${isJSX ? 'jsx-' : ''}worker.js`, import.meta.url),
       {
         type: "module",
-        // deno: {
-          // permissions: {
-          //   net: true,
-          //   env: true,
-          //   read: true,
-          //   write: true,
-          //   run: true,
-          //   sys: true,
-          //   ...config.permissions,
-          // },
-        // },
+        deno: {
+          permissions: {
+            net: true,
+            env: true,
+            read: true,
+            write: true,
+            run: true,
+            sys: true,
+            ...config.permissions,
+          },
+        },
       },
     );
   }
