@@ -47,7 +47,7 @@ export default (config: any) => {
     context: any = globalThis,
   ) => {
     try {
-      const { importUrl, params: requestParams, isJSX } = data;
+      const { importUrl, params: requestParams, isJSX, __requestId__ } = data;
 
       const { mod, pathParams, matchedPath, dependencies: localDependencies } = await loader(
         { importUrl, dependencies: remoteDependencies },
@@ -57,7 +57,7 @@ export default (config: any) => {
 
       const params = { ...requestParams, ...pathParams };
 
-      const workerRes = await moduleInstance(mod, params, dependencies, importUrl, response, isJSX);
+      const workerRes = await moduleInstance(mod, { ...params, __requestId__ }, dependencies, importUrl, response, isJSX);
 
       // try parsing the response as JSON
       const chunk = tryParseJSON(workerRes);
@@ -97,6 +97,7 @@ const moduleInstance: any = async (mod: any, params: any = {}, dependencies: any
     }
     else {
       workerRes = await mod({
+
         ...localDependencies,
         ...remoteDependencies,
         ...params,
