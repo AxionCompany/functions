@@ -17,8 +17,6 @@ export default async ({ importUrl, dependencies }: any) => {
     sharedModulesUrls.push(`${accPath}/shared?${searchParams}`);
   });
 
-
-
   let startTime = Date.now();
 
   const dependenciesPromises = sharedModulesUrls.map((url) =>
