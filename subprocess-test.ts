@@ -1,4 +1,5 @@
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+console.log('CHEGOU AQUI');
 
 async function measureSubprocessMemoryUsage() {
     // Measure initial memory usage
