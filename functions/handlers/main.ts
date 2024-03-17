@@ -25,6 +25,7 @@ export default (
       // Get Query parameters
       const url = new URL(req.url);
       const queryParams = Object.fromEntries(url.searchParams.entries());
+      const method = req.method;
 
       // Get Path name
       const pathname = new URL(req.url).pathname;
@@ -156,7 +157,7 @@ export default (
       }
 
       handler(
-        { url, pathname, pathParams, queryParams, data, headers, ctx, __requestId__ },
+        { url, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
         responseCallback(__requestId__, streamCallback),
       )
         .then((data: any) => streamCallback({ chunk: data, __done__: true }))

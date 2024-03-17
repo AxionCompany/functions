@@ -1,8 +1,9 @@
+
 import * as FileLoaders from "./adapters/main.ts";
 
 const fileLoaders: any = { ...FileLoaders };
 
-export default ({ config }: any) =>
+export default ({ config, modules }: any) =>
   async ({ pathname, pathParams, url, headers, searchParams }: any, res: any) => {
     // check if headers type is application/json
     const contentTypeHeaders = headers["content-type"];
@@ -10,25 +11,27 @@ export default ({ config }: any) =>
     const isImport =
       !(contentTypeHeaders && contentTypeHeaders?.includes("application/json"));
 
-    url = new URL(`${url.origin}/${config.functionsDir}${pathname}`);
+
     const { loaderType } = config || { loaderType: "local" };
 
     config.verbose && console.log(
       `Loading file ${pathname} with loader ${loaderType}`,
     );
 
-    let { content, redirect, error, params, path, matchPath } =
+    let { content, redirect, params, path, matchPath } =
       await (fileLoaders[loaderType]({ config }))(
         {
           path: pathname,
         },
       ) || {};
 
-    if (error) {
+    if (!path) {
       res.status(404);
-      return error;
+      res.statusText(`No path found for ${pathname}`)
+      return;
     }
 
+    redirect = (path !== pathname)
     if (redirect) {
       const baseUrl = url.origin;
       const redirectUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, baseUrl);
@@ -37,7 +40,7 @@ export default ({ config }: any) =>
     }
 
     if (!isImport) {
-      return { content, redirect, error, params, path, matchPath };
+      return { content, redirect, params, path, matchPath };
     }
 
     if (params) { // add export for params in content
