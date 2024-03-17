@@ -1,11 +1,50 @@
-import { match } from "npm:path-to-regexp";
 
-const subprocesses: any = {};
-const responseHandlers: any = {};
-const resolver: any = {};
+
+const isolates: any = {};
 const urlMetadatas: any = {};
 
-export default (config: any) => async (params: any, response: any) => {
+
+const getAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
+    for (let port = startPort; port <= endPort; port++) {
+        try {
+            const listener = Deno.listen({ port });
+            listener.close();
+            return port;
+        } catch (error) {
+            if (error instanceof Deno.errors.AddrInUse) {
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error("No available ports found.");
+};
+
+const waitForServer = async (url: string, timeout: number = 1000 * 60): Promise<void> => {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+        try {
+            await fetch(url);
+            return;
+        } catch (error) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+    }
+    throw new Error(`Timed out waiting for server: ${url}`);
+};
+
+const getPortFromIsolateId = (isolateId: string): number => {
+    return parseInt(isolates[isolateId].port);
+}
+
+// const cleanupIsolate = (isolateId: string): void => {
+//     if (isolates[isolateId]) {
+//         isolates[isolateId].process.;
+//         delete isolates[isolateId];
+//     }
+// };
+
+export default ({ modules }: any) => async (params: any, response: any) => {
     const { currentUrl, importUrl, pathParams, queryParams, data, __requestId__ } = params;
 
     const importSearchParams = new URL(importUrl).searchParams.toString();
@@ -14,10 +53,10 @@ export default (config: any) => async (params: any, response: any) => {
     let isJSX = false;
 
     for (const key in urlMetadatas) {
-        const regexp = match(key, { decode: decodeURIComponent });
-        const matched = regexp(importUrl.pathname);
+        const pattern = new URLPattern({ pathname: key })
+        const matched = pattern.exec(importUrl.pathname);
         if (matched) {
-            urlMetadata = { ...urlMetadatas[key], params: matched.params };
+            urlMetadata = { ...urlMetadatas[key], params: matched.pathname.groups };
         }
     }
 
@@ -27,87 +66,107 @@ export default (config: any) => async (params: any, response: any) => {
             headers: {
                 "Content-Type": "application/json",
             },
-        }).then((res) => res.json());
-        let match = urlMetadata?.matchPath?.split(".")?.[0];
-        if (!match?.startsWith("/")) match = "/" + match;
+        })
+        if (!urlMetadata.ok) {
+            response.status(urlMetadata.status)
+            response.statusText(urlMetadata.statusText)
+            return { error: urlMetadata.statusText }
+        }
+        urlMetadata = await urlMetadata.json();
+        const matchExt = modules.path.extname(urlMetadata?.matchPath);
+        let match = matchExt ? urlMetadata?.matchPath?.replace(matchExt, '') : urlMetadata?.matchPath;
+        match = modules.path.join('.', match);
         urlMetadata.matchPath = match;
         urlMetadatas[match] = urlMetadata;
     }
 
-    isJSX = urlMetadata?.path?.endsWith(".jsx") || urlMetadata?.path?.endsWith(".tsx");
+    const ext = modules.path.extname(urlMetadata?.path);
+    isJSX = ext === ".jsx" || ext === ".tsx";
 
-    const subprocessId = urlMetadata.matchPath;
+    const isolateId = urlMetadata.matchPath;
 
+    if (!isolates[isolateId]) {
+        try {
+            console.log("Spawning isolate", isolateId);
+            const port = await getAvailablePort(3000, 4000);
+            const command = new Deno.Command(Deno.execPath(), {
+                args: [
+                    'run', '-A', '-r', '--no-lock',
+                    '--unstable-sloppy-imports',
+                    new URL(`./${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, `${port}`
+                ],
+            });
+            const process = command.spawn();
+            isolates[isolateId] = {
+                port,
+                pid: process.pid,
+                process,
+            };
+            await waitForServer(`http://localhost:${port}`);
+        } catch (error) {
+            console.error(`Failed to spawn isolate: ${isolateId}`, error);
+            throw error;
+        }
+    }
 
-    if (!subprocesses[subprocessId]) {
-        console.log("Spawning subprocess", subprocessId);
-        // Adjust the command to your actual worker logic file or command
-        const command = new Deno.Command("__requestId__", {
-            args: [
-                "run",
-                "--allow-all", // Be specific with permissions for security
-                `./${isJSX ? 'jsx-' : ''}worker.js`,
-                // You can pass other necessary arguments here
-            ],
-            stdin: "piped",
-            stdout: "piped",
-            stderr: "piped",
+    try {
+        const port = getPortFromIsolateId(isolateId);
+        const moduleResponse = await fetch(`http://localhost:${port}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                __requestId__: __requestId__,
+                importUrl: new URL(`${urlMetadata.matchPath}?${importSearchParams}`, importUrl.origin).href,
+                currentUrl: currentUrl.href,
+                method: params.method,
+                params: { ...pathParams, ...urlMetadata.params, ...queryParams, ...data },
+                isJSX,
+            }),
         });
 
-        const process = command.spawn();
-        subprocesses[subprocessId] = process;
+        response.headers(Object.fromEntries(moduleResponse.headers.entries()));
+
+        if (!moduleResponse.ok) {
+            const errorResponse = await moduleResponse.text()
+            console.log("Error response", isolateId, errorResponse);
+            try {
+                return JSON.parse(errorResponse);
+            } catch (_) {
+                return errorResponse
+            }
+        }
+
+        // create a reader to read the stream
+        const reader = moduleResponse?.body?.getReader();
+
+        let resolver: any;
+
+        const resolved = new Promise((resolve, reject) => {
+            resolver = { resolve, reject };
+        });
+
+        reader?.read()?.then(function processText({ done, value }): any {
+            // value for fetch streams is a Uint8Array
+            const chunk = new TextDecoder("utf-8").decode(value);
+            response.stream(chunk);
+
+            // if it's done, then stop reading
+            if (done) {
+                resolver.resolve(chunk);
+                return;
+            }
+
+            // Read some more, and call this function again
+            return reader.read().then(processText);
+        });
+        return await resolved;
+
+    } catch (error) {
+        console.error("Error communicating with isolate server", error);
+        // cleanupIsolate(isolateId);
+        throw error;
     }
 
-    const promiseResult = new Promise((resolve, reject) => {
-        responseHandlers[subprocessId] = { ...responseHandlers?.[subprocessId] };
-        responseHandlers[subprocessId][__requestId__] = response;
-        resolver[subprocessId] = { ...resolver?.[subprocessId] };
-        resolver[subprocessId][__requestId__] = { resolve, reject };
-        return resolver[subprocessId][__requestId__]
-      });
-
-    const messageData = JSON.stringify({
-        __requestId__,
-        importUrl: new URL(`${urlMetadata.matchPath}?${importSearchParams}`, importUrl.origin).href,
-        currentUrl: currentUrl.href,
-        params: { ...pathParams, ...urlMetadata.params, ...queryParams, ...data },
-        isJSX,
-    });
-
-    // Write the message data to the subprocess
-    const writer = subprocesses[subprocessId].stdin.getWriter();
-    await writer.write(new TextEncoder().encode(messageData));
-    writer.releaseLock();
-    await subprocesses[subprocessId].stdin.close();
-
-    // Read the response from the subprocess
-    const result = await subprocesses[subprocessId].output();
-    const output:any = JSON.parse(new TextDecoder().decode(result));
-
-    if (output?.options) {
-        responseHandlers[subprocessId][output.__requestId__].options(
-            output.options,
-        );
-      }
-      !output?.__done__ && output?.chunk &&
-        responseHandlers[subprocessId][output.__requestId__].stream(
-            output.chunk,
-        );
-      if (output?.__done__) {
-        resolver[subprocessId][output.__requestId__].resolve(output.chunk);
-        delete responseHandlers[subprocessId][output.__requestId__];
-        delete resolver[subprocessId][output.__requestId__];
-      }
-
-    // Error handling
-    const errorResult = await subprocesses[subprocessId].stderrOutput();
-    const errorOutput = new TextDecoder().decode(errorResult);
-    if (errorOutput) {
-        console.log(errorOutput)
-        // resolver[subprocessId][__requestId__].reject(errorOutput);
-    } else {
-        resolver[subprocessId][__requestId__].resolve(output);
-    }
-
-    return await promiseResult;
 };

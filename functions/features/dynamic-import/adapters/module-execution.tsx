@@ -39,7 +39,7 @@ const htmlToRenderWithHydrateScript = (html: any, customTags: any, component: an
 
 
 export default (config: any) => {
-  let { loader, dependencies: remoteDependencies } = config || {};
+  let { loader, method, dependencies: remoteDependencies } = config || {};
   if (!loader) loader = moduleLoader;
   return async (
     data: any,
@@ -49,15 +49,26 @@ export default (config: any) => {
     try {
       const { importUrl, params: requestParams, isJSX, __requestId__ } = data;
 
-      const { mod, pathParams, matchedPath, dependencies: localDependencies } = await loader(
+      const { mod, GET, POST, PUT, DELETE, pathParams, matchedPath, dependencies: localDependencies } = await loader(
         { importUrl, dependencies: remoteDependencies },
       );
+
+      
+      const methods: any = { GET, POST, PUT, DELETE };
+
+      const methodMod = methods[method.toUpperCase()] || mod;
+
+      if (!methodMod) {
+        response.status(404)
+        response.statusText("Module not found")
+        return "Module Not Found"
+      }
 
       const dependencies = { localDependencies, remoteDependencies };
 
       const params = { ...requestParams, ...pathParams };
 
-      const workerRes = await moduleInstance(mod, { ...params, __requestId__ }, dependencies, importUrl, response, isJSX);
+      const workerRes = await moduleInstance(methodMod, { ...params, __requestId__ }, dependencies, importUrl, response, isJSX);
 
       // try parsing the response as JSON
       const chunk = tryParseJSON(workerRes);
@@ -71,8 +82,9 @@ export default (config: any) => {
 };
 
 const moduleInstance: any = async (mod: any, params: any = {}, dependencies: any = {}, importUrl: string, response: any, isJSX: boolean, iter = 0) => {
+
   const { localDependencies, remoteDependencies } = dependencies;
-  self.deps = { ...localDependencies, ...remoteDependencies };
+  globalThis.deps = { ...localDependencies, ...remoteDependencies };
 
   try {
     let workerRes;
@@ -81,7 +93,7 @@ const moduleInstance: any = async (mod: any, params: any = {}, dependencies: any
       response.headers({
         "Content-Type": "text/html",
       });
-      const { Component } = await recursiveReactElement(mod, params, self.deps);
+      const { Component } = await recursiveReactElement(mod, params, window.deps);
       const html = remoteDependencies.ReactDOMServer.renderToString(Component);
       const css = await remoteDependencies.getCss(localDependencies?.tailwind, html, localDependencies?.globalsCss)
       const bundle = (await remoteDependencies.bundle(importUrl));
