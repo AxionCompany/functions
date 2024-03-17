@@ -24,14 +24,8 @@ server({
     handlers: {
       "/(.*)+": FileLoader({
         config: {
-          // functionsDir: env.FUNCTIONS_DIR || ".",
           dirEntrypoint: "main",
           loaderType: "local",
-          //   loaderType: "github",
-          // gitOwner: "AxionCompany",
-          // gitRepo: "functions",
-          // gitToken: env.GIT_TOKEN,
-          // gitRef: "homolog",
         },
         modules: {
           path: {
