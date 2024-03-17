@@ -1,8 +1,11 @@
 /// <reference lib="deno.unstable" />
+import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
+
 
 self.addEventListener("unhandledrejection", event => {
   // Prevent this being reported (Firefox doesn't currently respect this)
   event.preventDefault();
+  console.log(event)
 
   self.postMessage({
     message: event.reason.message,
@@ -11,10 +14,10 @@ self.addEventListener("unhandledrejection", event => {
 });
 
 
+import server from "./functions/servers/main.ts";
 import RequestHandler from "./functions/handlers/main.ts";
 import DynamicImport from "./functions/features/dynamic-import/main.ts";
 import BearerAuth from "./functions/middlewares/bearerAuth.ts";
-import server from "./functions/servers/main.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
 let dotEnv;
@@ -29,13 +32,14 @@ try {
 const env = { ...dotEnv, ...Deno.env.toObject() };
 
 (async () => {
-  const fileLoaderUrl = env.FILE_LOADER_URL ||
-    "http://localhost:9000";
 
-  const adapters = await import(`${fileLoaderUrl}/adapters`)
-    .then((m: any) => {
-      return m.default;
-    })
+  const fileLoaderUrl = env.FILE_LOADER_URL
+    || "http://localhost:9000";
+
+    console.log(join(fileLoaderUrl, env.FUNCTIONS_DIR, 'adapters'))
+
+  const adapters = await import(join(fileLoaderUrl, env.FUNCTIONS_DIR, 'adapters'))
+    .then((m: any) => m.default)
     .catch((err: any) => console.log(err)) || ((e: any) => e);
 
   let config = {
@@ -48,8 +52,12 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
         config: {
           loaderUrl: fileLoaderUrl,
           useWebWorker: true,
+          functionsDir: env.FUNCTIONS_DIR || ".",
           // loader: CustomLoader({ type: "file", useWorker: false }),
         },
+        modules: {
+          path: { SEPARATOR, basename, extname, join, dirname }
+        }
       }),
     },
     serializers: {},

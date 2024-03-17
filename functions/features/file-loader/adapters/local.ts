@@ -11,7 +11,7 @@ const fileExists = async (path: string) => {
 
 export default ({ config }: any) =>
   async function findFile(
-    { path, currentPath = config?.functionsDir || ".", params = {}, fullPath }:
+    { path, currentPath =  ".", params = {}, fullPath }:
       {
         path: string;
         currentPath: string;
@@ -39,7 +39,7 @@ export default ({ config }: any) =>
     if (pathFileExists) {
       return {
         content: await Deno.readTextFile(pathFile),
-        matchPath: pathFile.split(`${config.functionsDir}${SEPARATOR}`).join(''),
+        matchPath: join('.',pathFile),
         path: fullPathFile,
         params,
       };
