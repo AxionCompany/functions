@@ -2,7 +2,7 @@ import { match } from "npm:path-to-regexp";
 import responseCallback from "../utils/responseCallback.ts";
 
 export default (
-  { handlers, middlewares, pipes, serializers, dependencies }: any,
+  { handlers, middlewares, pipes, serializers, modules }: any,
 ) =>
   async (req: Request) => {
     try {
@@ -28,22 +28,26 @@ export default (
       const method = req.method;
 
       // Get Path name
-      const pathname = new URL(req.url).pathname;
+      let pathname = new URL(req.url).pathname;
 
       // Match Handler
       let handler: any;
       let pathParams: any;
       let pathMatch: string;
+      let path;
       for (const key in handlers) {
         const regexp = match(key);
         const pathData: any = regexp(pathname);
         if (pathData?.params) {
+          const pathParts = pathData.params["0"] ? pathData?.params["0"] : [];
+          path = '/'+modules.path.join(".", ...pathParts);
           handler = handlers[key];
           pathParams = pathData.params;
           pathMatch = key;
           break;
         }
       }
+
 
       // Handle OPTIONS request
       if (req.method === "OPTIONS") {
@@ -92,7 +96,6 @@ export default (
       const responseHeadersPromise = new Promise((resolve) => {
         resolveResponseHeaders = resolve;
       });
-
 
       const responseStream = new ReadableStream({
         start: (ctlr) => {
@@ -155,6 +158,8 @@ export default (
 
         resolveResponseHeaders();
       }
+
+      console.log(url)
 
       handler(
         { url, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },

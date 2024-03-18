@@ -16,7 +16,8 @@ self.addEventListener("unhandledrejection", event => {
 
 import server from "./functions/servers/main.ts";
 import RequestHandler from "./functions/handlers/main.ts";
-import DynamicImport from "./functions/features/dynamic-import/main.ts";
+import Isolate from "./functions/features/isolate/main.ts";
+import FileLoader from "./functions/features/file-loader/main.ts";
 import BearerAuth from "./functions/middlewares/bearerAuth.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
@@ -36,7 +37,7 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
   const fileLoaderUrl = env.FILE_LOADER_URL
     || "http://localhost:9000";
 
-    console.log(join(fileLoaderUrl, env.FUNCTIONS_DIR, 'adapters'))
+  console.log(join(fileLoaderUrl, env.FUNCTIONS_DIR, 'adapters'))
 
   const adapters = await import(join(fileLoaderUrl, env.FUNCTIONS_DIR, 'adapters'))
     .then((m: any) => m.default)
@@ -47,13 +48,24 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
       "bearerAuth": BearerAuth,
     },
     pipes: {}, // default to no pipes
+    modules: {
+      path: { SEPARATOR, basename, extname, join, dirname }
+    },
     handlers: {
-      "/(.*)+": DynamicImport({
+      "/dist/(.*)+": FileLoader({
+        config: {
+          dirEntrypoint: "main",
+          loaderType: "local",
+          bundle: true,
+        },
+        modules: {
+          path: { SEPARATOR, basename, extname, join, dirname }
+        }
+      }),
+      "/(.*)+": Isolate({
         config: {
           loaderUrl: fileLoaderUrl,
-          useWebWorker: true,
           functionsDir: env.FUNCTIONS_DIR || ".",
-          // loader: CustomLoader({ type: "file", useWorker: false }),
         },
         modules: {
           path: { SEPARATOR, basename, extname, join, dirname }
@@ -80,7 +92,6 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
 })();
 
 async function watchFiles(env: any) {
-
   for await (const event of Deno.watchFs("./", { recursive: true })) {
     if (event.kind === "modify" && event.paths.some(path => /\.(html|js|jsx|tsx|ts)$/.test(path))) {
       const dir = Deno.cwd();

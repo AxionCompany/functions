@@ -8,9 +8,10 @@ export default ({ config, modules }: any) =>
     // check if headers type is application/json
     const contentTypeHeaders = headers["content-type"];
 
+    // console.log('PATHNAME', pathname)
+
     const isImport =
       !(contentTypeHeaders && contentTypeHeaders?.includes("application/json"));
-
 
     const { loaderType } = config || { loaderType: "local" };
 

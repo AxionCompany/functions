@@ -1,6 +1,6 @@
 import server from "../../../servers/main.ts";
 import RequestHandler from "../../../handlers/main.ts";
-import ModuleExecution from "./module-execution.tsx";
+import ModuleExecution from "../utils/module-execution.tsx";
 
 // Flag to check if overrides have been applied
 let overridesApplied = false;
