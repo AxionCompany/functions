@@ -1,6 +1,6 @@
 import server from "../../../servers/main.ts";
 import RequestHandler from "../../../handlers/main.ts";
-import ModuleExecution from "./module-execution.tsx";
+import ModuleExecution from "../utils/module-execution.tsx";
 import { bundle } from "https://deno.land/x/emit/mod.ts";
 import ReactDOMServer from "npm:react-dom/server";
 import React from "npm:react";
@@ -84,7 +84,7 @@ const _config = {
                         React,
                         getCss,
                         bundle,
-                        findDefaultExportedVariable
+                        findExportedVariables
                     },
                 });
                 const chunk = await moduleExecutor(data, response);
@@ -103,18 +103,18 @@ const { config, ...adapters }: any = _config
 
 server({ port, requestHandler: RequestHandler(adapters), config });
 
-// Function to find the default exported variable
-const findDefaultExportedVariable = (code: string) => {
+// // Function to find the exported variables
+const findExportedVariables = (code: string, names: string[] = ['default']) => {
     const ast = acorn.parse(code, { ecmaVersion: 2020, sourceType: "module" });
+    const exportedVariables: Record<string, string | null> = {};
     for (const node of ast.body) {
         if (node.type === 'ExportNamedDeclaration') {
-            // Look for the export default declaration
             for (const specifier of node.specifiers) {
-                if (specifier.exported.name === 'default') {
-                    return specifier.local.name;
+                if (names.includes(specifier.exported.name)) {
+                    exportedVariables[specifier.exported.name] = specifier.local.name;
                 }
             }
         }
     }
-    return null; // Return null if no default export found
+    return exportedVariables;
 }

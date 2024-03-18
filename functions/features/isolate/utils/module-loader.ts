@@ -4,7 +4,6 @@ export default async ({ importUrl, dependencies }: any) => {
 
   const [baseUrl, searchParams] = importUrl.split("?");
 
-  // const sharedModulesUrl = new URL(`./shared?${searchParams}`, new URL(importUrl).origin).href;
   const pathParts = new URL(baseUrl).pathname.split("/").filter(Boolean);
 
   let accPath = ".";
