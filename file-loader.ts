@@ -21,6 +21,9 @@ server({
   requestHandler: RequestHandler({
     middlewares: {},
     pipes: {},
+    modules: {
+      path: { SEPARATOR, basename, extname, join, dirname }
+    },
     handlers: {
       "/(.*)+": FileLoader({
         config: {
@@ -39,6 +42,5 @@ server({
   config: {
     PORT: env.FILE_LOADER_PORT || 9000,
     verbose: false
-  },
-
+  }
 });
