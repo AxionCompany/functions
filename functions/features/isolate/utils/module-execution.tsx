@@ -53,7 +53,7 @@ export default (config: any) => {
         { importUrl, dependencies: remoteDependencies },
       );
 
-      
+
       const methods: any = { GET, POST, PUT, DELETE };
 
       const methodMod = methods[method.toUpperCase()] || mod;
@@ -68,7 +68,7 @@ export default (config: any) => {
 
       const params = { ...requestParams, ...pathParams };
 
-      const workerRes = await moduleInstance(methodMod, { ...params, __requestId__ }, dependencies, importUrl, response, isJSX);
+      const workerRes = await moduleInstance(methodMod, { ...params, __requestId__ }, dependencies, importUrl, response, isJSX, method.toUpperCase());
 
       // try parsing the response as JSON
       const chunk = tryParseJSON(workerRes);
@@ -81,7 +81,7 @@ export default (config: any) => {
   };
 };
 
-const moduleInstance: any = async (mod: any, params: any = {}, dependencies: any = {}, importUrl: string, response: any, isJSX: boolean, iter = 0) => {
+const moduleInstance: any = async (mod: any, params: any = {}, dependencies: any = {}, importUrl: string, response: any, isJSX: boolean, method: string, iter = 0) => {
 
   const { localDependencies, remoteDependencies } = dependencies;
   globalThis.deps = { ...localDependencies, ...remoteDependencies };
@@ -93,13 +93,12 @@ const moduleInstance: any = async (mod: any, params: any = {}, dependencies: any
       response.headers({
         "Content-Type": "text/html",
       });
-      const { Component } = await recursiveReactElement(mod, params, window.deps);
+      const { Component } = await recursiveReactElement(mod, params, globalThis.deps);
       const html = remoteDependencies.ReactDOMServer.renderToString(Component);
       const css = await remoteDependencies.getCss(localDependencies?.tailwind, html, localDependencies?.globalsCss)
       const bundle = (await remoteDependencies.bundle(importUrl));
-      const defaultDeclaration = remoteDependencies.findDefaultExportedVariable(bundle.code);
-
-      workerRes = htmlToRenderWithHydrateScript(html, [`<style>\n${css}\n</style>`], bundle.code, params, defaultDeclaration);
+      const defaultDeclaration = remoteDependencies.findExportedVariables(bundle.code, ['default', 'GET', 'POST', 'PUT', 'DELETE']);
+      workerRes = htmlToRenderWithHydrateScript(html, [`<style>\n${css}\n</style>`], bundle.code, params, defaultDeclaration[method] || defaultDeclaration.default);
 
       // stream workerRes response
       workerRes.split("\n").forEach((line: any) => {
@@ -132,8 +131,7 @@ const recursiveReactElement: any = async (mod: any, props: any, deps: any, iter 
   try {
     if (typeof await mod(deps) === 'function') {
       return recursiveReactElement(await mod(deps), props, deps, iter + 1)
-    }
-    else {
+    } else {
       return { iter, Component: deps.React.createElement(mod, props) }
     }
   } catch (err) {

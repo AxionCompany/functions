@@ -3,7 +3,6 @@
 const isolates: any = {};
 const urlMetadatas: any = {};
 
-
 const getAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
     for (let port = startPort; port <= endPort; port++) {
         try {
@@ -44,8 +43,19 @@ const getPortFromIsolateId = (isolateId: string): number => {
 //     }
 // };
 
-export default ({ modules }: any) => async (params: any, response: any) => {
-    const { currentUrl, importUrl, pathParams, queryParams, data, __requestId__ } = params;
+export default ({ config, modules }: any) => async (
+    { url, pathname, method, data, params, queryParams, __requestId__ }: {
+        url: URL;
+        method: string;
+        pathname: string;
+        params: any | null;
+        data: any | null;
+        queryParams: any | null;
+        __requestId__: string;
+    }, response: any) => {
+
+    const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir));
+    importUrl.pathname = modules.path.join(importUrl.pathname, pathname);
 
     const importSearchParams = new URL(importUrl).searchParams.toString();
 
@@ -93,7 +103,7 @@ export default ({ modules }: any) => async (params: any, response: any) => {
                 args: [
                     'run', '-A', '-r', '--no-lock',
                     '--unstable-sloppy-imports',
-                    new URL(`./${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, `${port}`
+                    new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, `${port}`
                 ],
             });
             const process = command.spawn();
@@ -119,9 +129,9 @@ export default ({ modules }: any) => async (params: any, response: any) => {
             body: JSON.stringify({
                 __requestId__: __requestId__,
                 importUrl: new URL(`${urlMetadata.matchPath}?${importSearchParams}`, importUrl.origin).href,
-                currentUrl: currentUrl.href,
-                method: params.method,
-                params: { ...pathParams, ...urlMetadata.params, ...queryParams, ...data },
+                currentUrl: url.href,
+                method,
+                params: { ...params, ...urlMetadata.params, ...queryParams, ...data },
                 isJSX,
             }),
         });
