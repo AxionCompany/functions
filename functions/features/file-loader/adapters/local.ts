@@ -1,4 +1,5 @@
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
+import { match } from "npm:path-to-regexp";
 
 const fileExists = async (path: string) => {
   try {
@@ -11,7 +12,7 @@ const fileExists = async (path: string) => {
 
 export default ({ config }: any) =>
   async function findFile(
-    { path, currentPath =  ".", params = {}, fullPath }:
+    { path, currentPath = ".", params = {}, fullPath }:
       {
         path: string;
         currentPath: string;
@@ -39,7 +40,7 @@ export default ({ config }: any) =>
     if (pathFileExists) {
       return {
         content: await Deno.readTextFile(pathFile),
-        matchPath: join('.',pathFile),
+        matchPath: join('.', pathFile),
         path: fullPathFile,
         params,
       };
@@ -67,7 +68,7 @@ export default ({ config }: any) =>
             ),
           };
         }
-        
+
         const _currentIndexPath = join(currentPath, path, entry.name);
         if (
           (extname(entry.name) && (
@@ -93,19 +94,24 @@ export default ({ config }: any) =>
       if (
         entryName === segment ||
         entry.name === segment ||
-        entry.name.startsWith(":")
+        (entry.name.startsWith("[") && entry.name.endsWith("]"))
       ) {
         matches.push(entryName);
       }
     }
+    matches.sort((a: any, b: any) => {
+      if (a.startsWith("[") && a.endsWith("]")) return 1;
+      if (b.startsWith("[") && b.endsWith("]")) return -1;
+      return 0;
+    });
 
     // Try each match recursively
     for (const match of matches) {
       const newPath = join(currentPath, match);
       const newParams = { ...params };
 
-      if (match.startsWith(":")) {
-        newParams[basename(match, extname(match)).slice(1)] = segment;
+      if (match.startsWith("[") && match.endsWith("]")) {
+        newParams[basename(match, extname(match)).slice(1, -1)] = segment;
       }
 
       const result = await findFile({

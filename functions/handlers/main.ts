@@ -1,4 +1,4 @@
-import { match } from "npm:path-to-regexp";
+// import { match } from "npm:path-to-regexp";
 import responseCallback from "../utils/responseCallback.ts";
 
 export default (
@@ -34,13 +34,13 @@ export default (
       let handler: any;
       let pathParams: any;
       let pathMatch: string;
-      let path;
       for (const key in handlers) {
-        const regexp = match(key);
-        const pathData: any = regexp(pathname);
+        const routehandler = new URLPattern({ pathname: key });
+        const _match = routehandler.exec(new URL(req.url))
+        const pathData = { params: _match?.pathname?.groups };
         if (pathData?.params) {
-          const pathParts = pathData.params["0"] ? pathData?.params["0"] : [];
-          path = '/'+modules.path.join(".", ...pathParts);
+          const pathParts = pathData.params["0"] ? pathData?.params["0"] : '';
+          pathname = ("/" + pathParts).replace(/\/{2,}/g, "/");
           handler = handlers[key];
           pathParams = pathData.params;
           pathMatch = key;
@@ -158,8 +158,6 @@ export default (
 
         resolveResponseHeaders();
       }
-
-      console.log(url)
 
       handler(
         { url, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
