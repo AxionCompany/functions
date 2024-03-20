@@ -1,10 +1,12 @@
 
 import * as FileLoaders from "./adapters/main.ts";
+import { bundle } from "https://deno.land/x/emit/mod.ts";
 
 const fileLoaders: any = { ...FileLoaders };
 
 export default ({ config, modules }: any) =>
-  async ({ pathname, pathParams, url, headers, searchParams }: any, res: any) => {
+  async ({ pathname, url, headers, queryParams }: any, res: any) => {
+    const { bundle: shouldBundle, ...searchParams } = queryParams;
     // check if headers type is application/json
     const contentTypeHeaders = headers["content-type"];
 
@@ -30,7 +32,16 @@ export default ({ config, modules }: any) =>
       return;
     }
 
-    redirect = (path !== pathname)
+    if (shouldBundle) {
+      const bundleUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, url.origin);
+      console.log(bundleUrl);
+      const bundleContent = await bundle(bundleUrl);
+      if (bundleContent) {
+        return { content: bundleContent, params, path, matchPath };;
+      }
+    }
+
+    redirect = (path !== pathname) && !shouldBundle;
     if (redirect) {
       const baseUrl = url.origin;
       const redirectUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, baseUrl);
