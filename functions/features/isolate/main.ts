@@ -56,8 +56,12 @@ export default ({ config, modules }: any) => async (
         __requestId__: string;
     }, response: any) => {
 
+
     const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir));
     importUrl.pathname = modules.path.join(importUrl.pathname, pathname);
+    importUrl.search = url.search;
+    importUrl.username = url.username;
+    importUrl.password = url.password;
 
     const importSearchParams = new URL(importUrl).searchParams.toString();
 
@@ -72,7 +76,7 @@ export default ({ config, modules }: any) => async (
         }
     }
 
-    if (!urlMetadata) {
+    if (!urlMetadata || queryParams.bundle) {
         urlMetadata = await fetch(importUrl.href, {
             redirect: "follow",
             headers: {
@@ -85,6 +89,14 @@ export default ({ config, modules }: any) => async (
             return { error: urlMetadata.statusText }
         }
         urlMetadata = await urlMetadata.json();
+        if (queryParams.bundle) {
+            response.headers({ "content-type": "application/javascript" });
+            if (!urlMetadata?.content?.code) {
+                response.status(404)
+                response.statusText("Module not found")
+            }
+            return urlMetadata?.content?.code;
+        }
         const matchExt = modules.path.extname(urlMetadata?.matchPath);
         let match = matchExt ? urlMetadata?.matchPath?.replace(matchExt, '') : urlMetadata?.matchPath;
         match = modules.path.join('.', match);
