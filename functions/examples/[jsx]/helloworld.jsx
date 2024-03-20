@@ -1,5 +1,4 @@
 export default (props) => {
-  console.log(props)
   return (
     <div>
       <h1 className={`text-3xl text-${props["jsx"]}-800`}>
