@@ -36,12 +36,14 @@ const getPortFromIsolateId = (isolateId: string): number => {
     return parseInt(isolates[isolateId].port);
 }
 
-// const cleanupIsolate = (isolateId: string): void => {
-//     if (isolates[isolateId]) {
-//         isolates[isolateId].process.;
-//         delete isolates[isolateId];
-//     }
-// };
+const cleanupIsolate = (isolateId: string): void => {
+    if (isolates[isolateId]) {
+        // kill process
+        // Deno.kill(isolates[isolateId].pid, Deno.Signal.SIGKILL);
+        // delete isolate
+        delete isolates[isolateId];
+    }
+};
 
 export default ({ config, modules }: any) => async (
     { url, pathname, method, data, params, queryParams, __requestId__ }: {
@@ -175,7 +177,7 @@ export default ({ config, modules }: any) => async (
 
     } catch (error) {
         console.error("Error communicating with isolate server", error);
-        // cleanupIsolate(isolateId);
+        cleanupIsolate(isolateId);
         throw error;
     }
 
