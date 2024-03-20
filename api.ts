@@ -52,16 +52,6 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
       path: { SEPARATOR, basename, extname, join, dirname }
     },
     handlers: {
-      "/dist/(.*)+": FileLoader({
-        config: {
-          dirEntrypoint: "main",
-          loaderType: "local",
-          bundle: true,
-        },
-        modules: {
-          path: { SEPARATOR, basename, extname, join, dirname }
-        }
-      }),
       "/(.*)+": Isolate({
         config: {
           loaderUrl: fileLoaderUrl,
