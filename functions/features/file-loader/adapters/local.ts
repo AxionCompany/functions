@@ -1,5 +1,4 @@
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
-import { match } from "npm:path-to-regexp";
 
 const fileExists = async (path: string) => {
   try {
@@ -20,7 +19,7 @@ export default ({ config }: any) =>
         fullPath: string | undefined;
       },
   ): Promise<any> {
-    const segments: Array<string> = path.split(SEPARATOR).filter(Boolean);
+    const segments: Array<string> = path.replaceAll(SEPARATOR, "/").split("/").filter(Boolean);
 
     const mainEntrypoint = config?.dirEntrypoint || "index";
 
