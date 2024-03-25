@@ -57,13 +57,16 @@ export default ({ config, modules }: any) => async (
     }, response: any) => {
 
 
+
     const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir));
     importUrl.pathname = modules.path.join(importUrl.pathname, pathname);
     importUrl.search = url.search;
     importUrl.username = url.username;
     importUrl.password = url.password;
 
+
     const importSearchParams = new URL(importUrl).searchParams.toString();
+
 
     let urlMetadata;
     let isJSX = false;
@@ -80,9 +83,10 @@ export default ({ config, modules }: any) => async (
         urlMetadata = await fetch(importUrl.href, {
             redirect: "follow",
             headers: {
-                "Content-Type": "application/json",
+                "content-type": "application/json",
             },
         })
+
         if (!urlMetadata.ok) {
             response.status(urlMetadata.status)
             response.statusText(urlMetadata.statusText)
@@ -115,7 +119,7 @@ export default ({ config, modules }: any) => async (
             const port = await getAvailablePort(3000, 4000);
             const command = new Deno.Command(Deno.execPath(), {
                 args: [
-                    'run', '-A', '-r', '--no-lock',
+                    'run', '-A', `--reload=${importUrl.origin}`, '--no-lock',
                     '--unstable-sloppy-imports',
                     new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, `${port}`
                 ],
@@ -132,6 +136,7 @@ export default ({ config, modules }: any) => async (
             throw error;
         }
     }
+
 
     try {
         const port = getPortFromIsolateId(isolateId);
