@@ -34,7 +34,6 @@ export default ({ config, modules }: any) =>
 
     if (shouldBundle) {
       const bundleUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, url.origin);
-      console.log(bundleUrl);
       const bundleContent = await bundle(bundleUrl);
       if (bundleContent) {
         return { content: bundleContent, params, path, matchPath };;

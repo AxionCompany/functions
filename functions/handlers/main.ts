@@ -1,4 +1,3 @@
-// import { match } from "npm:path-to-regexp";
 import responseCallback from "../utils/responseCallback.ts";
 
 export default (
