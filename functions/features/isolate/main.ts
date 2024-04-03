@@ -119,8 +119,9 @@ export default ({ config, modules }: any) => async (
             const port = await getAvailablePort(3000, 4000);
             const command = new Deno.Command(Deno.execPath(), {
                 args: [
-                    'run', '-A', `--reload=${importUrl.origin}`, '--no-lock',
+                    'run', '-A', `--reload=${importUrl.origin},http://localhost:9000`, '--no-lock',
                     '--unstable-sloppy-imports',
+                    '--unstable',
                     new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, `${port}`
                 ],
             });
