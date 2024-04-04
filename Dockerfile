@@ -6,4 +6,4 @@ USER deno
 
 COPY --chown=deno:deno . .
 
-CMD ["task", "main"]
+CMD ["task", "start"]
