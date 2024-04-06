@@ -25,13 +25,13 @@ const denoOverrides: any = {
         originalModule: any;
     }) => async (data: any) => {
         try {
-            console.log(currentUrl)
+            console.log('currentUrl', currentUrl)
             const basePath = new URL(currentUrl).pathname.split("/").filter(Boolean)[0];
             const kvDir = `data/${basePath}`;
             await checkOrCreateDir(kvDir);
             return originalModule(kvDir + '/kv');
         } catch (err) {
-            console.log(err)
+            console.log('err in open Deno kv ', err)
             return originalModule(data)
         }
     },
@@ -49,10 +49,10 @@ const _config = {
             try {
                 // Apply overrides only once
                 if (!overridesApplied) {
-                    Object.keys(self.Deno).forEach((key) => {
-                        const originalModule = Deno[key];
+                    Object.keys(globalThis.Deno).forEach((key) => {
+                        const originalModule = globalThis.Deno[key];
                         if (denoOverrides[key]) {
-                            Deno[key] = denoOverrides[key]({
+                            globalThis.Deno[key] = denoOverrides[key]({
                                 currentUrl,
                                 originalModule,
                             });
