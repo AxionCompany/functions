@@ -1,5 +1,5 @@
-import github from './github.ts';
-import local from './local.ts';
+import github from './loaders/github.ts';
+import local from './loaders/local.ts';
 
 export {
     github,
