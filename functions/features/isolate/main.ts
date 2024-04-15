@@ -56,6 +56,7 @@ export default ({ config, modules }: any) => async (
         __requestId__: string;
     }, response: any) => {
 
+        console.log('CHEGOU NO ISOLATE MANAGER', queryParams, params, data)
 
 
     const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir));
@@ -88,12 +89,14 @@ export default ({ config, modules }: any) => async (
         })
 
         if (!urlMetadata.ok) {
+            console.log('URL METADATA NOT OK', urlMetadata.status, urlMetadata.statusText)
             response.status(urlMetadata.status)
             response.statusText(urlMetadata.statusText)
             return { error: urlMetadata.statusText }
         }
         urlMetadata = await urlMetadata.json();
         if (queryParams.bundle) {
+            console.log('CHEGOU NO BUNDLE')
             response.headers({ "content-type": "application/javascript" });
             if (!urlMetadata?.content?.code) {
                 response.status(404)

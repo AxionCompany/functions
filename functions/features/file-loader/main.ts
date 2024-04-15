@@ -1,6 +1,7 @@
 
 import * as FileLoaders from "./adapters/main.ts";
-import { bundle } from "https://deno.land/x/emit/mod.ts";
+// import { bundle } from "https://deno.land/x/emit/mod.ts";
+import bundle from './adapters/bundler/esbuild.js'
 
 const fileLoaders: any = { ...FileLoaders };
 
@@ -34,7 +35,7 @@ export default ({ config, modules }: any) =>
 
     if (shouldBundle) {
       const bundleUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, url.origin);
-      const bundleContent = await bundle(bundleUrl);
+      const bundleContent = await bundle(bundleUrl).then(res=>res).catch(console.log);
       if (bundleContent) {
         return { content: bundleContent, params, path, matchPath };;
       }
