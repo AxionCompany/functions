@@ -167,7 +167,7 @@ export default (
 
       await responseHeadersPromise;
 
-
+      delete options.headers["access-control-allow-origin"];
       return new Response(responseStream, options);
     } catch (err) {
       return new Response(
