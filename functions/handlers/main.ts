@@ -1,8 +1,7 @@
-import { match } from "npm:path-to-regexp";
 import responseCallback from "../utils/responseCallback.ts";
 
 export default (
-  { handlers, middlewares, pipes, serializers, dependencies }: any,
+  { handlers, middlewares, pipes, serializers, modules }: any,
 ) =>
   async (req: Request) => {
     try {
@@ -25,24 +24,29 @@ export default (
       // Get Query parameters
       const url = new URL(req.url);
       const queryParams = Object.fromEntries(url.searchParams.entries());
+      const method = req.method;
 
       // Get Path name
-      const pathname = new URL(req.url).pathname;
+      let pathname = new URL(req.url).pathname;
 
       // Match Handler
       let handler: any;
       let pathParams: any;
       let pathMatch: string;
       for (const key in handlers) {
-        const regexp = match(key);
-        const pathData: any = regexp(pathname);
+        const routehandler = new URLPattern({ pathname: key });
+        const _match = routehandler.exec(new URL(req.url))
+        const pathData = { params: _match?.pathname?.groups };
         if (pathData?.params) {
+          const pathParts = pathData.params["0"] ? pathData?.params["0"] : '';
+          pathname = ("/" + pathParts).replace(/\/{2,}/g, "/");
           handler = handlers[key];
           pathParams = pathData.params;
           pathMatch = key;
           break;
         }
       }
+
 
       // Handle OPTIONS request
       if (req.method === "OPTIONS") {
@@ -91,7 +95,6 @@ export default (
       const responseHeadersPromise = new Promise((resolve) => {
         resolveResponseHeaders = resolve;
       });
-
 
       const responseStream = new ReadableStream({
         start: (ctlr) => {
@@ -156,7 +159,7 @@ export default (
       }
 
       handler(
-        { url, pathname, pathParams, queryParams, data, headers, ctx, __requestId__ },
+        { url, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
         responseCallback(__requestId__, streamCallback),
       )
         .then((data: any) => streamCallback({ chunk: data, __done__: true }))
@@ -164,7 +167,7 @@ export default (
 
       await responseHeadersPromise;
 
-
+      delete options.headers["access-control-allow-origin"];
       return new Response(responseStream, options);
     } catch (err) {
       return new Response(
