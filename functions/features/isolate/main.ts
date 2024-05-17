@@ -56,7 +56,7 @@ export default ({ config, modules }: any) => async (
         __requestId__: string;
     }, response: any) => {
 
-    const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir));
+    const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir, pathname === "/" ? "/index" : ""));
     importUrl.pathname = modules.path.join(importUrl.pathname, pathname);
     importUrl.search = url.search;
     importUrl.username = url.username;
