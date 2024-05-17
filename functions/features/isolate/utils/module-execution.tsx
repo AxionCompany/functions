@@ -108,7 +108,6 @@ const moduleInstance: any = async (mod: any, params: any = {}, dependencies: any
     }
     else {
       workerRes = await mod({
-
         ...localDependencies,
         ...remoteDependencies,
         ...params,

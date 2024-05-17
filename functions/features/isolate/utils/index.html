@@ -1,26 +1,45 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 
 <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="./favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta name="description" content="Web site created using create-react-app" />
-    <link rel="apple-touch-icon" href="./logo192.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
-    <link rel="manifest" href="./manifest.json" />
-    <title>AXION FUNCTIONS</title>
+  
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://cdn.jsdelivr.net/npm/react@18.2.0/+esm",
+      "react-dom": "https://cdn.jsdelivr.net/npm/react-dom@18.2.0/+esm"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import React from 'react';
+    import ReactDOM from 'react-dom';
+    window.dynamicImport = async (url) => {
+      return await import(
+        /* webpackIgnore: true */
+        `${url}?bundle=true&v=${new Date().getTime()}`
+      )
+    }
+    window.React = React;
+    window.ReactDOM = ReactDOM;
+  </script>
+  <script>
+    window.importUrl = 'https://functions-features-isolate-utils.vercel.app/index.js';
+  </script>
 </head>
 
 <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root">
-
-    </div>
+  <div id="root"></div>
+  <script type="module">
+    const { default: Component } = await dynamicImport(window.importUrl);
+    const init = async (Component) => {
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      const App = React.createElement(Component);
+      root.render(App);
+    }
+    await init(Component);
+  </script>
 </body>
 
 </html>
