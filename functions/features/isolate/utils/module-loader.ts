@@ -57,7 +57,7 @@ export default async ({ importUrl, dependencies }: any) => {
       throw { message: "Imported Code should be an ESM Module.", status: 404 };
     }
 
-    
+
     return {
       mod,
       GET,
