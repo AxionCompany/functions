@@ -41,23 +41,29 @@ const checkOrCreateDir = async (path: string) => {
 const port: number = parseInt(Deno.args?.[0]) || 3000;
 
 const denoOverrides: any = {
-    "openKv": ({ currentUrl, originalModule }: {
+    "openKv": ({ currentUrl, originalModule, ...rest }: {
         currentUrl: string;
         originalModule: any;
-
     }) => async (data: any) => {
-        const basePath = new URL(currentUrl).pathname.split("/").filter(Boolean)[0];
-        const kvDir = `data/${basePath}`;
-        await checkOrCreateDir(kvDir);
-        return originalModule(kvDir + '/kv');
+        try {
+            const basePath = new URL(currentUrl).pathname.split("/").filter(Boolean)[0];
+            const kvDir = `data/${basePath}`;
+            await checkOrCreateDir(kvDir);
+            return originalModule(kvDir + '/kv');
+        } catch (err) {
+            console.log('err in open Deno kv ', err)
+            return originalModule(data)
+        }
     },
 };
+
 
 const _config = {
     middlewares: {},
     pipes: {}, // default to no pipes
     handlers: {
         "/(.*)+": async ({ data }: any, response: any) => {
+            if (Object.keys(data).length === 1) return
             const { currentUrl, method } = data;
             try {
                 // Apply overrides only once
