@@ -75,10 +75,9 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
     ...(await adapters(config)),
   };
 
-
   Deno.env.get('WATCH') && watchFiles(env);
 
-  server({ requestHandler: RequestHandler(_adapters), config: _config });
+  server({ requestHandler: RequestHandler({ ..._config, ..._adapters }), config: _config });
 })();
 
 async function watchFiles(env: any) {
