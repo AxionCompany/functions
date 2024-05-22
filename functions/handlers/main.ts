@@ -1,7 +1,7 @@
 import responseCallback from "../utils/responseCallback.ts";
 
 export default (
-  { handlers, middlewares, pipes, serializers, modules }: any,
+  { handlers, middlewares, pipes, serializers, ...rest }: any,
 ) =>
   async (req: Request) => {
     try {
@@ -62,7 +62,6 @@ export default (
 
       let data: any = typeof body === "string" ? { data: body } : { ...body };
       let ctx: any = {};
-
       // Adding Middlewares
       for (const key in middlewares) {
         const middleware = middlewares[key];
@@ -170,18 +169,38 @@ export default (
       delete options.headers["access-control-allow-origin"];
       return new Response(responseStream, options);
     } catch (err) {
+
+      const options: any = {
+        status: 500,
+        statusText: "Internal Server Error",
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers":
+            "authorization, x-client-info, apikey, content-type",
+          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
+          "Content-Type": "application/json"
+        }
+      }
+
+      if (typeof err === "object") {
+        options.status = err.status || options.status;
+        options.statusText = err.message || err.statusText || options.statusText;
+      }
+
+      let error: any = {}
+      if (typeof err === "string") {
+        error.message = err
+      } else {
+        error = {
+          message: err.message || err.statusText,
+          status: err.status || options.status,
+          stack: err.stack,
+        }
+      }
+      
       return new Response(
-        JSON.stringify(err),
-        {
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers":
-              "authorization, x-client-info, apikey, content-type",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
-          },
-          status: 500,
-          statusText: "Internal Server Error",
-        },
+        JSON.stringify({ error }),
+        options
       );
     }
   };
