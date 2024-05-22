@@ -46,10 +46,11 @@ const cleanupIsolate = (isolateId: string): void => {
 };
 
 export default ({ config, modules }: any) => async (
-    { url, pathname, method, data, params, queryParams, __requestId__ }: {
+    { url, pathname, method, data, ctx, params, queryParams, __requestId__ }: {
         url: URL;
         method: string;
         pathname: string;
+        ctx: any | null;
         params: any | null;
         data: any | null;
         queryParams: any | null;
@@ -150,7 +151,7 @@ export default ({ config, modules }: any) => async (
                 importUrl: new URL(`${urlMetadata.matchPath}?${importSearchParams}`, importUrl.origin).href,
                 currentUrl: url.href,
                 method,
-                params: { ...params, ...urlMetadata.params, ...queryParams, ...data },
+                params: { ...params, ...ctx, ...urlMetadata.params, ...queryParams, ...data },
                 isJSX,
             }),
         });
