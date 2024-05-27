@@ -37,7 +37,6 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
   const fileLoaderUrl = env.FILE_LOADER_URL
     || "http://localhost:9000";
 
-  console.log(join(fileLoaderUrl, env.FUNCTIONS_DIR, 'adapters'))
 
   const adapters = await import(join(fileLoaderUrl, env.FUNCTIONS_DIR, 'adapters'))
     .then((m: any) => m.default)
