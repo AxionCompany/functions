@@ -24,7 +24,12 @@ const startApi = async (iter = 0) => {
     };
 };
 
-startFileLoader();
-startApi();
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+startFileLoader().then(async () => {
+    await sleep(5000);
+    startApi();
+});
+   
 
 const maxRestarts = 100;
