@@ -1,8 +1,9 @@
+const { useState, useEffect } = React;
 
 export default (props) => {
-  const [count, setCount] = React.useState(0);
-  const [inputValue, setInputValue] = React.useState("");
-  React.useEffect(() => {
+  const [count, setCount] = useState(0);
+  const [inputValue, setInputValue] = useState("");
+  useEffect(() => {
     console.log("effect started");
   }, [count]);
 

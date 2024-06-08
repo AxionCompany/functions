@@ -86,7 +86,6 @@ export default (
         },
       };
 
-
       let controller: any;
       let responseSent = false;
       let resolveResponseHeaders: any;
