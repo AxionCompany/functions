@@ -44,3 +44,5 @@ server({
     verbose: false
   }
 });
+
+self.postMessage({ message: { 'status': 'ok' } });

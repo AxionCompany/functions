@@ -93,7 +93,7 @@ export default ({ config, modules }: any) => async (
         }
         urlMetadata = await urlMetadata.json();
         if (queryParams.bundle) {
-            response.headers({ "content-type": "application/javascript" });
+            response.headers({ "content-type": "text/javascript" });
             if (!urlMetadata?.content?.code) {
                 response.status(404)
                 response.statusText("Module not found")
@@ -110,12 +110,13 @@ export default ({ config, modules }: any) => async (
     const ext = modules.path.extname(urlMetadata?.path);
     isJSX = ext === ".jsx" || ext === ".tsx";
 
+
     const isolateId = urlMetadata.matchPath;
 
     if (!isolates[isolateId]) {
         try {
             console.log("Spawning isolate", isolateId);
-            const port = await getAvailablePort(3000, 4000);
+            const port = await getAvailablePort(3500, 4000);
             const command = new Deno.Command(Deno.execPath(), {
                 args: [
                     'run', '-A', '--no-lock',
