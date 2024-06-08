@@ -13,7 +13,7 @@ export default async ({ importUrl, dependencies }: any) => {
     })
     .forEach((url) => possibleSharedUrls.push(url));
 
-  const dependenciesUrl = (await Promise.all(possibleSharedUrls.map(async (url) => await getFile(url, ['js', 'jsx', 'ts', 'tsx'], 'matchPath').then(res => res).catch(_ => null))))
+  const dependenciesUrl = (await Promise.all(possibleSharedUrls.map(async (url) => await getFile(url, { ext: ['js', 'jsx', 'ts', 'tsx'], fileName: 'shared' }, 'matchPath').then(res => res).catch(_ => null))))
     .filter(Boolean);
 
   // Load shared modules
