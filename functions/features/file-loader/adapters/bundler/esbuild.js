@@ -1,4 +1,4 @@
-import * as esbuild from "npm:esbuild";
+import { build } from "npm:esbuild";
 import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader/mod.ts"
 
 export default async (path, { ...options } = {}) => {
@@ -14,14 +14,13 @@ export default async (path, { ...options } = {}) => {
         format: "esm",
         write: false,
         minify: true,
-        jsxFragment: "Fragment",
         jsx: "transform",
-        external:['react','react-dom'],
+        external: ['react', 'react-dom', ...(options.shared || [])],
     };
 
     config.entryPoints = [path.href];
 
-    const result = await esbuild.build(config);
+    const result = await build(config);
 
     return { code: result?.outputFiles?.[0]?.text }
 }

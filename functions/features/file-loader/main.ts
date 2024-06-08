@@ -1,13 +1,12 @@
 
 import * as FileLoaders from "./adapters/main.ts";
-// import { bundle } from "https://deno.land/x/emit/mod.ts";
 import bundle from './adapters/bundler/esbuild.js'
 
 const fileLoaders: any = { ...FileLoaders };
 
 export default ({ config, modules }: any) =>
   async ({ pathname, url, headers, queryParams }: any, res: any) => {
-    const { bundle: shouldBundle, ...searchParams } = queryParams;
+    const { bundle: shouldBundle, shared, ...searchParams } = queryParams;
     // check if headers type is application/json
     const contentTypeHeaders = headers["content-type"];
 
@@ -35,7 +34,7 @@ export default ({ config, modules }: any) =>
 
     if (shouldBundle) {
       const bundleUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, url.origin);
-      const bundleContent = await bundle(bundleUrl).then(res=>res).catch(console.log);
+      const bundleContent = await bundle(bundleUrl, { shared: shared.split(',') }).then(res => res).catch(console.log);
       if (bundleContent) {
         return { content: bundleContent, params, path, matchPath };;
       }

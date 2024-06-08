@@ -1,37 +1,30 @@
 import { config } from "https://deno.land/x/dotenv@v3.2.2/mod.ts";
+import getFile from "./getFile.ts";
 
 export default async ({ importUrl, dependencies }: any) => {
 
   const [baseUrl, searchParams] = importUrl.split("?");
 
-  const pathParts = new URL(baseUrl).pathname.split("/").filter(Boolean);
+  // Build shared modules possible urls
+  const possibleSharedUrls: string[] = [];
+  new URL(baseUrl).pathname.split('/')
+    .map((_, i, arr) => {
+      return new URL(arr.slice(0, i + 1).join('/') + `/shared?${searchParams}`, new URL(importUrl).origin).href
+    })
+    .forEach((url) => possibleSharedUrls.push(url));
 
-  let accPath = ".";
+  const dependenciesUrl = (await Promise.all(possibleSharedUrls.map(async (url) => await getFile(url, ['js', 'jsx', 'ts', 'tsx'], 'matchPath').then(res => res).catch(_ => null))))
+    .filter(Boolean);
 
-  const sharedModulesUrls = [`./shared?${searchParams}`];
-
-
-  pathParts.forEach((part) => {
-    if (!part) return
-    accPath = `${accPath}/${part}`;
-    sharedModulesUrls.push(`${accPath}/shared?${searchParams}`);
-  });
-
-  let startTime = Date.now();
-
-  const dependenciesPromises = sharedModulesUrls.map((url) =>
-    import(new URL(url, new URL(importUrl).origin).href)
-      .then((mod) => {
-        const { _matchPath } = mod;
-        const isShared = ['shared.js', 'shared.ts', 'shared.jsx', 'shared.tsx']
-          .some(i => _matchPath.includes(i))
-        if (!isShared) return (e: any) => e
-        return mod.default
-      }).catch((_) => { })
+  // Load shared modules
+  const SharedModules = await Promise.all(
+    dependenciesUrl.map((url) =>
+      import(new URL(url, new URL(importUrl).origin).href)
+        .then((mod) => mod.default)
+    )
   );
 
-  const SharedModules = await Promise.all(dependenciesPromises);
-
+  // Instantiate shared modules
   dependencies = SharedModules.reduce(
     (acc, Dependencies, index) => {
       if (!Dependencies) return acc
@@ -41,12 +34,16 @@ export default async ({ importUrl, dependencies }: any) => {
   );
 
   try {
-    startTime = Date.now();
-    const module = await import(importUrl).then(mod => mod).catch(console.log);
-    if (typeof module === "string") throw { message: "Module Not Found", status: 404 };
+    // Load target module
+    const ESModule = await import(importUrl).then(mod => mod).catch(console.log);
 
-    const { default: mod, GET, POST, PUT, DELETE, _pathParams: pathParams, _matchPath: matchedPath } = module;
+    // Check if module is not found
+    if (typeof ESModule === "string") throw { message: "Module Not Found", status: 404 };
 
+    // Destructure module methods and exported properties
+    const { default: mod, GET, POST, PUT, DELETE, _pathParams: pathParams, _matchPath: matchedPath, config } = ESModule;
+
+    // Check if module is not a function. If not, return error
     if (
       typeof mod !== "function" &&
       typeof GET !== "function" &&
@@ -57,7 +54,7 @@ export default async ({ importUrl, dependencies }: any) => {
       throw { message: "Imported Code should be an ESM Module.", status: 404 };
     }
 
-
+    // Return module and its dependencies
     return {
       mod,
       GET,
@@ -66,7 +63,8 @@ export default async ({ importUrl, dependencies }: any) => {
       DELETE,
       pathParams,
       matchedPath,
-      dependencies
+      dependencies,
+      config
     };
   } catch (err) {
     console.log(err);

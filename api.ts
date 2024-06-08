@@ -17,7 +17,6 @@ self.addEventListener("unhandledrejection", event => {
 import server from "./functions/servers/main.ts";
 import RequestHandler from "./functions/handlers/main.ts";
 import Isolate from "./functions/features/isolate/main.ts";
-import FileLoader from "./functions/features/file-loader/main.ts";
 import BearerAuth from "./functions/middlewares/bearerAuth.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
@@ -77,6 +76,7 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
   Deno.env.get('WATCH') && watchFiles(env);
 
   server({ requestHandler: RequestHandler({ ..._config, ..._adapters }), config: _config });
+  self.postMessage({ message: { 'status': 'ok' } });
 })();
 
 async function watchFiles(env: any) {
