@@ -120,7 +120,7 @@ export default ({ config, modules }: any) => async (
             const command = new Deno.Command(Deno.execPath(), {
                 args: [
                     'run', '-A', '--no-lock',
-                    `--reload=${importUrl.origin},${url.origin}`,
+                    `--reload=${importUrl.origin},${url.origin},${new URL(import.meta.url).origin}`,
                     '--unstable-sloppy-imports',
                     '--unstable',
                     new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, `${port}`
@@ -138,7 +138,6 @@ export default ({ config, modules }: any) => async (
             throw error;
         }
     }
-
 
     try {
         const port = getPortFromIsolateId(isolateId);
