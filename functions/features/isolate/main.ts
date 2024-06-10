@@ -120,7 +120,7 @@ export default ({ config, modules }: any) => async (
             const command = new Deno.Command(Deno.execPath(), {
                 args: [
                     'run', '-A', '--no-lock',
-                    `--reload=${importUrl.origin},http://localhost:9000`,
+                    `--reload=${importUrl.origin},${url.origin}`,
                     '--unstable-sloppy-imports',
                     '--unstable',
                     new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, `${port}`
