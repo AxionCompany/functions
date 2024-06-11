@@ -53,6 +53,7 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
       "/(.*)+": Isolate({
         config: {
           loaderUrl: fileLoaderUrl,
+          dirEntrypoint: env.DIR_ENTRYPOINT || "index",
           functionsDir: env.FUNCTIONS_DIR || ".",
         },
         modules: {

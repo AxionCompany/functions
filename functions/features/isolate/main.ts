@@ -57,15 +57,13 @@ export default ({ config, modules }: any) => async (
         __requestId__: string;
     }, response: any) => {
 
-    const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir, pathname === "/" ? "/index" : ""));
+    const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir));
     importUrl.pathname = modules.path.join(importUrl.pathname, pathname);
     importUrl.search = url.search;
     importUrl.username = url.username;
     importUrl.password = url.password;
-
-
+    
     const importSearchParams = new URL(importUrl).searchParams.toString();
-
 
     let urlMetadata;
     let isJSX = false;

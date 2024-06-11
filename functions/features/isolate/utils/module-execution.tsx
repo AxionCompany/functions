@@ -78,12 +78,13 @@ const moduleInstance: any = async (
         ...params,
       }, response);
     } else {
-      Object.assign(mod, dependencies);
+      Object.assign(mod, { ...dependencies, url });
     }
 
     if (isJSX) {
+      Object.assign(mod, { response });
       // set html content type headers
-      response.headers({ "content-type": "text/html" });
+      response.headers({ "content-type": "text/html; charset=utf-8" });
       // render the JSX component
       const html = dependencies?.ReactDOMServer.renderToString(dependencies.React.createElement(mod, params));
       // process css
