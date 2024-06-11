@@ -3,6 +3,8 @@ export default ({ url, html, addToHead, environment, props, shared }) => `
 <html>
 
   <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script type="module">
       window.dynamicImport = async (url) => {
         return await import(
