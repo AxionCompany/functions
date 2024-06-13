@@ -4,7 +4,6 @@ export default (props) => {
   const [count, setCount] = useState(0);
   const [inputValue, setInputValue] = useState("");
   useEffect(() => {
-    console.log("effect started");
   }, [count]);
 
   return (
