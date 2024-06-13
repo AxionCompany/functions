@@ -14,10 +14,10 @@ self.addEventListener("unhandledrejection", event => {
 });
 
 
-import server from "./functions/servers/main.ts";
-import RequestHandler from "./functions/handlers/main.ts";
-import Isolate from "./functions/features/isolate/main.ts";
-import BearerAuth from "./functions/middlewares/bearerAuth.ts";
+import server from "./functions/src/servers/main.ts";
+import RequestHandler from "./functions/src/handlers/main.ts";
+import Isolate from "./functions/src/isolate/main.ts";
+import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 
 let dotEnv;
