@@ -1,8 +1,8 @@
 /// <reference lib="deno.unstable" />
 
-import RequestHandler from "./functions/handlers/main.ts";
-import FileLoader from "./functions/features/file-loader/main.ts";
-import server from "./functions/servers/main.ts";
+import RequestHandler from "./functions/src/handlers/main.ts";
+import FileLoader from "./functions/src/file-loader/main.ts";
+import server from "./functions/src/servers/main.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 
