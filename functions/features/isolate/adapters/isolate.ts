@@ -25,7 +25,7 @@ const denoOverrides: any = {
         originalModule: any;
     }) => async (data: any) => {
         try {
-            console.log('currentUrl', currentUrl)
+            // console.log('currentUrl', currentUrl)
             const basePath = new URL(currentUrl).pathname.split("/").filter(Boolean)[0];
             const kvDir = `data/${basePath}`;
             await checkOrCreateDir(kvDir);
@@ -44,7 +44,7 @@ const _config = {
         "/(.*)+": async ({ data }: any, response: any) => {
             if (Object.keys(data).length === 1) return
             const { currentUrl, method } = data;
-            console.log('DATA >>>>', data)
+            // console.log('DATA >>>>', data)
 
             try {
                 // Apply overrides only once
