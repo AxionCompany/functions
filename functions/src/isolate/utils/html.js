@@ -38,7 +38,7 @@ export default ({ url, html, addToHead, environment, metaUrl, props, shared }) =
     }
     window.metaImport = async (url) => {
       return await import(
-        \`\${url}?bundle=true&customBaseUrl=${metaUrl}\`
+        \`\${url}?bundle=true&v=\${new Date().getTime()}&customBaseUrl=${metaUrl}\`
       )
     }
   </script>

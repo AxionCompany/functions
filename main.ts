@@ -13,7 +13,6 @@ try {
 const env = { ...dotEnv, ...Deno.env.toObject() };
 let fileLoaderStarted: any;
 
-
 const startFileLoader = async (iter = 0) => {
     const fileLoader = new Worker(new URL("./file-loader.ts", import.meta.url).href, { type: "module" });
     fileLoader.onmessage = (event) => {
@@ -33,7 +32,7 @@ const startFileLoader = async (iter = 0) => {
 const startApi = async (iter = 0) => {
     const fileLoaderUrl = env.FILE_LOADER_URL
         || "http://localhost:9000";
-    const api = new Worker(new URL("./api.ts", fileLoaderUrl).href, { type: "module" });
+    const api = new Worker(new URL("./api.ts", import.meta.url.startsWith('http') ? import.meta.url : fileLoaderUrl).href, { type: "module" });
     api.onmessage = (event) => {
         if (event?.data?.message?.status === 'ok') {
             return

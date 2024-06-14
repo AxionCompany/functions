@@ -26,13 +26,17 @@ export default ({ config, modules }: any) =>
         },
       ) || {};
 
-    if (!path) {
+    if (!path && !customBaseUrl) {
       res.status(404);
       res.statusText(`No path found for ${pathname}`)
       return;
     }
 
     if (shouldBundle) {
+      if (customBaseUrl) {
+        path = new URL(customBaseUrl).pathname + pathname;
+        path = path.replace('//', '/');
+      }
       const bundleUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, customBaseUrl ? customBaseUrl : url.origin);
       const bundleContent = await bundle(bundleUrl, { shared: shared?.split(',') }).then(res => res).catch(console.log);
       if (bundleContent) {

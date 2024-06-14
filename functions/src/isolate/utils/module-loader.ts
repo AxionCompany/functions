@@ -51,7 +51,7 @@ export default async ({ importUrl, dependencies }: any) => {
       typeof PUT !== "function" &&
       typeof DELETE !== "function"
     ) {
-      throw { message: "Imported Code should be an ESM Module.", status: 404 };
+      throw { message: "Imported Code should be an ESModule.", status: 404 };
     }
 
     // Return module and its dependencies
