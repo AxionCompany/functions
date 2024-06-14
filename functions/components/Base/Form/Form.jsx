@@ -1,5 +1,5 @@
 import { useForm, FormProvider, Controller } from "npm:react-hook-form";
-import WithProps from '../../Functions/WithProps';
+import WithProps from '../../Functions/WithProps.jsx';
 
 const Form = ({ className, children, onSubmit, attrName, updates, ...props }) => {
 

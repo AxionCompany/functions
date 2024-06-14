@@ -1,4 +1,3 @@
-import React from "react";
 
 import { Popup as PopupLF } from "react-leaflet";
 

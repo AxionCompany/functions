@@ -1,5 +1,3 @@
-import React from 'react';
-
 const WithProps = ({ children, recursive, transform, transformComponent, ...props }) => {
 
     recursive = recursive || 'last';

@@ -1,5 +1,4 @@
 
-import { useEffect, useState } from "react";
 
 import { Col } from "components/Base/Grid";
 import { MenuButton } from "components/Base/Button"
@@ -7,6 +6,7 @@ import Icon from "components/Base/Icon";
 import SidebarHeader from "./SidebarHeader";
 import SidebarFooter from "./SidebarFooter";
 
+const { useEffect, useState } = React;
 const defaultProps = {
     currentPage: '/',
     menuItems: [
@@ -67,7 +67,7 @@ const SideBar = ({ children, handlePageChange, currentPage, className, menuItems
                                     selected={url === currentPage ? true : false}
                                     className={`items-center justify-start`}>
                                     <Icon size={"18px"} iconName={icon} />
-                                    {isOpen && <span style={{display: "inline-flex", minWidth: "max-content"}} className={`ml-4 font-medium text-sm `}>{name}</span>}
+                                    {isOpen && <span style={{ display: "inline-flex", minWidth: "max-content" }} className={`ml-4 font-medium text-sm `}>{name}</span>}
                                 </MenuButton>
                         );
                     })}

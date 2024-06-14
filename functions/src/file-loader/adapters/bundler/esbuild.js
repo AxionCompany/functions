@@ -1,5 +1,6 @@
 import { build } from "npm:esbuild";
-import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader/mod.ts"
+import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader/mod.ts";
+
 
 export default async (path, { ...options } = {}) => {
 
@@ -24,3 +25,4 @@ export default async (path, { ...options } = {}) => {
 
     return { code: result?.outputFiles?.[0]?.text }
 }
+
