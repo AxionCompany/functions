@@ -8,7 +8,6 @@ export const GET = () => {
   const [count, setCount] = React.useState(0);
   return (
     <div>
-      <h1>Yeeey!</h1>
       <Button onClick={() => setCount(count + 1)}>Click me!</Button>
       <p>GET request received</p>
       <p>Count: {count}</p>

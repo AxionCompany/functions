@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { isElement } from "react-dom/test-utils";
+
+
 import TabHeader from "./tabHeader";
+
+const { useState, useEffect } = React;
 
 export default function TabPage({ children, companyId, router, activeTab }) {
   const [childrenKey, setChildrenKey] = useState(parseInt(activeTab) || 0);

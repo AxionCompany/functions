@@ -1,4 +1,3 @@
-import React from "react";
 
 import { Marker as MarkerLF } from "react-leaflet";
 import L from "leaflet";

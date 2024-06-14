@@ -1,8 +1,6 @@
-import React, { useEffect } from "react";
-
 import { Polyline as PolylineLF, useMap } from "react-leaflet";
 import 'leaflet-arrowheads';
-
+const { useEffect } = React;
 export default function Polyline(props) {
   let polylineRef;
   const map = useMap();
@@ -14,7 +12,7 @@ export default function Polyline(props) {
 
   useEffect(() => {
     const polylineDom = polylineRef
-    if (props.arrowheads){
+    if (props.arrowheads) {
       polylineDom.arrowheads(props.arrowheads)
       polylineDom._update()
     }
