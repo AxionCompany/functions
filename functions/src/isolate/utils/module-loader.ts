@@ -1,24 +1,27 @@
 import { config } from "https://deno.land/x/dotenv@v3.2.2/mod.ts";
-import getFile from "./getFile.ts";
+import getAllFiles from "./getAllFiles.ts";
 
-export default async ({ importUrl, dependencies }: any) => {
+export default async ({ importUrl, dependencies, isJSX }: any) => {
 
-  const [baseUrl, searchParams] = importUrl.split("?");
+  const sharedModuleUrls = await getAllFiles({ url: importUrl, name: 'shared', extensions: ['js', 'jsx', 'ts', 'tsx'], returnProp: 'matchPath' });
 
-  // Build shared modules possible urls
-  const possibleSharedUrls: string[] = [];
-  new URL(baseUrl).pathname.split('/')
-    .map((_, i, arr) => {
-      return new URL(arr.slice(0, i + 1).join('/') + `/shared?${searchParams}`, new URL(importUrl).origin).href
-    })
-    .forEach((url) => possibleSharedUrls.push(url));
-
-  const dependenciesUrl = (await Promise.all(possibleSharedUrls.map(async (url) => await getFile(url, { ext: ['js', 'jsx', 'ts', 'tsx'], fileName: 'shared' }, 'matchPath').then(res => res).catch(_ => null))))
-    .filter(Boolean);
-
+  let LayoutModules = [];
+  let layoutUrls = [];
+  if (isJSX) {
+    const indexHtml = (await getAllFiles({ url: importUrl, name: 'index', extensions: ['html'], returnProp: 'content' })).slice(-1)[0];
+    indexHtml && (dependencies.indexHtml = indexHtml);
+    layoutUrls = await getAllFiles({ url: importUrl, name: 'layout', extensions: ['js', 'jsx', 'ts', 'tsx'], returnProp: 'matchPath' });
+    // Load layout modules
+    LayoutModules = await Promise.all(
+      layoutUrls.map((url) =>
+        import(new URL(url, new URL(importUrl).origin).href)
+          .then((mod) => mod.default)
+      )
+    );
+  }
   // Load shared modules
   const SharedModules = await Promise.all(
-    dependenciesUrl.map((url) =>
+    sharedModuleUrls.map((url) =>
       import(new URL(url, new URL(importUrl).origin).href)
         .then((mod) => mod.default)
     )
@@ -30,7 +33,8 @@ export default async ({ importUrl, dependencies }: any) => {
       if (!Dependencies) return acc
       return Dependencies({ ...acc })
     },
-    { env: { ...Deno.env.toObject(), ...config(), ...dependencies } }
+    // Initial dependencies
+    { env: { ...Deno.env.toObject(), ...config() }, ...dependencies, LayoutModules, layoutUrls }
   );
 
   try {
