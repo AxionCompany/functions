@@ -154,7 +154,8 @@ export default ({ config, modules }: any) => async (
                 method,
                 params: { ...params, ...ctx, ...urlMetadata.params, ...queryParams, ...data },
                 isJSX,
-                headers
+                headers,
+                ...config
             }),
         });
 

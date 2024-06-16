@@ -13,7 +13,6 @@ self.addEventListener("unhandledrejection", event => {
   });
 });
 
-
 import server from "./functions/src/servers/main.ts";
 import RequestHandler from "./functions/src/handlers/main.ts";
 import Isolate from "./functions/src/isolate/main.ts";
@@ -33,9 +32,7 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
 
 (async () => {
 
-  const fileLoaderUrl = env.FILE_LOADER_URL
-    || "http://localhost:9000";
-
+  const fileLoaderUrl = env.FILE_LOADER_URL || "http://localhost:9000";
 
   const adapters = await import(join(fileLoaderUrl, env.FUNCTIONS_DIR, 'adapters'))
     .then((m: any) => m.default)
