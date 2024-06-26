@@ -14,10 +14,11 @@ const createScripts = ({
         ? `{
           "imports": {
             "react": "https://ga.jspm.io/npm:react@18.3.1/dev.index.js",
-            "react-dom": "https://ga.jspm.io/npm:react-dom@18.3.1/dev.index.js"
+            "react-dom/client": "https://ga.jspm.io/npm:react-dom@18.3.1/dev.client.js"
           },
           "scopes": {
             "https://ga.jspm.io/": {
+              "react-dom": "https://ga.jspm.io/npm:react-dom@18.3.1/dev.index.js",
               "scheduler": "https://ga.jspm.io/npm:scheduler@0.23.2/dev.index.js"
             }
           }
@@ -25,10 +26,11 @@ const createScripts = ({
         : `{
           "imports": {
             "react": "https://ga.jspm.io/npm:react@18.3.1/index.js",
-            "react-dom": "https://ga.jspm.io/npm:react-dom@18.3.1/index.js"
+            "react-dom/client": "https://ga.jspm.io/npm:react-dom@18.3.1/client.js"
           },
           "scopes": {
             "https://ga.jspm.io/": {
+              "react-dom": "https://ga.jspm.io/npm:react-dom@18.3.1/index.js",
               "scheduler": "https://ga.jspm.io/npm:scheduler@0.23.2/index.js"
             }
           }
@@ -39,6 +41,7 @@ const createScripts = ({
       content: `
       window.baseUrl = "${new URL(url).origin}";
       window.importPath = "${new URL(url).pathname}";
+      window.isServer = false;
       window.dynamicImport = async (path) => {
         return await import(
           \`\${new URL(path,window.baseUrl).href}?bundle=true&v=\${new Date().getTime()}&shared=${shared?.length ? shared.join(',') : ''}\`
@@ -58,33 +61,38 @@ const createScripts = ({
       type: 'module',
       content: `
            import React from 'react';
-           import ReactDOM from 'react-dom';
+           import {hydrateRoot} from 'react-dom/client';
            window.React = React;
            const init = async (App) => {
-             const root = ReactDOM.createRoot(document.getElementById('root'));
-             root.render(App);
+             // Hydrate the App
+             hydrateRoot(document.body.querySelector('main'), App);
            }
            window.importAxion = (path) => metaImport(path);
            const layouts = await Promise.all([
             ${layoutUrls.map((path) => `"${path}"`).join(",")}
            ].map(async (path) => await dynamicImport(path)));
-           const Layout = layouts.reduce((acc, mod) => {
-            const LayoutComponent = mod.GET || mod.default;
-            return (props) => React.createElement(LayoutComponent, props, acc(props));
-           }, ({ children }) => children);
+           const Layout = layouts.reduce(
+            (acc, mod) => {
+              const LayoutComponent = mod.GET || mod.default;
+              if (!LayoutComponent) return acc;
+              return (props) => React.createElement(acc, props, React.createElement(LayoutComponent,props));
+           }, 
+            ({ children }) => children
+           );
+           const props = ${JSON.stringify(props)};
            const mod = await dynamicImport(window.importPath);
            const Component = mod.GET || mod.default;
            const App = React.createElement(
             Layout, 
-            ${JSON.stringify(props)},
+            props,
             React.createElement(
-              Component,  
-              ${JSON.stringify(props)}
+              Component,
+              props,
             )
           );
            await init(App);
       `
-    }
+    },
   ]
   return {
     headScripts,

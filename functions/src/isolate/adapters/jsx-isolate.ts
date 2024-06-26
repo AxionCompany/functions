@@ -7,15 +7,19 @@ import ReactDOMServer from "npm:react-dom/server";
 import React from "npm:react";
 import { DOMParser } from "npm:linkedom";
 
-globalThis.React = React;
 
+const isServer = true;
 const metaUrl = import.meta.url.split('src')?.[0];
 const importAxion: any = (path: string) => {
     console.log('Importing Axion Module from:', new URL(path, metaUrl).href);
     return import(new URL(path, metaUrl).href);
-}
+};
 
+globalThis.React = React;
+globalThis.metaUrl = metaUrl;
 globalThis.importAxion = importAxion;
+globalThis.isServer = isServer;
+
 
 const indexHtml = ` 
 <!DOCTYPE html>
@@ -32,8 +36,11 @@ const _config = {
     pipes: {}, // default to no pipes
     handlers: {
         "/(.*)+": async ({ data }: any, response: any) => {
-            if (Object.keys(data).length === 1) return
+
+            if (!data) return
+
             const { currentUrl, method, functionsDir, dirEntrypoint } = data;
+
             try {
 
                 if (!data.importUrl) {
@@ -52,12 +59,12 @@ const _config = {
                         processCss,
                         DOMParser,
                         htmlScripts,
-                        indexHtml
+                        indexHtml,
                     },
                 });
 
                 const chunk = await moduleExecutor(data, response);
-                return response.send(chunk);
+                return chunk;
             } catch (err) {
                 response.error(err);
             }
@@ -71,4 +78,3 @@ const _config = {
 const { config, ...adapters }: any = _config
 
 server({ port, requestHandler: RequestHandler(adapters), config });
-

@@ -1,9 +1,9 @@
-import { Alert } from "../../Base/Alert/main.js";
+import { Alert } from "../../Base/Alert/main.js"
 const { useState, useEffect } = React;
 
 const AlertContext = React.createContext({});
 
-export const AlertProvider = ({ children }) => {
+export const AlertProvider = ({ children, ...props }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [type, setType] = useState("error");
   const [message, setMessage] = useState("");
@@ -30,10 +30,14 @@ export const AlertProvider = ({ children }) => {
   };
 
   return (
-    <AlertContext.Provider value={{ showAlert }}>
+    // <AlertContext.Provider value={{ showAlert }}>
+    <div>
       {isOpen && <Alert type={type} message={message} />}
-      {children}
-    </AlertContext.Provider>
+      {Array.isArray(children)
+        ? children.map((child) => React.cloneElement(child, { ...props, showAlert }))
+        : React.cloneElement(children, { ...props, showAlert })}
+    </div>
+    // </AlertContext.Provider>
   );
 };
 

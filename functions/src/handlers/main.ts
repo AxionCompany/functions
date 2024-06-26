@@ -59,7 +59,10 @@ export default (
         });
       }
 
-      let data: any = typeof body === "string" ? { data: body } : { ...body };
+      let data: any;
+      if (body) {
+        data = typeof body === "string" ? { data: body } : { ...body };
+      }
       let ctx: any = {};
       // Adding Middlewares
       for (const key in middlewares) {
@@ -79,8 +82,8 @@ export default (
         status: 200,
         statusText: "OK",
         headers: {
-          "Access-Control-Allow-Origin": "*",
-          "content-type": "text/plain; charset=utf-8",
+          "access-control-allow-origin": "*",
+          "content-type": "text/plain",
           "x-content-type-options": "nosniff",
         },
       };
@@ -97,6 +100,11 @@ export default (
         start: (ctlr) => {
           controller = ctlr;
         },
+        // pull(ctlr) {
+        //   if (ctlr.desiredSize && ctlr.desiredSize > 0) {
+        //     controller = ctlr;
+        //   }
+        // },
         cancel: () => {
           console.log('Stream cancelled', __requestId__);
           if (!responseSent) {
@@ -141,30 +149,35 @@ export default (
           };
         }
 
-        if (serializedResponse && !responseSent) {
-          controller.enqueue(new TextEncoder().encode(serializedResponse));
+        if (serializedResponse 
+          && !responseSent
+        ) {
+          const encoded = new TextEncoder().encode(serializedResponse);
+          controller.enqueue(encoded);
         }
 
         // Close the stream if done
-        if (streamData.__done__ && !responseSent) {
-
+        if (streamData.__done__ 
+          && !responseSent
+        ) {
           responseSent = true;
           controller.close();
         }
-
         resolveResponseHeaders();
       }
 
+      const responseFn = responseCallback(__requestId__, streamCallback);
+
       handler(
         { url, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
-        responseCallback(__requestId__, streamCallback),
+        responseFn,
       )
-        .then((data: any) => streamCallback({ chunk: data, __done__: true }))
-        .catch(responseCallback(__requestId__, streamCallback).error);
+        .then(responseFn.send)
+        .catch(responseFn.error);
 
       await responseHeadersPromise;
 
-      delete options.headers["access-control-allow-origin"];
+      // delete options.headers["access-control-allow-origin"];
       return new Response(responseStream, options);
     } catch (err) {
 
@@ -172,11 +185,11 @@ export default (
         status: 500,
         statusText: "Internal Server Error",
         headers: {
-          "Access-Control-Allow-Origin": "*",
+          // "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Headers":
             "authorization, x-client-info, apikey, content-type",
           "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
-          "Content-Type": "application/json"
+          "content-type": "application/json"
         }
       }
 

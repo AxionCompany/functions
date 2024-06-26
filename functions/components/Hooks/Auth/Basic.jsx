@@ -1,4 +1,5 @@
 export const AuthContext = React.createContext();
+
 const { useState, useEffect } = React;
 
 export const AuthProvider = (
@@ -13,9 +14,11 @@ export const AuthProvider = (
     redirectUrl,
     onSignIn,
     publicPaths,
+    children,
     ...props
   },
 ) => {
+
   authRoute = authRoute || "/auth/login";
   loginPath = loginPath || "/login";
   applicationId = applicationId || "default";
@@ -75,14 +78,15 @@ export const AuthProvider = (
     if (tokenStored && tokenVerification) {
       setToken(tokenStored);
       if (router.pathname.indexOf(loginPath) > -1) {
-        router.push(redirectUrl);
+        router?.push(redirectUrl);
       }
     } else {
       await signOut();
       if (
-        publicPaths && publicPaths?.indexOf(router?.asPath.split("?")[0]) > -1
+        publicPaths &&
+        publicPaths?.indexOf(router?.asPath?.split("?")?.[0]) > -1
       ) return;
-      router.push(loginPath);
+      router?.push(loginPath);
     }
   };
 
@@ -122,14 +126,16 @@ export const AuthProvider = (
         isAdmin: isAdmin(),
         server,
         isAuthenticated,
+        ...props
       }}
     >
-      {props.children}
+      {children}
     </AuthContext.Provider>
   );
 };
 
-export const WithAuth = ({ children }) => {
+export const WithAuth = ({ children, ...props }) => {
+
   return (
     <AuthContext.Consumer>
       {children}
