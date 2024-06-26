@@ -1,8 +1,12 @@
 {
     "tasks": {
-        "start": "deno run -A -r --no-lock --unstable --allow-run main.ts",
+        "start": "deno run -A -r --no-lock --unstable main.ts",
         "dev": "PORT=9002 deno run -A -r --no-lock --unstable main.ts",
         "file-loader": "deno run -A -r --no-lock --unstable file-loader.ts",
         "api": "deno run -A -r --no-lock --unstable file-loader.ts"
-    }
+    },
+    "imports": {
+        "react": "npm:react@^18.3.1",
+        "react-dom": "npm:react-dom@^18.3.1"
+      }
 }

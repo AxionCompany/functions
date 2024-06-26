@@ -1,4 +1,7 @@
 import moduleLoader from "./module-loader.ts";
+import { createHash } from "../../../modules/connectors/security.js";
+import { get, set } from "https://deno.land/x/kv_toolbox/blob.ts";
+
 
 const tryParseJSON = (str: any) => {
   try {
@@ -22,7 +25,7 @@ export default (config: any) => {
 
       // load the module
       const { mod: defaultModule, GET, POST, PUT, DELETE, pathParams, matchedPath, dependencies: localDependencies, ...moduleExports } = await loader(
-        { importUrl, dependencies: remoteDependencies, isJSX },
+        { importUrl, currentUrl, dependencies: remoteDependencies, isJSX },
       );
 
       // get the config
@@ -93,33 +96,43 @@ const moduleInstance: any = async (
         },
         ({ children }: any) => children
       );
+      const { headers, ..._pageParams } = params;
       // render the JSX component
       const html = dependencies?.ReactDOMServer.renderToString(
         dependencies.React.createElement(
           Layout,
-          params,
-          dependencies.React.createElement(mod, params)
+          _pageParams,
+          dependencies.React.createElement(mod, _pageParams)
         )
       );
       // parse the html
       const document = new dependencies.DOMParser().parseFromString(dependencies.indexHtml, 'text/html');
 
       // add html to a div in body
-      const div = document.createElement('div');
-      div.id = 'root';
-      div.innerHTML = html;
-      document.body.appendChild(div);
+      let mainElement = document.body.querySelector('main');
+      if (!mainElement) {
+        mainElement = document.createElement('main');
+        mainElement.innerHTML = html
+        document.body.appendChild(mainElement);
+      } else {
+        mainElement.innerHTML = html
+      }
 
+      const compiledHtml = [dependencies.bundledLayouts.join('\n'), dependencies.bundledModule].join('\n');
       // compile css script
-      const css = dependencies.postCssConfig ? await dependencies.processCss(dependencies.postCssConfig, html, importUrl) : '';
+      // build css with page visible elements, only
+      const css = await (buildStyles(dependencies))(html, { importUrl });
+      // async build css with all elements and dependent components
+      const completeCss = (buildStyles(dependencies))(compiledHtml, { importUrl });
       // add css to head
       const style = document.createElement('style');
       style.textContent = css;
       document.head.appendChild(style);
+      // build scripts
       const { headScripts, bodyScripts } = dependencies.htmlScripts({
         url,
         metaUrl,
-        props: params,
+        props: _pageParams,
         layoutUrls: dependencies.layoutUrls.map((url: string) => url.replace(`${functionsDir}/`, '')),
         environment: (dependencies?.env?.ENV || 'production'),
         shared: dependencies?.config?.sharedModules
@@ -141,7 +154,25 @@ const moduleInstance: any = async (
       // render the html template
       workerRes = document.toString();
       // stream the response
-      workerRes.split("\n").forEach((chunk: any) => response.stream(chunk + "\n"));
+      for (let chunk of workerRes.split("\n")) {
+        // stream up to the main element for readly availability of SSR content 
+        const endIndex = chunk.indexOf('</body>');
+        if (endIndex > -1) {
+          const endChunk = chunk.slice(0, endIndex);
+          response.stream(endChunk + '\n')
+          // then, stream script for updating the style tag
+          await completeCss.then((css: string) =>
+            css && response.stream(`
+          <script>
+          const style = document.querySelector('style');
+          style.textContent = ${JSON.stringify(css)};
+          </script>
+          `))
+          chunk = chunk.slice(endIndex);
+        }
+        // stream the rest of the content
+        response.stream(chunk + '\n')
+      }
       // the end
       return;
     }
@@ -160,3 +191,22 @@ const moduleInstance: any = async (
 }
 
 
+const buildStyles = (dependencies: any) => async (html: string, { importUrl }: { importUrl: string }) => {
+  if (dependencies.postCssConfig) {
+
+    const hash = await createHash(html);
+    const kv = await Deno.openKv();
+    try {
+      const cachedData: any = await get(kv, ['cache', 'styles', hash])
+      if (cachedData?.value) {
+        const cachedStyle = new TextDecoder('utf-8').decode(cachedData.value);
+        return cachedStyle
+      } else {
+        const style = await dependencies.processCss(dependencies.postCssConfig, html, importUrl)
+        set(kv, ['cache', 'styles', hash], new TextEncoder().encode(style), { expireIn: 1000 * 60 });
+        return style;
+      }
+    } catch (_) { }
+  }
+  return ''
+}

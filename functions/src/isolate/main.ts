@@ -133,6 +133,7 @@ export default ({ config, modules }: any) => async (
                 pid: process.pid,
                 process,
             };
+            // await sleep(5000)
             await waitForServer(`http://localhost:${port}`);
         } catch (error) {
             console.error(`Failed to spawn isolate: ${isolateId}`, error);
@@ -142,10 +143,11 @@ export default ({ config, modules }: any) => async (
 
     try {
         const port = getPortFromIsolateId(isolateId);
+       
         const moduleResponse = await fetch(`http://localhost:${port}`, {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
+                "content-type": "application/json",
             },
             body: JSON.stringify({
                 __requestId__: __requestId__,
@@ -171,18 +173,20 @@ export default ({ config, modules }: any) => async (
             }
         }
 
-        // create a reader to read the stream
-        const reader = moduleResponse?.body?.getReader();
-
         let resolver: any;
 
         const resolved = new Promise((resolve, reject) => {
             resolver = { resolve, reject };
         });
 
+        // create a reader to read the stream
+        const reader = moduleResponse?.body?.getReader();
+
         reader?.read()?.then(function processText({ done, value }): any {
+
             // value for fetch streams is a Uint8Array
-            const chunk = new TextDecoder("utf-8").decode(value);
+            const chunk = new TextDecoder('utf-8').decode(value);
+            // stream the chunk to the response
             response.stream(chunk);
 
             // if it's done, then stop reading
@@ -194,7 +198,8 @@ export default ({ config, modules }: any) => async (
             // Read some more, and call this function again
             return reader.read().then(processText);
         });
-        return await resolved;
+        await resolved;
+        return;
 
     } catch (error) {
         console.error("Error communicating with isolate server", error);

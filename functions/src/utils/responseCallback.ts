@@ -28,7 +28,7 @@ export default (__requestId__: string, cb: Function) => {
           "Access-Control-Allow-Headers":
             "authorization, x-client-info, apikey, content-type",
           "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
-          "Content-Type": "application/json"
+          "content-type": "application/json"
         }
       }
 
