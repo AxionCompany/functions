@@ -1,6 +1,7 @@
 
 import * as FileLoaders from "./adapters/main.ts";
-import bundle from './adapters/bundler/esbuild.js'
+import bundle from './adapters/bundler/esbuild.js';
+import { get, set, } from "https://deno.land/x/kv_toolbox/blob.ts";
 
 const fileLoaders: any = { ...FileLoaders };
 
@@ -19,12 +20,17 @@ export default ({ config, modules }: any) =>
       `Loading file ${pathname} with loader ${loaderType}`,
     );
 
-    let { content, redirect, params, path, matchPath } =
-      await (fileLoaders[loaderType]({ config }))(
-        {
-          path: pathname,
-        },
-      ) || {};
+    const fileLoader = fileLoaders[loaderType]({ config });
+
+    // const startTimer = Date.now();
+    let { content, redirect, params, path, matchPath } = await responseWithCache({ path: pathname, cachettl: config.cachettl }, fileLoader) || {};
+    // console.log(`Loaded ${pathname} in ${Date.now() - startTimer}ms`);
+    // let { content, redirect, params, path, matchPath } =
+    //   await (fileLoaders[loaderType]({ config }))(
+    //     {
+    //       path: pathname,
+    //     },
+    //   ) || {};
 
     if (!path && !customBaseUrl) {
       res.status(404);
@@ -64,3 +70,33 @@ export default ({ config, modules }: any) =>
 
     return content;
   };
+
+const responseWithCache = async (params: { path: string, cachettl: number }, fn: Function) => {
+  await createDirIfNotExists('data/');
+  const kv = await Deno.openKv('data/cache');
+  try {
+    const cachedData: any = await get(kv, ['cache', 'file-loader', params.path])
+    if (cachedData?.value !== null) {
+      const cachedContent = new TextDecoder('utf-8').decode(cachedData.value);
+      let parsedContent;
+      try {
+        parsedContent = JSON.parse(cachedContent);
+        if (parsedContent?.error) return null;
+      } catch (_) {
+        parsedContent = cachedContent;
+      }
+      return parsedContent;
+    } else {
+      const data = await fn(params);
+      const strData = JSON.stringify(data || { error: "No data" });
+      await set(kv, ['cache', 'file-loader', params.path], new TextEncoder().encode(strData), { expireIn: params.cachettl });
+      return data;
+    }
+  } catch (_) { }
+}
+
+const createDirIfNotExists = async (path: string) => {
+  try {
+    await Deno.mkdir(path, { recursive: true });
+  } catch (_) { }
+}
