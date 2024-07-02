@@ -7,10 +7,14 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
 
   let layoutUrls = [];
   let resolvedJsxData: any = [];
+
   if (isJSX) {
+    let start = Date.now();
     const indexHtml = (await getAllFiles({ url: importUrl, name: 'index', extensions: ['html'], returnProp: 'content' })).slice(-1)[0];
     indexHtml && (dependencies.indexHtml = indexHtml);
     layoutUrls = await getAllFiles({ url: importUrl, name: 'layout', extensions: ['js', 'jsx', 'ts', 'tsx'], returnProp: 'matchPath' });
+    console.log(`Loaded layout files in ${Date.now() - start}ms`);
+    start = Date.now();
     // Load layout modules
     const LayoutModulesPromise = Promise.all(
       layoutUrls.map((url) =>
@@ -18,6 +22,7 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
           .then((mod) => mod.default)
       )
     );
+
     // Load layout bundles
     const bundledLayoutsPromise = getAllFiles({
       url: currentUrl + '?bundle=true',
@@ -36,7 +41,9 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
       bundledLayoutsPromise,
       bundledModulePromise
     ])
+    console.log(`Loaded layout bundles in ${Date.now() - start}ms`);
   }
+  let start = Date.now();
   const [LayoutModules, bundledLayouts, bundledModule] = resolvedJsxData;
   // Load shared modules
   const SharedModules = await Promise.all(
@@ -45,7 +52,8 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
         .then((mod) => mod.default)
     )
   );
-
+  console.log(`Loaded shared modules in ${Date.now() - start}ms`); 
+  start = Date.now();
   // Instantiate shared modules
   dependencies = SharedModules.reduce(
     (acc, Dependencies, index) => {
@@ -55,10 +63,13 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
     // Initial dependencies
     { env: { ...Deno.env.toObject(), ...config() }, ...dependencies, LayoutModules, layoutUrls, bundledLayouts, bundledModule }
   );
+  console.log(`Instantiated shared modules in ${Date.now() - start}ms`);
 
   try {
+    start = Date.now();
     // Load target module
     const ESModule = await import(importUrl).then(mod => mod).catch(console.log);
+    console.log(`Loaded target module in ${Date.now() - start}ms`);
 
     // Check if module is not found
     if (typeof ESModule === "string") throw { message: "Module Not Found", status: 404 };

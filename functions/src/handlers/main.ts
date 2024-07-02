@@ -23,6 +23,7 @@ export default (
 
       // Get Query parameters
       const url = new URL(req.url);
+      const subdomain = getSubdomain(url.href)
       const queryParams = Object.fromEntries(url.searchParams.entries());
       const method = req.method;
 
@@ -149,7 +150,7 @@ export default (
           };
         }
 
-        if (serializedResponse 
+        if (serializedResponse
           && !responseSent
         ) {
           const encoded = new TextEncoder().encode(serializedResponse);
@@ -157,7 +158,7 @@ export default (
         }
 
         // Close the stream if done
-        if (streamData.__done__ 
+        if (streamData.__done__
           && !responseSent
         ) {
           responseSent = true;
@@ -169,7 +170,7 @@ export default (
       const responseFn = responseCallback(__requestId__, streamCallback);
 
       handler(
-        { url, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
+        { url, subdomain, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
         responseFn,
       )
         .then(responseFn.send)
@@ -215,3 +216,29 @@ export default (
       );
     }
   };
+
+
+export function getSubdomain(url) {
+  // Create a new URL object
+  const urlObj = new URL(url);
+
+  // Get the hostname from the URL object
+  const hostname = urlObj.hostname;
+
+  // Split the hostname by dots
+  const parts = hostname.split('.');
+
+  // Check if there are more than two parts (subdomain exists)
+  if (parts.length > 2) {
+    // Return the subdomain
+    return parts.slice(0, -2).join('.');
+  }
+
+  // Return null if there is no subdomain
+  return null;
+}
+
+// Example usage:
+const url = 'https://sub.example.com/path';
+const subdomain = getSubdomain(url);
+console.log(subdomain); // Output: sub

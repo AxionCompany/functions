@@ -1,36 +1,78 @@
-import { basename, extname, join } from "https://deno.land/std/path/mod.ts";
-
-const GITHUB_API_BASE = "https://api.github.com/repos";
-
-const GithubApi = (owner:string, repo:string, ref:string, token:string) =>async (path:string)=>{
-  const url = `${GITHUB_API_BASE}/${owner}/${repo}/contents/${path}${
-    ref ? `?ref=${ref}` : ""
-  }`;
-  const headers = new Headers();
-  if (token) {
-    headers.set("Authorization", `token ${token}`);
-  }
-  const response = await fetch(url, { headers });
-
-  const data = await response.json();
-
-  return data
-}
+import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 
 
-export default ({ config }: any) =>
-  async function findFile(
-    { path, currentPath = config?.functionsDir || ".", params = {}, fullPath }:
+export default ({ config }: any) => {
+  const GITHUB_API_URL = "https://api.github.com";
+  const headers = {}
+  if (config.apiKey) {
+    headers.Authorization = `token ${config.apiKey}`;
+  };
+
+  const getExactRepoInfo = async (owner: string, repo: string, branch: string) => {
+    const branchData = await fetch(`${GITHUB_API_URL}/repos/${owner}/${repo}/branches/${branch}`, { headers }).then(res => res.json());
+    const branchUrl = branchData?._links?.self;
+    const exactRepo = branchUrl?.split('/').slice(-3, -2)?.[0];
+    const exactBranch = branchData?.name;
+    const exactOwner = branchUrl?.split('/')?.slice(-4, -3)?.[0];
+    return { owner: exactOwner, repo: exactRepo, branch: exactBranch };
+  };
+
+  let gitInfo = getExactRepoInfo(config.owner, config.repo, config.branch);
+
+  const fileExists = async (path: string) => {
+    gitInfo = await gitInfo;
+    try {
+      const response = await fetch(`${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`, { headers, cache: "force-cache" });
+      if (response.status === 200) {
+        const data = await response.json();
+        return data.type === "file";
+      } else {
+        return false;
+      }
+    } catch (err) {
+      return false;
+    }
+  };
+
+  const readTextFile = async (path: string) => {
+    gitInfo = await gitInfo;
+    const response = await fetch(`${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`, { headers, cache: "force-cache" });
+    if (response.status === 200) {
+      const data = await response.json();
+      const content = atob(data.content);
+      return content;
+    } else {
+      throw new Error(`Failed to fetch file: ${path}`);
+    }
+  };
+
+  const readDir = async (path: string) => {
+    gitInfo = await gitInfo;
+    const response = await fetch(`${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`, { headers, cache: "force-cache" });
+    if (response.status === 200) {
+      const data = await response.json();
+      return data.map((entry: any) => ({
+        name: entry.name,
+        isFile: entry.type === "file",
+        isDirectory: entry.type === "dir",
+      }));
+    } else {
+      throw new Error(`Failed to fetch directory: ${path}`);
+    }
+  };
+
+
+  return async function findFile(
+    { path, currentPath = ".", params = {}, fullPath }:
       {
         path: string;
         currentPath: string;
         params: any;
-        fullPath: string;
+        fullPath: string | undefined;
       },
   ): Promise<any> {
 
-        
-    const segments: Array<string> = path.split("/").filter(Boolean);
+    const segments: Array<string> = path.replaceAll(SEPARATOR, "/").split("/").filter(Boolean);
 
     const mainEntrypoint = config?.dirEntrypoint || "index";
 
@@ -41,79 +83,73 @@ export default ({ config }: any) =>
     const fullPathFile = fullPath;
     const fullPathIndex = join(fullPathFile, mainEntrypoint);
 
-
-    const githubInstance = GithubApi(
-      config?.gitOwner,
-      config?.gitRepo,
-      config?.gitRef,
-      config?.gitToken,
-    );
-
-    const fileExists = async (path: string, mainEntrypoint:string) => {
-      try {
-        const stats = await githubInstance(path);
-        return stats?.type === 'file' ? stats : false;
-      } catch (err) {
-        return false;
-      }
-    };
-
-    // Get the next segment to match
     const segment = segments.shift();
     const matches: any = [];
 
-    const pathFileData = await fileExists(pathFile, mainEntrypoint);
+    const pathFileExists = await fileExists(pathFile);
 
-    if(pathFileData) {
+    if (pathFileExists) {
       return {
-        content: atob(pathFileData?.content ),
-        matchPath: (pathFileData ? pathFile : indexFile).split(`${config.functionsDir}/`).join(''),
-        path: pathFileData? fullPathFile : fullPathIndex,
+        content: await readTextFile(pathFile),
+        matchPath: join('.', pathFile),
+        path: fullPathFile,
         params,
       };
     }
-    
-    const currentPathData = await githubInstance(currentPath);
 
-    for (const entry of currentPathData) {
-      // Check for an index file in the directory
-      const _currentPath = join(currentPath, entry.name);
-      const _currentIndexPath = join(currentPath, path, entry.name);
-
-      if (segments.length === 0 && entry.type==='file') {
+    for (const entry of await readDir(currentPath)) {
+      if (segments.length === 0 && entry.isFile) {
+        const _currentPath = join(currentPath, entry.name);
         if (
           (extname(entry.name) && (
             pathFile.split(extname(entry.name))[0] ===
-              _currentPath.split(extname(entry.name))[0]
+            _currentPath.split(extname(entry.name))[0]
           )) ||
           (pathFile === _currentPath)
         ) {
           return {
-            // content: atob(entry.content),
+            content: await readTextFile(_currentPath),
             match: _currentPath,
             params,
             redirect: fullPath !== pathFile,
             path: join(
-              fullPathFile.slice(0, fullPathFile.lastIndexOf("/")),
+              dirname(fullPathFile),
               entry.name,
             ),
           };
         }
-       
+
+        const _currentIndexPath = join(currentPath, path, entry.name);
         if (
           (extname(entry.name) && (
             indexFile.split(extname(entry.name))[0] ===
-              _currentIndexPath.split(extname(entry.name))[0]
+            _currentIndexPath.split(extname(entry.name))[0]
           )) ||
           (indexFile === _currentIndexPath)
         ) {
           return {
-            // content: atob(entry.content),
+            content: await readTextFile(_currentIndexPath),
             match: _currentIndexPath,
             params,
             redirect: _currentIndexPath !== pathFile,
             path: join(
-              fullPathFile,
+              dirname(fullPathIndex),
+              entry.name,
+            ),
+          };
+        }
+
+        const maybeVariable = basename(entry.name, extname(entry.name));
+        if (maybeVariable.startsWith("[") && maybeVariable.endsWith("]")) {
+          const variable = maybeVariable.slice(1, -1);
+          params[variable] = segment;
+          return {
+            content: await readTextFile(_currentPath),
+            match: _currentPath,
+            params,
+            redirect: true,
+            path: join(
+              dirname(fullPathFile),
               entry.name,
             ),
           };
@@ -124,30 +160,34 @@ export default ({ config }: any) =>
       if (
         entryName === segment ||
         entry.name === segment ||
-        entry.name.startsWith(":")
+        (entry.name.startsWith("[") && entry.name.endsWith("]"))
       ) {
         matches.push(entryName);
       }
     }
 
-    // Try each match recursively
+    matches.sort((a: any, b: any) => {
+      if (a.startsWith("[") && a.endsWith("]")) return 1;
+      if (b.startsWith("[") && b.endsWith("]")) return -1;
+      return 0;
+    });
+
     for (const match of matches) {
       const newPath = join(currentPath, match);
       const newParams = { ...params };
-
-      if (match.startsWith(":")) {
-        newParams[basename(match, extname(match)).slice(1)] = segment;
+      if (match.startsWith("[") && match.endsWith("]")) {
+        newParams[basename(match, extname(match)).slice(1, -1)] = segment;
       }
-
       const result = await findFile({
-        path: segments.join("/"),
+        path: join(...segments),
         currentPath: newPath,
         params: newParams,
         fullPath: fullPath || path,
       });
 
-      if (result) return result; // Successful match found
+      if (result) return result;
     }
 
-    return null; // No valid paths found
+    return null;
   };
+}
