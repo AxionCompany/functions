@@ -18,27 +18,45 @@ try {
 const env = { ...dotEnv, ...Deno.env.toObject() };
 
 server({
-  requestHandler: RequestHandler({
-    middlewares: {},
-    pipes: {},
-    modules: {
-      path: { SEPARATOR, basename, extname, join, dirname }
-    },
-    handlers: {
-      "/(.*)+": FileLoader({
-        config: {
-          dirEntrypoint: "main",
-          loaderType: "local",
-        },
-        modules: {
-          path: {
-            SEPARATOR, basename, extname, join, dirname
+  requestHandler: (req: Request) => {
+    const urlParts = new URL(req.url).host.split('.');
+    const gitInfo = {}
+    if (urlParts.length > 2 || urlParts[1]?.includes('localhost')) {
+      const [owner, repo, branch] = urlParts[0]?.split('--') || [];
+      const getRepoData = (owner: string, repo: string, branch: string) => ({
+        owner,
+        repo,
+        branch
+      });
+      Object.assign(gitInfo, getRepoData(owner, repo, branch));
+    }
+    return RequestHandler({
+      middlewares: {},
+      pipes: {},
+      modules: {
+        path: { SEPARATOR, basename, extname, join, dirname }
+      },
+      handlers: {
+        "/(.*)+": FileLoader({
+          config: {
+            dirEntrypoint: env.DIR_ENTRYPOINT || "main",
+            loaderType: env.DEFAULT_LOADER_TYPE || "local",
+            cachettl: env.CACHE_TTL || 1000 * 60 * 10,
+            owner: gitInfo?.owner || "AxionCompany",
+            repo: gitInfo?.repo || "functions",
+            branch: gitInfo?.branch || "develop", // or any other branch you want to fetch files froM
+            apiKey: env.GIT_API_KEY
+          },
+          modules: {
+            path: {
+              SEPARATOR, basename, extname, join, dirname
+            }
           }
-        }
-      }),
-    },
-    serializers: {},
-  }),
+        }),
+      },
+      serializers: {},
+    })(req)
+  },
   config: {
     PORT: env.FILE_LOADER_PORT || 9000,
     verbose: false

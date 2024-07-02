@@ -1,6 +1,6 @@
 {
     "tasks": {
-        "start": "deno run -A -r --no-lock --unstable main.ts",
+        "start": "deno run -A -r --no-lock --unstable --unstable-kv main.ts",
         "dev": "PORT=9002 deno run -A -r --no-lock --unstable main.ts",
         "file-loader": "deno run -A -r --no-lock --unstable file-loader.ts",
         "api": "deno run -A -r --no-lock --unstable file-loader.ts"
