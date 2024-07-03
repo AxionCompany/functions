@@ -12,7 +12,6 @@ self.addEventListener("unhandledrejection", event => {
     stack: event.reason.stack,
   });
 });
-
 import server from "./functions/src/servers/main.ts";
 import RequestHandler from "./functions/src/handlers/main.ts";
 import Isolate from "./functions/src/isolate/main.ts";
