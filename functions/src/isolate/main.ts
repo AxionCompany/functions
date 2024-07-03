@@ -46,10 +46,11 @@ const cleanupIsolate = (isolateId: string): void => {
 };
 
 export default ({ config, modules }: any) => async (
-    { url, pathname, headers, method, data, ctx, params, queryParams, __requestId__ }: {
+    { url, pathname, headers, subdomain, method, data, ctx, params, queryParams, __requestId__ }: {
         url: URL;
         method: string;
         headers: any;
+        subdomain: string;
         pathname: string;
         ctx: any | null;
         params: any | null;
@@ -58,12 +59,12 @@ export default ({ config, modules }: any) => async (
         __requestId__: string;
     }, response: any) => {
 
-    const importUrl = !queryParams?.customBaseUrl ? new URL(modules.path.join(config.loaderUrl, config.functionsDir), url.origin) : new URL(config.loaderUrl, url.origin);
-
+    const importUrl = !queryParams?.customBaseUrl ? new URL(modules.path.join(config.loaderUrl, config.functionsDir)) : new URL(config.loaderUrl);
     importUrl.pathname = modules.path.join(importUrl.pathname, pathname);
     importUrl.search = url.search;
     importUrl.username = url.username;
     importUrl.password = url.password;
+    importUrl.hostname = [subdomain,importUrl.hostname].join('.');
 
     const importSearchParams = new URL(importUrl).searchParams.toString();
 

@@ -22,15 +22,7 @@ export default ({ config, modules }: any) =>
 
     const fileLoader = fileLoaders[loaderType]({ config });
 
-    // const startTimer = Date.now();
-    let { content, redirect, params, path, matchPath } = await responseWithCache({ path: pathname, cachettl: config.cachettl }, fileLoader) || {};
-    // console.log(`Loaded ${pathname} in ${Date.now() - startTimer}ms`);
-    // let { content, redirect, params, path, matchPath } =
-    //   await (fileLoaders[loaderType]({ config }))(
-    //     {
-    //       path: pathname,
-    //     },
-    //   ) || {};
+    let { content, redirect, params, path, matchPath } = await responseWithCache({ path: pathname, cachettl: config.cachettl, useCache: config.useCache }, fileLoader) || {};
 
     if (!path && !customBaseUrl) {
       res.status(404);
@@ -71,27 +63,31 @@ export default ({ config, modules }: any) =>
     return content;
   };
 
-const responseWithCache = async (params: { path: string, cachettl: number }, fn: Function) => {
-  await createDirIfNotExists('data/');
-  const kv = await Deno.openKv('data/cache');
+const responseWithCache = async (params: { path: string, cachettl: number, useCache: boolean }, fn: Function) => {
   try {
-    const cachedData: any = await get(kv, ['cache', 'file-loader', params.path])
-    if (cachedData?.value !== null) {
-      const cachedContent = new TextDecoder('utf-8').decode(cachedData.value);
-      let parsedContent;
-      try {
-        parsedContent = JSON.parse(cachedContent);
-        if (parsedContent?.error) return null;
-      } catch (_) {
-        parsedContent = cachedContent;
+    const kv = await Deno.openKv('data/cache');
+    // params.useCache=false;
+    if (params.useCache) {
+      await createDirIfNotExists('data/');
+      const cachedData: any = await get(kv, ['cache', 'file-loader', params.path])
+      if (cachedData?.value !== null) {
+        const cachedContent = new TextDecoder('utf-8').decode(cachedData.value);
+        let parsedContent;
+        try {
+          parsedContent = JSON.parse(cachedContent);
+          if (parsedContent?.error) return null;
+        } catch (_) {
+          parsedContent = cachedContent;
+        }
+        return parsedContent;
       }
-      return parsedContent;
-    } else {
-      const data = await fn(params);
+    }
+    const data = await fn(params);
+    if (params.useCache) {
       const strData = JSON.stringify(data || { error: "No data" });
       await set(kv, ['cache', 'file-loader', params.path], new TextEncoder().encode(strData), { expireIn: params.cachettl });
-      return data;
     }
+    return data;
   } catch (_) { }
 }
 

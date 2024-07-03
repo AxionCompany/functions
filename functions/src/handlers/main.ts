@@ -23,7 +23,7 @@ export default (
 
       // Get Query parameters
       const url = new URL(req.url);
-      const subdomain = getSubdomain(url.href)
+      const subdomain = getSubdomain(req.url);
       const queryParams = Object.fromEntries(url.searchParams.entries());
       const method = req.method;
 
@@ -218,7 +218,7 @@ export default (
   };
 
 
-export function getSubdomain(url) {
+export function getSubdomain(url:string) {
   // Create a new URL object
   const urlObj = new URL(url);
 
@@ -226,19 +226,14 @@ export function getSubdomain(url) {
   const hostname = urlObj.hostname;
 
   // Split the hostname by dots
-  const parts = hostname.split('.');
+  const parts = hostname?.split('.') || [];
 
   // Check if there are more than two parts (subdomain exists)
-  if (parts.length > 2) {
+  if (parts?.length > 2 || parts?.[1]?.includes('localhost')) {
     // Return the subdomain
-    return parts.slice(0, -2).join('.');
+    return parts.slice(0,  parts?.[1]?.includes('localhost') ? -1 : -2)?.join('.');
   }
 
   // Return null if there is no subdomain
   return null;
 }
-
-// Example usage:
-const url = 'https://sub.example.com/path';
-const subdomain = getSubdomain(url);
-console.log(subdomain); // Output: sub

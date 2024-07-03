@@ -1,6 +1,6 @@
 /// <reference lib="deno.unstable" />
 
-import RequestHandler from "./functions/src/handlers/main.ts";
+import RequestHandler, { getSubdomain } from "./functions/src/handlers/main.ts";
 import FileLoader from "./functions/src/file-loader/main.ts";
 import server from "./functions/src/servers/main.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
@@ -22,7 +22,8 @@ server({
     const urlParts = new URL(req.url).host.split('.');
     const gitInfo = {}
     if (urlParts.length > 2 || urlParts[1]?.includes('localhost')) {
-      const [owner, repo, branch] = urlParts[0]?.split('--') || [];
+      const sub = getSubdomain(req.url)
+      const [owner, repo, branch] = sub?.split('--') || [];
       const getRepoData = (owner: string, repo: string, branch: string) => ({
         owner,
         repo,
@@ -40,7 +41,8 @@ server({
         "/(.*)+": FileLoader({
           config: {
             dirEntrypoint: env.DIR_ENTRYPOINT || "main",
-            loaderType: env.DEFAULT_LOADER_TYPE || "local",
+            loaderType: "local",
+            useCache: env.USE_CACHE || true,
             cachettl: env.CACHE_TTL || 1000 * 60 * 10,
             owner: gitInfo?.owner || "AxionCompany",
             repo: gitInfo?.repo || "functions",
