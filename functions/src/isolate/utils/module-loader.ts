@@ -2,18 +2,21 @@ import { config } from "https://deno.land/x/dotenv@v3.2.2/mod.ts";
 import getAllFiles from "./getAllFiles.ts";
 
 export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
+  let start = Date.now();
 
   const sharedModuleUrls = await getAllFiles({ url: importUrl, name: 'shared', extensions: ['js', 'jsx', 'ts', 'tsx'], returnProp: 'matchPath' });
-
+  console.log(`Loaded shared module files in ${Date.now() - start}ms`);
   let layoutUrls = [];
   let resolvedJsxData: any = [];
 
   if (isJSX) {
     let start = Date.now();
     const indexHtml = (await getAllFiles({ url: importUrl, name: 'index', extensions: ['html'], returnProp: 'content' })).slice(-1)[0];
+    console.log(`Loaded layout files 1 in ${Date.now() - start}ms`);
+    start = Date.now();
     indexHtml && (dependencies.indexHtml = indexHtml);
     layoutUrls = await getAllFiles({ url: importUrl, name: 'layout', extensions: ['js', 'jsx', 'ts', 'tsx'], returnProp: 'matchPath' });
-    console.log(`Loaded layout files in ${Date.now() - start}ms`);
+    console.log(`Loaded layout files 2 in ${Date.now() - start}ms`);
     start = Date.now();
     // Load layout modules
     const LayoutModulesPromise = Promise.all(
@@ -43,7 +46,7 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
     ])
     console.log(`Loaded layout bundles in ${Date.now() - start}ms`);
   }
-  let start = Date.now();
+  start = Date.now();
   const [LayoutModules, bundledLayouts, bundledModule] = resolvedJsxData;
   // Load shared modules
   const SharedModules = await Promise.all(
