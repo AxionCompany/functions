@@ -58,7 +58,7 @@ export default ({ config, modules }: any) => async (
         __requestId__: string;
     }, response: any) => {
 
-    const importUrl = !queryParams?.customBaseUrl ? new URL(modules.path.join(config.loaderUrl, config.functionsDir)) : new URL(config.loaderUrl);
+    const importUrl = !queryParams?.customBaseUrl ? new URL(modules.path.join(config.loaderUrl, config.functionsDir), url.origin) : new URL(config.loaderUrl, url.origin);
 
     importUrl.pathname = modules.path.join(importUrl.pathname, pathname);
     importUrl.search = url.search;
@@ -143,7 +143,7 @@ export default ({ config, modules }: any) => async (
 
     try {
         const port = getPortFromIsolateId(isolateId);
-       
+
         const moduleResponse = await fetch(`http://localhost:${port}`, {
             method: "POST",
             headers: {
