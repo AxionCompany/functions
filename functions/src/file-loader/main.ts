@@ -1,9 +1,7 @@
 
-import * as FileLoaders from "./adapters/main.ts";
+import FileLoader from "./adapters/loaders/main.ts";
 import bundle from './adapters/bundler/esbuild.js';
 import { get, set, } from "https://deno.land/x/kv_toolbox/blob.ts";
-
-const fileLoaders: any = { ...FileLoaders };
 
 export default ({ config, modules }: any) =>
   async ({ pathname, url, headers, queryParams }: any, res: any) => {
@@ -20,10 +18,9 @@ export default ({ config, modules }: any) =>
       `Loading file ${pathname} with loader ${loaderType}`,
     );
 
-    const fileLoader = fileLoaders[loaderType]({ config });
+    const fileLoader = FileLoader({ config });
 
-    let { content, redirect, params, path, matchPath } = await responseWithCache({ path: pathname, cachettl: config.cachettl, useCache: config.useCache }, fileLoader) || {};
-
+    let { content, redirect, params, path, matchPath } = await withCache({ path: pathname, cachettl: config.cachettl, useCache: config.useCache }, fileLoader) || {};
     if (!path && !customBaseUrl) {
       res.status(404);
       res.statusText(`No path found for ${pathname}`)
@@ -63,12 +60,11 @@ export default ({ config, modules }: any) =>
     return content;
   };
 
-const responseWithCache = async (params: { path: string, cachettl: number, useCache: boolean }, fn: Function) => {
+const withCache = async (params: { path: string, cachettl: number, useCache: boolean }, cb: Function) => {
   try {
+    await createDirIfNotExists('data/');
     const kv = await Deno.openKv('data/cache');
-    // params.useCache=false;
     if (params.useCache) {
-      await createDirIfNotExists('data/');
       const cachedData: any = await get(kv, ['cache', 'file-loader', params.path])
       if (cachedData?.value !== null) {
         const cachedContent = new TextDecoder('utf-8').decode(cachedData.value);
@@ -82,10 +78,10 @@ const responseWithCache = async (params: { path: string, cachettl: number, useCa
         return parsedContent;
       }
     }
-    const data = await fn(params);
+    const data = await cb(params);
     if (params.useCache) {
       const strData = JSON.stringify(data || { error: "No data" });
-      await set(kv, ['cache', 'file-loader', params.path], new TextEncoder().encode(strData), { expireIn: params.cachettl });
+      set(kv, ['cache', 'file-loader', params.path], new TextEncoder().encode(strData), { expireIn: params.cachettl });
     }
     return data;
   } catch (_) { }

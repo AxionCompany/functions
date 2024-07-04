@@ -7,6 +7,13 @@ const createScripts = ({
   shared
 }) => {
 
+  const baseUrl = new URL(url)
+  if (environment === 'development') {
+    baseUrl.protocol = 'http:'
+  } else {
+    baseUrl.protocol = 'https:'
+  }
+
   const headScripts = [
     {
       type: 'importmap',
@@ -39,8 +46,8 @@ const createScripts = ({
     {
       type: 'text/javascript',
       content: `
-      window.baseUrl = "${new URL(url).origin}";
-      window.importPath = "${new URL(url).pathname}";
+      window.baseUrl = "${baseUrl.origin}";
+      window.importPath = "${baseUrl.pathname}";
       window.isServer = false;
       window.dynamicImport = async (path) => {
         return await import(

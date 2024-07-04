@@ -1,9 +1,8 @@
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 
-
 export default ({ config }: any) => {
   const GITHUB_API_URL = "https://api.github.com";
-  const headers = {}
+  const headers: any = {}
   if (config.apiKey) {
     headers.Authorization = `token ${config.apiKey}`;
   };
@@ -17,7 +16,7 @@ export default ({ config }: any) => {
     return { owner: exactOwner, repo: exactRepo, branch: exactBranch };
   };
 
-  let gitInfo = getExactRepoInfo(config.owner, config.repo, config.branch);
+  let gitInfo: any = getExactRepoInfo(config.owner, config.repo, config.branch);
 
   const fileExists = async (path: string) => {
     gitInfo = await gitInfo;
@@ -36,6 +35,7 @@ export default ({ config }: any) => {
 
   const readTextFile = async (path: string) => {
     gitInfo = await gitInfo;
+
     const response = await fetch(`${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`, { headers, cache: "force-cache" });
     if (response.status === 200) {
       const data = await response.json();
@@ -48,6 +48,7 @@ export default ({ config }: any) => {
 
   const readDir = async (path: string) => {
     gitInfo = await gitInfo;
+
     const response = await fetch(`${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`, { headers, cache: "force-cache" });
     if (response.status === 200) {
       const data = await response.json();
@@ -59,6 +60,12 @@ export default ({ config }: any) => {
     } else {
       throw new Error(`Failed to fetch directory: ${path}`);
     }
+  };
+
+  return {
+    fileExists,
+    readTextFile,
+    readDir,
   };
 
 
