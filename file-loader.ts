@@ -26,7 +26,11 @@ server({
     } catch (err) {
       useCache = true;
     }
-    const gitInfo = {}
+    const gitInfo: {
+      owner?: string,
+      repo?: string,
+      branch?: string
+    } = {}
     const sub = getSubdomain(req.url)
     const [owner, repo, branch] = sub?.split('--') || [];
     const getRepoData = (owner: string, repo: string, branch: string) => ({
@@ -45,9 +49,10 @@ server({
         "/(.*)+": FileLoader({
           config: {
             dirEntrypoint: env.DIR_ENTRYPOINT || "main",
-            loaderType: (env.DEFAULT_LOADER_TYPE || "local"),
+            loaderType: (gitInfo?.owner && gitInfo?.repo && gitInfo?.branch) ? 'github' : (env.DEFAULT_LOADER_TYPE || "local"),
+            debug: env.DEBUG === 'true',
             useCache,
-            cachettl: env.CACHE_TTL || 1000 * 60 * 10,
+            cachettl: Number(env.CACHE_TTL) || 1000 * 60 * 10,
             owner: gitInfo?.owner || env.GIT_OWNER,
             repo: gitInfo?.repo || env.GIT_REPO,
             branch: gitInfo?.branch || env.GIT_BRANCH, // or any other branch you want to fetch files froM

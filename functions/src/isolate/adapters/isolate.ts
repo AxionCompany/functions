@@ -8,15 +8,14 @@ const port: number = parseInt(Deno.args?.[0]) || 3000;
 
 const isServer = true;
 const metaUrl = import.meta.url.split('src')?.[0];
-const importAxion: any = (path: string) => {
-    console.log('Importing Axion Module from:', new URL(path, metaUrl).href);
+const importAxion: any = (path: string, config: any = {}) => {
+    config?.debug && console.log('Importing Axion Module from:', new URL(path, metaUrl).href);
     return import(new URL(path, metaUrl).href);
 };
 
 globalThis.metaUrl = metaUrl;
 globalThis.importAxion = importAxion;
 globalThis.isServer = isServer;
-
 
 const _config = {
     middlewares: {},

@@ -10,8 +10,8 @@ import { DOMParser } from "npm:linkedom";
 
 const isServer = true;
 const metaUrl = import.meta.url.split('src')?.[0];
-const importAxion: any = (path: string) => {
-    console.log('Importing Axion Module from:', new URL(path, metaUrl).href);
+const importAxion: any = (path: string, config: any = {}) => {
+    config?.debug && console.log('Importing Axion Module from:', new URL(path, metaUrl).href);
     return import(new URL(path, metaUrl).href);
 };
 

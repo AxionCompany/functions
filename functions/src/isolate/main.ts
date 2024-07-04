@@ -93,6 +93,7 @@ export default ({ config, modules }: any) => async (
             return { error: urlMetadata.statusText }
         }
         urlMetadata = await urlMetadata.json();
+
         if (queryParams.bundle) {
             response.headers({ "content-type": "text/javascript" });
             if (!urlMetadata?.content?.code) {
@@ -101,6 +102,7 @@ export default ({ config, modules }: any) => async (
             }
             return urlMetadata?.content?.code;
         }
+
         const matchExt = modules.path.extname(urlMetadata?.matchPath);
         let match = matchExt ? urlMetadata?.matchPath?.replace(matchExt, '') : urlMetadata?.matchPath;
         match = modules.path.join('.', match);

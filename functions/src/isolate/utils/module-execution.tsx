@@ -24,7 +24,7 @@ export default (config: any) => {
       const { importUrl, currentUrl, params: requestParams, headers: requestHeaders, isJSX, __requestId__ } = data;
 
       // load the module
-      const { mod: defaultModule, GET, POST, PUT, DELETE, pathParams, matchedPath, dependencies: localDependencies, ...moduleExports } = await loader(
+      const { mod: defaultModule, GET, POST, PUT, DELETE, dependencies: localDependencies, ...moduleExports } = await loader(
         { importUrl, currentUrl, dependencies: remoteDependencies, isJSX },
       );
 
@@ -48,7 +48,7 @@ export default (config: any) => {
       const dependencies = { ...localDependencies, ...remoteDependencies };
 
       // merge path params
-      const params = { headers: requestHeaders, ...requestParams, ...pathParams, __requestId__ };
+      const params = { headers: requestHeaders, ...requestParams, __requestId__ };
 
       // execute the module
       const workerRes = await moduleInstance({ mod, params, dependencies, url: currentUrl, metaUrl, isJSX, importUrl, functionsDir }, response);
@@ -165,7 +165,7 @@ const moduleInstance: any = async (
             css && response.stream(`
           <script>
           const style = document.querySelector('style');
-          style.textContent = ${JSON.stringify(css)};
+          style.textContent += ${JSON.stringify(css)};
           </script>
           `))
           chunk = chunk.slice(endIndex);

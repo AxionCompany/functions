@@ -1,8 +1,8 @@
-import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
+import { SEPARATOR, basename, extname, join } from "https://deno.land/std/path/mod.ts";
 
 export default ({ config }: any) => {
 
-    const loaderFunctionsPromise = import('./' + config.loaderType + '.ts').then(m => m.default(config));
+    const loaderFunctionsPromise = import('./' + config.loaderType + '.ts').then(m => m.default({ config }));
 
     return async function findFile(
         { path, currentPath = ".", params = {}, fullPath }:
@@ -14,7 +14,7 @@ export default ({ config }: any) => {
             },
     ): Promise<any> {
 
-        const { fileExists, readTextFile, readDir } = await loaderFunctionsPromise;
+        const { readTextFile, readDir } = await loaderFunctionsPromise;
 
         const segments: Array<string> = path.replaceAll(SEPARATOR, "/").split("/").filter(Boolean);
 
@@ -24,21 +24,13 @@ export default ({ config }: any) => {
 
         const segment = segments.shift();
         const matches: any = [];
-        
-        const pathFileExists = await fileExists(pathFile);
-        if (pathFileExists) {
-            return {
-                content: await readTextFile(pathFile),
-                matchPath: join('.', pathFile),
-                path,
-                params,
-            };
-        }
+
         const maybeReturn = [];
+        config.debug && console.log('Checking path', currentPath, 'for', segment, 'in', segments, 'remaining')
         const dirFiles = await readDir(currentPath);
         let addSegment;
         for (const entry of dirFiles) {
-            console.log('Checking entry', entry.name, 'for', segment, 'in', currentPath, 'with', segments, 'remaining')
+            config.debug && console.log('Checking entry', entry.name, 'for', segment, 'in', currentPath, 'with', segments, 'remaining')
             // Last segment. Check for matches. First, match by file name, Then by index file, and finally by variable
             if (
                 segments.length === 0
@@ -51,18 +43,14 @@ export default ({ config }: any) => {
                         _currentPath.split(extname(entry.name))[0]
                     ))
                 ) {
-                    console.log('adding', _currentPath, 'to maybeReturn')
+                    config.debug && console.log(_currentPath, 'added to file candidates with priority 1', extname(path))
                     maybeReturn.push({
                         priority: 1,
                         content: await readTextFile(_currentPath),
-                        match: _currentPath,
+                        matchPath: _currentPath,//join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')),
                         params,
-                        redirect: fullPath !== pathFile,
-                        path: join(
-                            // dirname(fullPathFile),
-                            fullPath ||'',
-                            entry.name,
-                        ),
+                        redirect: !extname(path),
+                        path: join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')),
                     });
                 }
                 // Priority 2: Check if the entry name matches a variable
@@ -72,59 +60,65 @@ export default ({ config }: any) => {
                     maybeVariable.startsWith("[") &&
                     maybeVariable.endsWith("]")
                 ) {
-                    console.log('adding', _currentPath, 'to maybeReturn')
+                    config.debug && console.log(_currentPath, 'added to file candidates with priority 2')
                     const variable = maybeVariable.slice(1, -1);
-                    params[variable] = segment;
+                    const newParams = { ...params };
+                    newParams[variable] = basename(path, extname(path));
                     maybeReturn.push({
                         priority: 2,
-                        content: await Deno.readTextFile(_currentPath),
-                        match: _currentPath,
-                        params,
-                        redirect: true,
-                        path: join(
-                            // dirname(fullPathFile),
-                            fullPath || '',
-                            entry.name,
-                        ),
+                        content: await readTextFile(_currentPath),
+                        matchPath: _currentPath,//join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')),
+                        params: newParams,
+                        redirect: !extname(path),
+                        path: join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')),
                     })
                 }
 
             }
 
             // If it is not the last segment, check for matches and continue recursively
+            if (entry.isFile) continue;
             const entryName = basename(entry.name, extname(entry.name));
             if (
                 (entry.name.startsWith("[") && entry.name.endsWith("]")) // Check if the entry name is a variable
-                && segments.length
             ) {
+                if (
+                    !segments.length // If it is the last segment, add the main entrypoint to the segments array
+                ) {
+                    config.debug && console.log('Adding main entrypoint to segments', entryName);
+                    addSegment = mainEntrypoint; // Indicate that the main entrypoint should be added to the segments array for the next iteration after the for loop
+
+                }
                 // Add the match to the matches array
-                console.log('adding', entryName, 'to matches')
+                config.debug && console.log('Partial path match with', entryName, 'adding to matches');
                 matches.push(entryName);
             } else if (
                 entryName === segment // Check if the entry name matches the segment without extension
             ) {
                 if (
-                    !segments.length
-                    && segment !== mainEntrypoint
+                    !segments.length // If it is the last segment, add the main entrypoint to the segments array
+                    && segment !== mainEntrypoint // If the segment is not the main entrypoint
                 ) {
-                    console.log('adding', mainEntrypoint, 'to segments')
-                    addSegment = mainEntrypoint;
+                    config.debug && console.log('Adding main entrypoint to segments', entryName);
+                    addSegment = mainEntrypoint; // Indicate that the main entrypoint should be added to the segments array for the next iteration after the for loop
 
                 }
-                console.log('adding', entryName, 'to matches')
-                matches.push(entryName);
+                config.debug && console.log('Partial path match with', entryName, 'adding to matches');
+                matches.push(entryName); // Add the match to the matches array
             }
         }
 
-        addSegment && segments.push(mainEntrypoint)
+        addSegment && segments.push(mainEntrypoint) // Add the main entrypoint to the segments array
 
         if (maybeReturn.length > 0) {
+            // If there are any priority 1 matches in maybeReturn (i.e. the file name matches the path), return the first one
             const priority = maybeReturn.find(i => i.priority === 1);
             if (priority) return priority;
         }
 
         // Variable Matches should be last in matches array;
         matches.sort((a: any, b: any) => {
+            // Sort the matches array so that variables are last
             if (a.startsWith("[") && a.endsWith("]")) return 1;
             if (b.startsWith("[") && b.endsWith("]")) return -1;
             return 0;
@@ -144,16 +138,18 @@ export default ({ config }: any) => {
                 path: join(...segments),
                 currentPath: newPath,
                 params: newParams,
-                fullPath: join(fullPath || '', match),
+                fullPath: join(fullPath || '', segment || '')
             });
 
+            // Successful match found, add it to maybeReturn
             if (result) {
                 maybeReturn.push({
                     ...result
                 });
-            } // Successful match found
+            }
         }
 
+        // If there are any valid paths in maybeReturn, return the one with the highest priority
         if (maybeReturn.length > 0) {
             maybeReturn.sort((a: any, b: any) => a.priority - b.priority);
             return maybeReturn[0];
