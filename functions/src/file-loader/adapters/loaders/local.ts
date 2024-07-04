@@ -1,17 +1,48 @@
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 
-const fileExists = async (path: string) => {
-  try {
-    const stats = await Deno.stat(path);
-    return stats.isFile;
-  } catch (err) {
-    return false;
+
+export default ({ config }: any) => {
+  const fileExists = async (path: string) => {
+    try {
+      const stats = await Deno.stat(path);
+      return stats.isFile;
+    } catch (err) {
+      return false;
+    }
+  };
+  const readTextFile = async (path: string) => {
+    try {
+      return await Deno.readTextFile(path || "");
+    } catch (err) {
+      return "";
+    }
   }
-};
 
+  const readDir = async (path: string) => {
+    try {
+      const files = [];
+      for await (const dirEntry of Deno.readDir(path)) {
+        files.push({
+          name: dirEntry.name,
+          isFile: dirEntry.isFile,
+          isDirectory: dirEntry.isDirectory
+        });
+      }
+      return files;
+    } catch (err) {
+      console.log('ERROR', err);
+      return [];
+    }
+  }
 
-export default ({ config }: any) =>
-  async function findFile(
+  return {
+    fileExists,
+    readTextFile,
+    readDir
+
+  }
+
+  return async function findFile(
     { path, currentPath = ".", params = {}, fullPath }:
       {
         path: string;
@@ -151,3 +182,4 @@ export default ({ config }: any) =>
 
     return null; // No valid paths found
   };
+}

@@ -17,7 +17,6 @@ import RequestHandler from "./functions/src/handlers/main.ts";
 import Isolate from "./functions/src/isolate/main.ts";
 import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
-
 let dotEnv;
 
 try {
@@ -36,6 +35,7 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
   const adapters = await import(join(fileLoaderUrl, env.FUNCTIONS_DIR, 'adapters'))
     .then((m: any) => m.default)
     .catch((err: any) => console.log(err)) || ((e: any) => e);
+
 
   let config = {
     middlewares: {

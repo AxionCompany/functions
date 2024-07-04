@@ -19,18 +19,22 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
 
 server({
   requestHandler: (req: Request) => {
-    const urlParts = new URL(req.url).host.split('.');
-    const gitInfo = {}
-    if (urlParts.length > 2 || urlParts[1]?.includes('localhost')) {
-      const sub = getSubdomain(req.url)
-      const [owner, repo, branch] = sub?.split('--') || [];
-      const getRepoData = (owner: string, repo: string, branch: string) => ({
-        owner,
-        repo,
-        branch
-      });
-      Object.assign(gitInfo, getRepoData(owner, repo, branch));
+
+    let useCache;
+    try {
+      useCache = JSON.parse(env.USE_CACHE || 'true');
+    } catch (err) {
+      useCache = true;
     }
+    const gitInfo = {}
+    const sub = getSubdomain(req.url)
+    const [owner, repo, branch] = sub?.split('--') || [];
+    const getRepoData = (owner: string, repo: string, branch: string) => ({
+      owner,
+      repo,
+      branch
+    });
+    Object.assign(gitInfo, getRepoData(owner, repo, branch));
     return RequestHandler({
       middlewares: {},
       pipes: {},
@@ -41,12 +45,12 @@ server({
         "/(.*)+": FileLoader({
           config: {
             dirEntrypoint: env.DIR_ENTRYPOINT || "main",
-            loaderType: "local",
-            useCache: env.USE_CACHE || true,
+            loaderType: (env.DEFAULT_LOADER_TYPE || "local"),
+            useCache,
             cachettl: env.CACHE_TTL || 1000 * 60 * 10,
-            owner: gitInfo?.owner || "AxionCompany",
-            repo: gitInfo?.repo || "functions",
-            branch: gitInfo?.branch || "develop", // or any other branch you want to fetch files froM
+            owner: gitInfo?.owner || env.GIT_OWNER,
+            repo: gitInfo?.repo || env.GIT_REPO,
+            branch: gitInfo?.branch || env.GIT_BRANCH, // or any other branch you want to fetch files froM
             apiKey: env.GIT_API_KEY
           },
           modules: {

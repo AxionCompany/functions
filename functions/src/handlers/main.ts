@@ -168,7 +168,6 @@ export default (
       }
 
       const responseFn = responseCallback(__requestId__, streamCallback);
-
       handler(
         { url, subdomain, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
         responseFn,

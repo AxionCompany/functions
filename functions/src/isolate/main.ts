@@ -64,7 +64,7 @@ export default ({ config, modules }: any) => async (
     importUrl.search = url.search;
     importUrl.username = url.username;
     importUrl.password = url.password;
-    importUrl.hostname = [subdomain,importUrl.hostname].join('.');
+    importUrl.hostname = [subdomain, importUrl.hostname].filter(Boolean).join('.');
 
     const importSearchParams = new URL(importUrl).searchParams.toString();
 
