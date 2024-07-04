@@ -14,8 +14,8 @@ const getAllFiles = async ({ url, name, extensions, returnProp }: any) => {
 
     const files = (
         await Promise.all(
-            possibleFileUrls.map(async (url) =>
-                await getFile(url, { ext: extensions, fileName: name }, returnProp)
+            possibleFileUrls.map((url) =>
+                getFile(url, { ext: extensions, fileName: name }, returnProp)
                     .then(res => res).catch(_ => null)
             ))
     ).filter(Boolean);

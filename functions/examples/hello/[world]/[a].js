@@ -1,0 +1,1 @@
+export default (props) => `Hello ${props.world}, ${props.a}`;

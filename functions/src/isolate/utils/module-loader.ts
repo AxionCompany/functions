@@ -2,22 +2,15 @@ import { config } from "https://deno.land/x/dotenv@v3.2.2/mod.ts";
 import getAllFiles from "./getAllFiles.ts";
 
 export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
-  let start = Date.now();
 
   const sharedModuleUrls = await getAllFiles({ url: importUrl, name: 'shared', extensions: ['js', 'jsx', 'ts', 'tsx'], returnProp: 'matchPath' });
-  console.log(`Loaded shared module files in ${Date.now() - start}ms`);
   let layoutUrls = [];
   let resolvedJsxData: any = [];
 
   if (isJSX) {
-    let start = Date.now();
     const indexHtml = (await getAllFiles({ url: importUrl, name: 'index', extensions: ['html'], returnProp: 'content' })).slice(-1)[0];
-    console.log(`Loaded layout files 1 in ${Date.now() - start}ms`);
-    start = Date.now();
     indexHtml && (dependencies.indexHtml = indexHtml);
     layoutUrls = await getAllFiles({ url: importUrl, name: 'layout', extensions: ['js', 'jsx', 'ts', 'tsx'], returnProp: 'matchPath' });
-    console.log(`Loaded layout files 2 in ${Date.now() - start}ms`);
-    start = Date.now();
     // Load layout modules
     const LayoutModulesPromise = Promise.all(
       layoutUrls.map((url) =>
@@ -44,9 +37,7 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
       bundledLayoutsPromise,
       bundledModulePromise
     ])
-    console.log(`Loaded layout bundles in ${Date.now() - start}ms`);
   }
-  start = Date.now();
   const [LayoutModules, bundledLayouts, bundledModule] = resolvedJsxData;
   // Load shared modules
   const SharedModules = await Promise.all(
@@ -55,8 +46,6 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
         .then((mod) => mod.default)
     )
   );
-  console.log(`Loaded shared modules in ${Date.now() - start}ms`); 
-  start = Date.now();
   // Instantiate shared modules
   dependencies = SharedModules.reduce(
     (acc, Dependencies, index) => {
@@ -66,19 +55,17 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
     // Initial dependencies
     { env: { ...Deno.env.toObject(), ...config() }, ...dependencies, LayoutModules, layoutUrls, bundledLayouts, bundledModule }
   );
-  console.log(`Instantiated shared modules in ${Date.now() - start}ms`);
 
   try {
-    start = Date.now();
     // Load target module
     const ESModule = await import(importUrl).then(mod => mod).catch(console.log);
-    console.log(`Loaded target module in ${Date.now() - start}ms`);
 
     // Check if module is not found
     if (typeof ESModule === "string") throw { message: "Module Not Found", status: 404 };
 
+
     // Destructure module methods and exported properties
-    const { default: mod, GET, POST, PUT, DELETE, _pathParams: pathParams, _matchPath: matchedPath, config } = ESModule;
+    const { default: mod, GET, POST, PUT, DELETE, _matchPath: matchedPath, config } = ESModule;
 
     // Check if module is not a function. If not, return error
     if (
@@ -98,7 +85,6 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
       POST,
       PUT,
       DELETE,
-      pathParams,
       matchedPath,
       dependencies,
       config
