@@ -3,8 +3,12 @@ import FileLoader from "./adapters/loaders/main.ts";
 import bundle from './adapters/bundler/esbuild.js';
 import { get, set, } from "https://deno.land/x/kv_toolbox/blob.ts";
 
-export default ({ config, modules }: any) =>
-  async ({ pathname, url, headers, queryParams }: any, res: any) => {
+export default ({ config, modules }: any) => {
+
+  const fileLoader = FileLoader({ config });
+
+
+  return async ({ pathname, url, headers, queryParams }: any, res: any) => {
     const { bundle: shouldBundle, customBaseUrl, shared, ...searchParams } = queryParams;
     // check if headers type is application/json
     const contentTypeHeaders = headers["content-type"];
@@ -14,18 +18,20 @@ export default ({ config, modules }: any) =>
 
     const { loaderType } = config || { loaderType: "local" };
 
-    config.verbose && console.log(
+    config.debug && config.verbose && console.log(
       `Loading file ${pathname} with loader ${loaderType}`,
     );
 
-    const fileLoader = FileLoader({ config });
-
+    const startTime = Date.now();
     let { content, redirect, params, path, matchPath } = await withCache({ path: pathname, cachettl: config.cachettl, useCache: config.useCache }, fileLoader) || {};
     if (!path && !customBaseUrl) {
       res.status(404);
       res.statusText(`No path found for ${pathname}`)
       return;
     }
+    // console.log('Loading', pathname, { redirect, params, path, matchPath })
+    config.debug && console.log(`Loaded file ${url} in ${Date.now() - startTime}ms`)
+
 
     if (shouldBundle) {
       if (customBaseUrl) {
@@ -39,11 +45,11 @@ export default ({ config, modules }: any) =>
       }
     }
 
-    redirect = (path !== pathname) && !shouldBundle;
+    redirect = redirect && !shouldBundle;
     if (redirect) {
       const baseUrl = url.origin;
       const redirectUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, baseUrl);
-      config.verbose && console.log(`Redirecting to ${redirectUrl.href}`);
+      config.debug && console.log(`Redirecting to ${redirectUrl.href}`);
       return res.redirect(redirectUrl.href);
     }
 
@@ -59,6 +65,7 @@ export default ({ config, modules }: any) =>
 
     return content;
   };
+}
 
 const withCache = async (params: { path: string, cachettl: number, useCache: boolean }, cb: Function) => {
   try {
@@ -79,12 +86,15 @@ const withCache = async (params: { path: string, cachettl: number, useCache: boo
       }
     }
     const data = await cb(params);
+    // console.log(params.path, data)
     if (params.useCache) {
       const strData = JSON.stringify(data || { error: "No data" });
       set(kv, ['cache', 'file-loader', params.path], new TextEncoder().encode(strData), { expireIn: params.cachettl });
     }
     return data;
-  } catch (_) { }
+  } catch (e) {
+    console.log('ERROR', e)
+  }
 }
 
 const createDirIfNotExists = async (path: string) => {
