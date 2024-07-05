@@ -61,11 +61,13 @@ export default ({ config, modules }: any) => {
       return { content, redirect, params, path, matchPath };
     }
 
-    if (params) { // add export for params in content
-      content += `\n\nexport const _pathParams = ${JSON.stringify(params)};`;
-    }
+    if (['js', 'jsx', 'ts', 'tsx'].includes(matchPath?.split('.').pop())) {
+      if (params) { // add export for params in content
+        content += `\n\nexport const _pathParams = ${JSON.stringify(params)};`;
+      }
 
-    content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\', '/')}"`;
+      content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\', '/')}"`;
+    }
 
     return content;
   };

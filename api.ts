@@ -12,8 +12,9 @@ self.addEventListener("unhandledrejection", event => {
     stack: event.reason.stack,
   });
 });
+
 import server from "./functions/src/servers/main.ts";
-import RequestHandler from "./functions/src/handlers/main.ts";
+import RequestHandler, { getSubdomain } from "./functions/src/handlers/main.ts";
 import Isolate from "./functions/src/isolate/main.ts";
 import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
 import { config } from "https://deno.land/x/dotenv/mod.ts";
@@ -30,49 +31,57 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
 
 (async () => {
 
-  const fileLoaderUrl = env.FILE_LOADER_URL || "http://localhost:9000";
-
-  const adapters = await import(join(fileLoaderUrl, env.FUNCTIONS_DIR, 'adapters'))
-    .then((m: any) => m.default)
-    .catch((err: any) => console.log(err)) || ((e: any) => e);
-
-
-  let config = {
-    middlewares: {
-      "bearerAuth": BearerAuth,
-    },
-    pipes: {}, // default to no pipes
-    modules: {
-      path: { SEPARATOR, basename, extname, join, dirname }
-    },
-    handlers: {
-      "/(.*)+": Isolate({
-        config: {
-          loaderUrl: fileLoaderUrl,
-          dirEntrypoint: env.DIR_ENTRYPOINT || "index",
-          functionsDir: env.FUNCTIONS_DIR || ".",
-        },
-        modules: {
-          path: { SEPARATOR, basename, extname, join, dirname }
-        }
-      }),
-    },
-    serializers: {},
-    dependencies: {},
-    config: {
-      PORT: env.PORT || 9002,
-    },
-    env,
-  };
-
-  const { config: _config, ..._adapters }: any = {
-    ...config,
-    ...(await adapters(config)),
-  };
+  const fileLoaderUrl = new URL(env.FILE_LOADER_URL || "http://localhost:9000");
 
   Deno.env.get('WATCH') && watchFiles(env);
 
-  server({ requestHandler: RequestHandler({ ..._config, ..._adapters }), config: _config });
+  server({
+    requestHandler: async (req: Request) => {
+
+      const subdomain = getSubdomain(req.url);
+
+      fileLoaderUrl.hostname = [subdomain, fileLoaderUrl.hostname].filter(Boolean).join('.');
+
+      const adapters = await import(join(fileLoaderUrl.href, env.FUNCTIONS_DIR, 'adapters'))
+        .then((m: any) => m.default)
+        .catch((err: any) => console.log(err)) || ((e: any) => e);
+
+      const configUrl = new URL('axion.config.json', fileLoaderUrl.origin).href;
+      
+      const config = await fetch(configUrl)
+        .then(async (res) => await res.json())
+        .catch((err) => console.log(err)) || {};
+      return RequestHandler({
+        middlewares: {
+          "bearerAuth": BearerAuth,
+        },
+        pipes: {}, // default to no pipes
+        modules: {
+          path: { SEPARATOR, basename, extname, join, dirname }
+        },
+        handlers: {
+          "/(.*)+": Isolate({
+            config: {
+              loaderUrl: fileLoaderUrl,
+              dirEntrypoint: env.DIR_ENTRYPOINT || "index",
+              functionsDir: env.FUNCTIONS_DIR || ".",
+              ...config
+            },
+            modules: {
+              path: { SEPARATOR, basename, extname, join, dirname }
+            }
+          }),
+        },
+        serializers: {},
+        dependencies: {},
+        env,
+        ...(await adapters(config))
+      })(req)
+    },
+    config: {
+      PORT: env.PORT || 9002,
+    }
+  });
   self.postMessage({ message: { 'status': 'ok' } });
 })();
 
