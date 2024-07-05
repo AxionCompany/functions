@@ -47,7 +47,7 @@ export default ({ config }: any) => {
                     maybeReturn.push({
                         priority: 1,
                         content: await readTextFile(_currentPath),
-                        matchPath: _currentPath,//join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')),
+                        matchPath: _currentPath,
                         params,
                         redirect: !extname(path),
                         path: join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')),
@@ -67,7 +67,7 @@ export default ({ config }: any) => {
                     maybeReturn.push({
                         priority: 2,
                         content: await readTextFile(_currentPath),
-                        matchPath: _currentPath,//join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')),
+                        matchPath: _currentPath,
                         params: newParams,
                         redirect: !extname(path),
                         path: join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')),
@@ -84,10 +84,10 @@ export default ({ config }: any) => {
             ) {
                 if (
                     !segments.length // If it is the last segment, add the main entrypoint to the segments array
+                    && basename(path, extname(path)) !== mainEntrypoint // If the segment is not the main entrypoint
                 ) {
                     config.debug && console.log('Adding main entrypoint to segments', entryName);
                     addSegment = mainEntrypoint; // Indicate that the main entrypoint should be added to the segments array for the next iteration after the for loop
-
                 }
                 // Add the match to the matches array
                 config.debug && console.log('Partial path match with', entryName, 'adding to matches');
