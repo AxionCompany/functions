@@ -194,8 +194,8 @@ const moduleInstance: any = async (
 const buildStyles = (dependencies: any) => async (html: string, { importUrl }: { importUrl: string }) => {
   if (dependencies.postCssConfig) {
     try {
-      await createDirIfNotExists('cache');
-      const kv = await Deno.openKv('cache/db');
+      await createDirIfNotExists('./cache');
+    const kv = await Deno.openKv('./cache/db');
       const hash = await createHash(html);
       const cachedData: any = await get(kv, ['cache', 'styles', hash])
       if (cachedData?.value) {
