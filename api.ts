@@ -47,11 +47,14 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
         .catch((err: any) => console.log(err)) || ((e: any) => e);
 
       const configUrl = new URL('axion.config.json', fileLoaderUrl.origin).href;
+      console.log('CONFIG URL', configUrl)
 
-      const config = await fetch(configUrl)
+      let config = await fetch(configUrl)
         .then(async (res) => await res.json())
         .catch((err) => console.log(err)) || {};
-      return RequestHandler({
+      console.log('CONFIG', config)
+
+      const handlerConfig = {
         middlewares: {
           "bearerAuth": BearerAuth,
         },
@@ -62,7 +65,7 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
         handlers: {
           "/(.*)+": Isolate({
             config: {
-              loaderUrl: fileLoaderUrl,
+              loaderUrl: fileLoaderUrl.href,
               dirEntrypoint: env.DIR_ENTRYPOINT || "index",
               functionsDir: env.FUNCTIONS_DIR || ".",
               ...config
@@ -75,7 +78,12 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
         serializers: {},
         dependencies: {},
         env,
-        ...(await adapters(config))
+      }
+
+
+      return RequestHandler({
+        handlerConfig,
+        ...(await adapters(handlerConfig))
       })(req)
     },
     config: {
