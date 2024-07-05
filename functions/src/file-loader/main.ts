@@ -23,7 +23,11 @@ export default ({ config, modules }: any) => {
     );
 
     const startTime = Date.now();
-    let { content, redirect, params, path, matchPath } = await withCache({ path: pathname, cachettl: config.cachettl, useCache: config.useCache }, fileLoader) || {};
+    let { content, redirect, params, path, matchPath } = await withCache(
+      fileLoader,
+      { cachettl: config.cachettl, useCache: config.useCache, keys: ['file-loader', pathname] }, {
+      path: pathname
+    }) || {};
     if (!path && !customBaseUrl) {
       res.status(404);
       res.statusText(`No path found for ${pathname}`)
@@ -67,12 +71,16 @@ export default ({ config, modules }: any) => {
   };
 }
 
-const withCache = async (params: { path: string, cachettl: number, useCache: boolean }, cb: Function) => {
+export const withCache = async (cb: Function, config: { useCache: boolean | undefined, keys: string[], cachettl: number | undefined }, ...params: any[]) => {
+
+  config.useCache = config.useCache !== false;
+  config.cachettl = config.cachettl || 1000 * 60 * 10; // 10 minutes
+
   try {
     await createDirIfNotExists('data/');
     const kv = await Deno.openKv('data/cache');
-    if (params.useCache) {
-      const cachedData: any = await get(kv, ['cache', 'file-loader', params.path])
+    if (config.useCache) {
+      const cachedData: any = await get(kv, ['cache', ...config.keys])
       if (cachedData?.value !== null) {
         const cachedContent = new TextDecoder('utf-8').decode(cachedData.value);
         let parsedContent;
@@ -85,11 +93,10 @@ const withCache = async (params: { path: string, cachettl: number, useCache: boo
         return parsedContent;
       }
     }
-    const data = await cb(params);
-    // console.log(params.path, data)
-    if (params.useCache) {
+    const data = await cb(...params);
+    if (config.useCache) {
       const strData = JSON.stringify(data || { error: "No data" });
-      set(kv, ['cache', 'file-loader', params.path], new TextEncoder().encode(strData), { expireIn: params.cachettl });
+      set(kv, ['cache', ...config.keys], new TextEncoder().encode(strData), { expireIn: config.cachettl });
     }
     return data;
   } catch (e) {
