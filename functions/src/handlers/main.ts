@@ -218,21 +218,25 @@ export default (
 
 
 export function getSubdomain(url:string) {
-  // Create a new URL object
-  const urlObj = new URL(url);
+  // Use the URL constructor to parse the URL
+  const parsedUrl = new URL(url);
 
-  // Get the hostname from the URL object
-  const hostname = urlObj.hostname;
+  // Extract the hostname
+  const hostname = parsedUrl.hostname;
 
-  // Split the hostname by dots
-  const parts = hostname?.split('.') || [];
+  // Split the hostname into parts
+  const parts = hostname.split('.');
 
-  // Check if there are more than two parts (subdomain exists)
-  if (parts?.length > 2 || parts?.[1]?.includes('localhost')) {
-    // Return the subdomain
-    return parts.slice(0,  parts?.[1]?.includes('localhost') ? -1 : -2)?.join('.');
+  // Handle special cases for localhost and IP addresses
+  if (hostname === 'localhost' || /^[0-9.]+$/.test(hostname)) {
+    return ''; // No subdomain for localhost or IP addresses
   }
 
-  // Return null if there is no subdomain
-  return null;
+  // If there are more than two parts, the subdomain is everything except the last two parts
+  if (parts.length > 2) {
+    return parts.slice(0, -2).join('.');
+  }
+
+  // If there are only two parts, there's no subdomain
+  return '';
 }
