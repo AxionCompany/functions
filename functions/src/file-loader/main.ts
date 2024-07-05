@@ -77,8 +77,8 @@ export const withCache = async (cb: Function, config: { useCache: boolean | unde
   config.cachettl = config.cachettl || 1000 * 60 * 10; // 10 minutes
 
   try {
-    await createDirIfNotExists('data/');
-    const kv = await Deno.openKv('data/cache');
+    await createDirIfNotExists('cache');
+    const kv = await Deno.openKv('cache/db');
     if (config.useCache) {
       const cachedData: any = await get(kv, ['cache', ...config.keys])
       if (cachedData?.value !== null) {

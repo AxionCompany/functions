@@ -193,10 +193,10 @@ const moduleInstance: any = async (
 
 const buildStyles = (dependencies: any) => async (html: string, { importUrl }: { importUrl: string }) => {
   if (dependencies.postCssConfig) {
-    await createDirIfNotExists('data/');
-    const kv = await Deno.openKv('data/cache');
-    const hash = await createHash(html);
     try {
+      await createDirIfNotExists('cache');
+      const kv = await Deno.openKv('cache/db');
+      const hash = await createHash(html);
       const cachedData: any = await get(kv, ['cache', 'styles', hash])
       if (cachedData?.value) {
         const cachedStyle = new TextDecoder('utf-8').decode(cachedData.value);
@@ -206,7 +206,7 @@ const buildStyles = (dependencies: any) => async (html: string, { importUrl }: {
         set(kv, ['cache', 'styles', hash], new TextEncoder().encode(style), { expireIn: 1000 * 60 });
         return style;
       }
-    } catch (_) { }
+    } catch (e) { console.log('ERROR', e) }
   }
   return ''
 }
