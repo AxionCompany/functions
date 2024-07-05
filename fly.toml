@@ -3,13 +3,13 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'axion-functions'
+app = 'vfssantos'
 primary_region = 'gig'
 
 [build]
 
 [http_service]
-  internal_port = 9000
+  internal_port = 9002
   force_https = true
   auto_stop_machines = true
   auto_start_machines = true
