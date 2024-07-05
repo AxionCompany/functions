@@ -1,3 +1,5 @@
+import { withCache } from "../../main.ts";
+
 export default ({ config }: any) => {
   const GITHUB_API_URL = "https://api.github.com";
   const headers: any = {}
@@ -6,7 +8,15 @@ export default ({ config }: any) => {
   };
 
   const getExactRepoInfo = async (owner: string, repo: string, branch: string) => {
-    const branchData = await fetch(`${GITHUB_API_URL}/repos/${owner}/${repo}/branches/${branch}`, { headers, cache: "force-cache" }).then(res => res.json());
+    const url = `${GITHUB_API_URL}/repos/${owner}/${repo}/branches/${branch}`;
+
+    const branchData = await withCache(
+      (a: string, b: any) => fetch(a, b).then(res => res.status === 200 ? res.json() : ""),
+      { keys: ['github', url], useCache: undefined, cachettl: undefined },
+      url,
+      { headers }
+    )
+
     const branchUrl = branchData?._links?.self;
     const exactRepo = branchUrl?.split('/').slice(-3, -2)?.[0];
     const exactBranch = branchData?.name;
@@ -21,34 +31,40 @@ export default ({ config }: any) => {
     .catch((err: any) => console.log(err));
 
   const readTextFile = async (path: string) => {
+
     gitInfo = await gitInfo;
 
-    const response = await fetch(`${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`, { headers, cache: "force-cache" });
-    if (response.status === 200) {
-      const data = await response.json();
-      const content = atob(data.content);
-      return content;
-    } else {
-      console.log('ERROR readTextFile', response)
-      return "";
-    }
+    const url = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`;
+
+    const response = await withCache(
+      (a: string, b: any) => fetch(a, b).then(res => res.status === 200 ? res.json() : ""),
+      { keys: ['github', url], useCache: undefined, cachettl: undefined },
+      url,
+      { headers }
+    )
+    const content = atob(response.content);
+    return content;
+
   };
 
   const readDir = async (path: string) => {
     gitInfo = await gitInfo;
 
-    const response = await fetch(`${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`, { headers, cache: "force-cache" });
-    if (response.status === 200) {
-      const data = await response.json();
-      return data.map((entry: any) => ({
-        name: entry.name,
-        isFile: entry.type === "file",
-        isDirectory: entry.type === "dir",
-      }));
-    } else {
-      console.log('ERROR readDir', response)
-      return [];
-    }
+    const url = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`;
+
+    const response = await withCache(
+      (a: string, b: any) => fetch(a, b).then(res => res.status === 200 ? res.json() : ""),
+      { keys: ['github', url], useCache: undefined, cachettl: undefined },
+      url,
+      { headers }
+    )
+
+    return response.map((entry: any) => ({
+      name: entry.name,
+      isFile: entry.type === "file",
+      isDirectory: entry.type === "dir",
+    }));
+
   };
 
   return {
