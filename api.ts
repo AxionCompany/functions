@@ -31,9 +31,6 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
 
 (async () => {
 
-
-  Deno.env.get('WATCH') && watchFiles(env);
-
   server({
     requestHandler: async (req: Request) => {
       const fileLoaderUrl = new URL(env.FILE_LOADER_URL || "http://localhost:9000");
@@ -47,7 +44,6 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
         .catch((err: any) => console.log(err)) || ((e: any) => e);
 
       const configUrl = new URL('axion.config.json', fileLoaderUrl.origin).href;
-      console.log('CONFIG URL', configUrl)
 
       let config = await fetch(configUrl)
         .then(async (res) => await res.json())
@@ -91,6 +87,7 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
     }
   });
   self.postMessage({ message: { 'status': 'ok' } });
+  Deno.env.get('WATCH') && watchFiles(env);
 })();
 
 async function watchFiles(env: any) {
