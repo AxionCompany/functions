@@ -1,7 +1,6 @@
 /// <reference lib="deno.unstable" />
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 
-
 self.addEventListener("unhandledrejection", event => {
   // Prevent this being reported (Firefox doesn't currently respect this)
   event.preventDefault();
@@ -38,17 +37,23 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
       const subdomain = getSubdomain(req.url);
 
       fileLoaderUrl.hostname = [subdomain, fileLoaderUrl.hostname].filter(Boolean).join('.');
+      let functionsDir = env.FUNCTIONS_DIR || ".";
+      functionsDir.endsWith('/') && (functionsDir = functionsDir.slice(0, -1));
 
-      const adapters = await import(join(fileLoaderUrl.href, env.FUNCTIONS_DIR, 'adapters'))
+      const adapters = await import(new URL(`${functionsDir}/adapters`, fileLoaderUrl).href)
         .then((m: any) => m.default)
-        .catch((err: any) => console.log(err)) || ((e: any) => e);
+        .catch((err: any) => {
+          console.warn(
+            `Error trying to load adapters: ${err.toString()}`
+              .replaceAll(new URL(functionsDir, fileLoaderUrl).href, '')
+          )
+        }) || ((a: any) => a);
 
       const configUrl = new URL('axion.config.json', fileLoaderUrl.origin).href;
 
       let config = await fetch(configUrl)
         .then(async (res) => await res.json())
         .catch((err) => console.log(err)) || {};
-      console.log('CONFIG', config)
 
       const handlerConfig = {
         middlewares: {
@@ -63,7 +68,7 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
             config: {
               loaderUrl: fileLoaderUrl.href,
               dirEntrypoint: env.DIR_ENTRYPOINT || "index",
-              functionsDir: env.FUNCTIONS_DIR || ".",
+              functionsDir: functionsDir,
               ...config
             },
             modules: {

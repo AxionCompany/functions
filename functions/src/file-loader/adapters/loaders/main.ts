@@ -14,11 +14,13 @@ export default ({ config }: any) => {
             },
     ): Promise<any> {
 
+        const mainEntrypoint = config?.dirEntrypoint || "index";
+
         const { readTextFile, readDir } = await loaderFunctionsPromise;
 
-        const segments: Array<string> = path.replaceAll(SEPARATOR, "/").split("/").filter(Boolean);
+        path = (path)?.replaceAll(SEPARATOR, "/").split("/").filter(Boolean).length > 0 ? path : join(path, mainEntrypoint);
 
-        const mainEntrypoint = config?.dirEntrypoint || "index";
+        const segments: Array<string> = (path)?.replaceAll(SEPARATOR, "/").split("/").filter(Boolean);
 
         const pathFile = join(currentPath, path);
 
@@ -77,8 +79,8 @@ export default ({ config }: any) => {
             }
 
             // If it is not the last segment, check for matches and continue recursively
-            if (entry.isFile) continue;
             const entryName = basename(entry.name, extname(entry.name));
+            if (entry.isFile) continue;
             if (
                 (entry.name.startsWith("[") && entry.name.endsWith("]")) // Check if the entry name is a variable
             ) {

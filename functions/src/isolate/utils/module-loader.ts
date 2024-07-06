@@ -3,14 +3,22 @@ import getAllFiles from "./getAllFiles.ts";
 
 export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
 
-  const sharedModuleUrls = await getAllFiles({ url: importUrl, name: 'shared', extensions: ['js', 'jsx', 'ts', 'tsx'], returnProp: 'matchPath' });
+  const sharedModuleUrls = await getAllFiles({
+    url: importUrl,
+    name: 'shared',
+    extensions: ['js', 'ts'],
+    returnProp: 'matchPath'
+  });
+
   let layoutUrls = [];
   let resolvedJsxData: any = [];
 
   if (isJSX) {
     const indexHtml = (await getAllFiles({ url: importUrl, name: 'index', extensions: ['html'], returnProp: 'content' })).slice(-1)[0];
     indexHtml && (dependencies.indexHtml = indexHtml);
-    layoutUrls = await getAllFiles({ url: importUrl, name: 'layout', extensions: ['js', 'jsx', 'ts', 'tsx'], returnProp: 'matchPath' });
+    layoutUrls = await getAllFiles({ url: importUrl, name: 'layout', extensions: ['jsx', 'tsx'], returnProp: 'matchPath' });
+
+
     // Load layout modules
     const LayoutModulesPromise = Promise.all(
       layoutUrls.map((url) =>
@@ -23,7 +31,7 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
     const bundledLayoutsPromise = getAllFiles({
       url: currentUrl + '?bundle=true',
       name: 'layout',
-      extensions: ['js', 'jsx', 'ts', 'tsx'],
+      extensions: ['jsx', 'tsx'],
       returnProp: 'matchPath'
     }).then(res => Promise.all(
       res.map((url: string) => fetchDynamicImportFiles(new URL(url, currentUrl).href, import.meta.url.split('/src')[0], 10))
@@ -44,6 +52,10 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
     sharedModuleUrls.map((url) =>
       import(new URL(url, new URL(importUrl).origin).href)
         .then((mod) => mod.default)
+        .catch(err => {
+          console.log(`Error Importing Shared Module \`${url}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, '/'));
+          throw { message: `Error Importing Shared Module \`${url}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, '/'), status: 401 };
+        })
     )
   );
   // Instantiate shared modules
@@ -58,7 +70,9 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
 
   try {
     // Load target module
-    const ESModule = await import(importUrl).then(mod => mod).catch(console.log);
+    const ESModule = await import(importUrl).then(mod => mod).catch(err => {
+      throw { message: `Error Importing Module \`${importUrl}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, '/'), status: 401 };
+    });
 
     // Check if module is not found
     if (typeof ESModule === "string") throw { message: "Module Not Found", status: 404 };
@@ -75,7 +89,7 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
       typeof PUT !== "function" &&
       typeof DELETE !== "function"
     ) {
-      throw { message: "Imported Code should be an ESModule.", status: 404 };
+      throw { message: 'Expected ESModule to export one of the following functions: ["default", "GET", "POST", "PUT", "DELETE"]. Found none.', status: 404 };
     }
 
     // Return module and its dependencies
@@ -94,7 +108,6 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
     throw err;
   }
 };
-
 
 
 async function fetchDynamicImportFiles(url: string, customBaseUrl: string, maxRecursions: number) {
