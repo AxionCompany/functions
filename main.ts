@@ -1,16 +1,8 @@
 
-import { config } from "https://deno.land/x/dotenv/mod.ts";
+import getEnv from "./functions/src/utils/environmentVariables.ts";
 
-let dotEnv;
+const env = getEnv();
 
-try {
-    dotEnv = config();
-} catch (err) {
-    console.log(err);
-    dotEnv = {};
-}
-
-const env = { ...dotEnv, ...Deno.env.toObject() };
 let fileLoaderStarted: any;
 
 const startFileLoader = async (iter = 0) => {
@@ -30,9 +22,13 @@ const startFileLoader = async (iter = 0) => {
 };
 
 const startApi = async (iter = 0) => {
-    const fileLoaderUrl = env.FILE_LOADER_URL
-        || "http://localhost:9000";
-    const api = new Worker(new URL("./api.ts", import.meta.url), { type: "module" });
+
+    const fileLoaderUrl = env.FILE_LOADER_URL || "http://localhost:9000";
+
+    const apiBaseUrl = env.DEFAULT_LOADER_TYPE === 'local' && !import.meta.url.startsWith('http') ? fileLoaderUrl : import.meta.url
+
+    const api = new Worker(new URL("./api.ts", apiBaseUrl), { type: "module" });
+
     api.onmessage = (event) => {
         if (event?.data?.message?.status === 'ok') {
             return

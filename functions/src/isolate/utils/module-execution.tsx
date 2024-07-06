@@ -25,7 +25,7 @@ export default (config: any) => {
 
       // load the module
       const { mod: defaultModule, GET, POST, PUT, DELETE, dependencies: localDependencies, ...moduleExports } = await loader(
-        { importUrl, currentUrl, dependencies: remoteDependencies, isJSX },
+        { importUrl, currentUrl, env: requestParams?.env, dependencies: remoteDependencies, isJSX },
       );
 
       // get the config
@@ -195,7 +195,7 @@ const buildStyles = (dependencies: any) => async (html: string, { importUrl }: {
   if (dependencies.postCssConfig) {
     try {
       await createDirIfNotExists('./cache');
-    const kv = await Deno.openKv('./cache/db');
+      const kv = await Deno.openKv('./cache/db');
       const hash = await createHash(html);
       const cachedData: any = await get(kv, ['cache', 'styles', hash])
       if (cachedData?.value) {

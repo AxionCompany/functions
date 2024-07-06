@@ -3,23 +3,13 @@
 import RequestHandler, { getSubdomain } from "./functions/src/handlers/main.ts";
 import FileLoader from "./functions/src/file-loader/main.ts";
 import server from "./functions/src/servers/main.ts";
-import { config } from "https://deno.land/x/dotenv/mod.ts";
+import getEnv from "./functions/src/utils/environmentVariables.ts";
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 
-let dotEnv;
-
-try {
-  dotEnv = config();
-} catch (err) {
-  console.log(err);
-  dotEnv = {};
-}
-
-const env = { ...dotEnv, ...Deno.env.toObject() };
+const env = getEnv();
 
 server({
   requestHandler: (req: Request) => {
-
     let useCache;
     try {
       useCache = JSON.parse(env.USE_CACHE || 'true');
@@ -29,16 +19,18 @@ server({
     const gitInfo: {
       owner?: string,
       repo?: string,
-      branch?: string
+      branch?: string,
+      environment?: string
     } = {}
     const sub = getSubdomain(req.url)
-    const [owner, repo, branch] = sub?.split('--') || [];
-    const getRepoData = (owner: string, repo: string, branch: string) => ({
+    const [owner, repo, branch, environment] = sub?.split('--') || [];
+    const getRepoData = (owner: string, repo: string, branch: string, environment: string) => ({
       owner,
       repo,
-      branch
+      branch,
+      environment
     });
-    Object.assign(gitInfo, getRepoData(owner, repo, branch));
+    Object.assign(gitInfo, getRepoData(owner, repo, branch, environment));
     return RequestHandler({
       middlewares: {},
       pipes: {},
@@ -56,6 +48,7 @@ server({
             owner: gitInfo?.owner || env.GIT_OWNER,
             repo: gitInfo?.repo || env.GIT_REPO,
             branch: gitInfo?.branch || env.GIT_BRANCH, // or any other branch you want to fetch files froM
+            environment: gitInfo?.environment || env.ENV,
             apiKey: env.GIT_API_KEY
           },
           modules: {

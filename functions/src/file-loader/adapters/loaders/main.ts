@@ -46,9 +46,11 @@ export default ({ config }: any) => {
                     ))
                 ) {
                     config.debug && console.log(_currentPath, 'added to file candidates with priority 1', extname(path))
+                    const { content, variables } = await readTextFile(_currentPath) || {};
                     maybeReturn.push({
                         priority: 1,
-                        content: await readTextFile(_currentPath),
+                        content,
+                        variables,
                         matchPath: _currentPath,
                         params,
                         redirect: !extname(path),
@@ -66,9 +68,11 @@ export default ({ config }: any) => {
                     const variable = maybeVariable.slice(1, -1);
                     const newParams = { ...params };
                     newParams[variable] = basename(path, extname(path));
+                    const { content, variables } = await readTextFile(_currentPath) || {};
                     maybeReturn.push({
                         priority: 2,
-                        content: await readTextFile(_currentPath),
+                        content,
+                        variables,
                         matchPath: _currentPath,
                         params: newParams,
                         redirect: !extname(path),
@@ -145,9 +149,7 @@ export default ({ config }: any) => {
 
             // Successful match found, add it to maybeReturn
             if (result) {
-                maybeReturn.push({
-                    ...result
-                });
+                maybeReturn.push(result);
             }
         }
 
