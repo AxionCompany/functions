@@ -23,7 +23,7 @@ export default ({ config, modules }: any) => {
     );
 
     const startTime = Date.now();
-    let { content, redirect, params, path, matchPath } = await withCache(
+    let { content, redirect, params, path, variables, matchPath } = await withCache(
       fileLoader,
       { cachettl: config.cachettl, useCache: config.useCache, keys: ['file-loader', url] }, {
       path: pathname
@@ -35,7 +35,6 @@ export default ({ config, modules }: any) => {
     }
     // console.log('Loading', pathname, { redirect, params, path, matchPath })
     config.debug && console.log(`Loaded file ${url} in ${Date.now() - startTime}ms`)
-
 
     if (shouldBundle) {
       if (customBaseUrl) {
@@ -58,7 +57,7 @@ export default ({ config, modules }: any) => {
     }
 
     if (!isImport) {
-      return { content, redirect, params, path, matchPath };
+      return { content, redirect, params, path, variables, matchPath };
     }
 
     if (['js', 'jsx', 'ts', 'tsx'].includes(matchPath?.split('.').pop())) {

@@ -1,7 +1,6 @@
-import { config } from "https://deno.land/x/dotenv@v3.2.2/mod.ts";
 import getAllFiles from "./getAllFiles.ts";
 
-export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
+export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) => {
 
   const sharedModuleUrls = await getAllFiles({
     url: importUrl,
@@ -58,6 +57,7 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
         })
     )
   );
+
   // Instantiate shared modules
   dependencies = SharedModules.reduce(
     (acc, Dependencies, index) => {
@@ -65,7 +65,7 @@ export default async ({ currentUrl, importUrl, dependencies, isJSX }: any) => {
       return Dependencies({ ...acc })
     },
     // Initial dependencies
-    { env: { ...Deno.env.toObject(), ...config() }, ...dependencies, LayoutModules, layoutUrls, bundledLayouts, bundledModule }
+    { env, ...dependencies, LayoutModules, layoutUrls, bundledLayouts, bundledModule }
   );
 
   try {
@@ -117,6 +117,7 @@ async function fetchDynamicImportFiles(url: string, customBaseUrl: string, maxRe
 
     customBaseUrl && urlWithParams.searchParams.append('customBaseUrl', customBaseUrl);
     urlWithParams.searchParams.append('bundle', 'true');
+    console.log(urlWithParams)
     const response = await fetch(urlWithParams.toString());
     if (!response.ok) {
       throw new Error(`Failed to fetch ${urlWithParams.toString()}: ${response.statusText}`);

@@ -112,7 +112,6 @@ export default ({ config, modules }: any) => async (
     const ext = modules.path.extname(urlMetadata?.path);
     isJSX = ext === ".jsx" || ext === ".tsx";
 
-
     const isolateId = urlMetadata.matchPath;
 
     if (!isolates[isolateId]) {
@@ -122,10 +121,20 @@ export default ({ config, modules }: any) => async (
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null
             const command = new Deno.Command(Deno.execPath(), {
                 args: [
-                    'run', '-A', '--no-lock',
+                    'run',
                     `--reload=${[importUrl.origin, url.origin, metaUrl].filter(Boolean).join(',')}`,
+                    '-A',
+                    '--deny-read',
+                    '--deny-write',
+                    '--deny-sys',
+                    '--deny-env',
+                    '--allow-net',
+                    '--allow-read=/cache',
+                    '--allow-write=/cache',
                     '--unstable-sloppy-imports',
+                    '--unstable-kv',
                     '--unstable',
+                    '--no-lock',
                     new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, `${port}`
                 ],
             });
@@ -135,7 +144,6 @@ export default ({ config, modules }: any) => async (
                 pid: process.pid,
                 process,
             };
-            // await sleep(5000)
             await waitForServer(`http://localhost:${port}`);
         } catch (error) {
             console.error(`Failed to spawn isolate: ${isolateId}`, error);
@@ -156,7 +164,7 @@ export default ({ config, modules }: any) => async (
                 importUrl: new URL(`${urlMetadata.matchPath}?${importSearchParams}`, importUrl.origin).href,
                 currentUrl: url.href,
                 method,
-                params: { ...params, ...ctx, ...urlMetadata.params, ...queryParams, ...data },
+                params: { env: { ...urlMetadata.variables }, ...params, ...ctx, ...urlMetadata.params, ...queryParams, ...data },
                 isJSX,
                 headers,
                 ...config
