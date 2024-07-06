@@ -25,7 +25,7 @@ export default ({ config, modules }: any) => {
     const startTime = Date.now();
     let { content, redirect, params, path, matchPath } = await withCache(
       fileLoader,
-      { cachettl: config.cachettl, useCache: config.useCache, keys: ['file-loader', pathname] }, {
+      { cachettl: config.cachettl, useCache: config.useCache, keys: ['file-loader', url] }, {
       path: pathname
     }) || {};
     if (!path && !customBaseUrl) {
