@@ -16,17 +16,9 @@ import server from "./functions/src/servers/main.ts";
 import RequestHandler, { getSubdomain } from "./functions/src/handlers/main.ts";
 import Isolate from "./functions/src/isolate/main.ts";
 import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
-import { config } from "https://deno.land/x/dotenv/mod.ts";
-let dotEnv;
+import getEnv from "./functions/src/utils/environmentVariables.ts";
 
-try {
-  dotEnv = config();
-} catch (err) {
-  console.log(err);
-  dotEnv = {};
-}
-
-const env = { ...dotEnv, ...Deno.env.toObject() };
+const env = getEnv();
 
 (async () => {
 
@@ -80,7 +72,6 @@ const env = { ...dotEnv, ...Deno.env.toObject() };
         dependencies: {},
         env,
       }
-
 
       return RequestHandler({
         handlerConfig,

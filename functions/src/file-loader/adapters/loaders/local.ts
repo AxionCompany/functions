@@ -1,10 +1,13 @@
+import getEnv from "../../../utils/environmentVariables.ts";
 
 export default ({ config }: any) => {
 
   const readTextFile = async (path: string) => {
     try {
-      return await Deno.readTextFile(path || "");
-    } catch (err) {
+      const content = await Deno.readTextFile(path || "");
+      const variables = getEnv();
+      return ({ content, variables });
+    } catch (_) {
       return null;
     }
   }
@@ -21,14 +24,14 @@ export default ({ config }: any) => {
       }
       return files;
     } catch (err) {
-      console.log('ERROR', err);
+      console.log('Error Reading Directory', err);
       return [];
     }
   }
 
+
   return {
     readTextFile,
-    readDir
-
+    readDir,
   }
 }
