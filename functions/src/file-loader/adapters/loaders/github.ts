@@ -15,7 +15,7 @@ export default ({ config }: any) => {
 
     const branchData = await withCache(
       (url: string, options: any) => fetch(url, options).then(res => res.status === 200 ? res.json() : ""),
-      { keys: ['github', url], useCache: undefined, cachettl: undefined },
+      { keys: ['github', url], cachettl: config.cachettl, useCache: config.useCache,  },
       url,
       { headers }
     );
@@ -40,7 +40,7 @@ export default ({ config }: any) => {
     const repoVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/actions/variables`;
     const repoVariablesPromise = withCache(
       (url: string, options: any) => fetch(url, options).then(res => res.status === 200 ? res.json() : ""),
-      { keys: ['github', repoVariablesUrl], useCache: undefined, cachettl: undefined },
+      { keys: ['github', repoVariablesUrl],  cachettl: config.cachettl, useCache: config.useCache,  },
       repoVariablesUrl,
       { headers }
     );
@@ -49,7 +49,7 @@ export default ({ config }: any) => {
     const environmentVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/environments/${gitInfo.environment}/variables`;
     const environmetVariablesPromises = withCache(
       (url: string, options: any) => fetch(url, options).then(res => res.status === 200 ? res.json() : ""),
-      { keys: ['github', environmentVariablesUrl], useCache: undefined, cachettl: undefined },
+      { keys: ['github', environmentVariablesUrl],  cachettl: config.cachettl, useCache: config.useCache, },
       environmentVariablesUrl,
       { headers }
     );
@@ -71,7 +71,7 @@ export default ({ config }: any) => {
 
     const responsePromise = withCache(
       (url: string, options: any) => fetch(url, options).then(res => res.status === 200 ? res.json() : ""),
-      { keys: ['github', url], useCache: undefined, cachettl: undefined },
+      { keys: ['github', url],  cachettl: config.cachettl, useCache: config.useCache,  },
       url,
       { headers }
     )
@@ -91,7 +91,7 @@ export default ({ config }: any) => {
 
     const response = await withCache(
       (url: string, options: any) => fetch(url, options).then(res => res.status === 200 ? res.json() : ""),
-      { keys: ['github', url], useCache: undefined, cachettl: undefined },
+      { keys: ['github', url], cachettl: config.cachettl, useCache: config.useCache,  },
       url,
       { headers }
     )
