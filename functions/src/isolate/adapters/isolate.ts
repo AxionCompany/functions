@@ -4,7 +4,9 @@ import server from "../../servers/main.ts";
 import RequestHandler from "../../handlers/main.ts";
 import ModuleExecution from "../utils/module-execution.tsx";
 
-const port: number = parseInt(Deno.args?.[0]) || 3000;
+const [portString, configString]: string[] = Deno.args || [];
+const port = parseInt(portString) || 3000;
+const config = JSON.parse(configString);
 
 const isServer = true;
 const metaUrl = import.meta.url.split('src')?.[0];
@@ -17,21 +19,18 @@ globalThis.metaUrl = metaUrl;
 globalThis.importAxion = importAxion;
 globalThis.isServer = isServer;
 
-const _config = {
+
+const moduleExecutor = await ModuleExecution(config);
+
+
+const handlerConfig = {
     middlewares: {},
     pipes: {}, // default to no pipes
     handlers: {
         "/(.*)+": async ({ data }: any, response: any) => {
             if (!data) return
 
-            const { currentUrl, method } = data;
-
             try {
-                if (!data.importUrl) {
-                    return response.send('ok');
-                }
-
-                const moduleExecutor = ModuleExecution({ currentUrl, method, metaUrl });
                 const chunk = await moduleExecutor(data, response);
                 return chunk;
             } catch (err) {
@@ -41,9 +40,6 @@ const _config = {
     },
     serializers: {},
     dependencies: {},
-    config: {},
 };
 
-const { config, ...adapters }: any = _config
-
-server({ port, requestHandler: RequestHandler(adapters), config });
+server({ port, requestHandler: RequestHandler(handlerConfig), config });

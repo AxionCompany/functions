@@ -135,7 +135,17 @@ export default ({ config, modules }: any) => async (
                     '--unstable-kv',
                     '--unstable',
                     '--no-lock',
-                    new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, `${port}`
+                    new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, 
+                    `${port}`,
+                    JSON.stringify({ 
+                        __requestId__: __requestId__,
+                        importUrl: new URL(`${urlMetadata.matchPath}?${importSearchParams}`, importUrl.origin).href,
+                        currentUrl: url.href,
+                        isJSX,
+                        headers,
+                        env: { ...urlMetadata.variables }, 
+                        ...config,
+                    }),
                 ],
             });
             const process = command.spawn();
@@ -160,14 +170,18 @@ export default ({ config, modules }: any) => async (
                 "content-type": "application/json",
             },
             body: JSON.stringify({
-                __requestId__: __requestId__,
-                importUrl: new URL(`${urlMetadata.matchPath}?${importSearchParams}`, importUrl.origin).href,
-                currentUrl: url.href,
-                method,
-                params: { env: { ...urlMetadata.variables }, ...params, ...ctx, ...urlMetadata.params, ...queryParams, ...data },
-                isJSX,
                 headers,
-                ...config
+                env: { ...urlMetadata.variables }, 
+                params:{
+                    ...params, 
+                    ...ctx, 
+                    ...urlMetadata.params, 
+                    ...queryParams, 
+                    ...data,
+                },
+                method,
+                __requestId__: __requestId__,
+                currentUrl: url.href,
             }),
         });
 
