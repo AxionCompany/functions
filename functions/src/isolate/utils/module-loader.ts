@@ -109,7 +109,6 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
   }
 };
 
-
 async function fetchDynamicImportFiles(url: string, customBaseUrl: string, maxRecursions: number) {
   // Helper function to perform GET requests with query parameters
   async function getRequest(url: string, customBaseUrl: string | null) {
@@ -117,7 +116,6 @@ async function fetchDynamicImportFiles(url: string, customBaseUrl: string, maxRe
 
     customBaseUrl && urlWithParams.searchParams.append('customBaseUrl', customBaseUrl);
     urlWithParams.searchParams.append('bundle', 'true');
-    console.log(urlWithParams)
     const response = await fetch(urlWithParams.toString());
     if (!response.ok) {
       throw new Error(`Failed to fetch ${urlWithParams.toString()}: ${response.statusText}`);

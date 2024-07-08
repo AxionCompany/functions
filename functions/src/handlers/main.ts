@@ -1,4 +1,5 @@
 import responseCallback from "../utils/responseCallback.ts";
+import { getSubdomain } from "../utils/urlFunctions.ts";
 
 export default (
   { handlers, middlewares, pipes, serializers }: any,
@@ -101,14 +102,18 @@ export default (
         start: (ctlr) => {
           controller = ctlr;
         },
-        // pull(ctlr) {
-        //   if (ctlr.desiredSize && ctlr.desiredSize > 0) {
-        //     controller = ctlr;
-        //   }
-        // },
+        pull(ctlr) {
+          if (ctlr.desiredSize && ctlr.desiredSize > 0) {
+            controller = ctlr;
+          }
+        },
         cancel: () => {
           console.log('Stream cancelled', __requestId__);
-          if (!responseSent) {
+          if (
+            !responseSent
+            && controller.desiredSize
+            // && controller.desiredSize > 0
+          ) {
             responseSent = true;
             controller.close();
           }
@@ -152,6 +157,7 @@ export default (
 
         if (serializedResponse
           && !responseSent
+          && controller.desiredSize
         ) {
           const encoded = new TextEncoder().encode(serializedResponse);
           controller.enqueue(encoded);
@@ -177,7 +183,6 @@ export default (
 
       await responseHeadersPromise;
 
-      // delete options.headers["access-control-allow-origin"];
       return new Response(responseStream, options);
     } catch (err) {
 
@@ -185,7 +190,7 @@ export default (
         status: 500,
         statusText: "Internal Server Error",
         headers: {
-          // "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Headers":
             "authorization, x-client-info, apikey, content-type",
           "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
@@ -216,27 +221,3 @@ export default (
     }
   };
 
-
-export function getSubdomain(url:string) {
-  // Use the URL constructor to parse the URL
-  const parsedUrl = new URL(url);
-
-  // Extract the hostname
-  const hostname = parsedUrl.hostname;
-
-  // Split the hostname into parts
-  const parts = hostname.split('.');
-
-  // Handle special cases for localhost and IP addresses
-  if (hostname === 'localhost' || /^[0-9.]+$/.test(hostname)) {
-    return ''; // No subdomain for localhost or IP addresses
-  }
-
-  // If there are more than two parts, the subdomain is everything except the last two parts
-  if (parts.length > 2) {
-    return parts.slice(0, -2).join('.');
-  }
-
-  // If there are only two parts, there's no subdomain
-  return '';
-}

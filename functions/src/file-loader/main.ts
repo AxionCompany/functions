@@ -1,12 +1,10 @@
 
 import FileLoader from "./adapters/loaders/main.ts";
 import bundle from './adapters/bundler/esbuild.js';
-import { get, set, } from "https://deno.land/x/kv_toolbox/blob.ts";
 
 export default ({ config, modules }: any) => {
 
   const fileLoader = FileLoader({ config });
-
 
   return async ({ pathname, url, headers, queryParams }: any, res: any) => {
     const { bundle: shouldBundle, customBaseUrl, shared, ...searchParams } = queryParams;
@@ -23,9 +21,9 @@ export default ({ config, modules }: any) => {
     );
 
     const startTime = Date.now();
-    let { content, redirect, params, path, variables, matchPath } = await withCache(
+    let { content, redirect, params, path, variables, matchPath } = await modules.withCache(
       fileLoader,
-      { cachettl: config.cachettl, useCache: config.useCache, keys: ['file-loader', url] }, {
+      { cachettl: config.cachettl, useCache: config.useCache, keys: ['file-loader', url.href] }, {
       path: pathname
     }) || {};
     if (!path && !customBaseUrl) {
@@ -33,8 +31,7 @@ export default ({ config, modules }: any) => {
       res.statusText(`No path found for ${pathname}`)
       return;
     }
-    // console.log('Loading', pathname, { redirect, params, path, matchPath })
-    config.debug && console.log(`Loaded file ${url} in ${Date.now() - startTime}ms`)
+    config.debug && console.log(`Loaded file ${url.href} in ${Date.now() - startTime}ms`)
 
     if (shouldBundle) {
       if (customBaseUrl) {
@@ -42,7 +39,14 @@ export default ({ config, modules }: any) => {
         path = path.replace('//', '/');
       }
       const bundleUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, customBaseUrl ? customBaseUrl : url.origin);
-      const bundleContent = await bundle(bundleUrl, { shared: shared?.split(',') }).then(res => res).catch(console.log);
+      const bundleContent = await withCache(
+        bundle,
+        { cachettl: config.cachettl, useCache: config.useCache, keys: ['bundler', bundleUrl.href] },
+        bundleUrl,
+        { shared: shared?.split(',') }
+      ).then(res => res).catch(console.log);
+
+      bundle(bundleUrl, { shared: shared?.split(',') }).then(res => res).catch(console.log);
       if (bundleContent) {
         return { content: bundleContent, params, path, matchPath };;
       }
@@ -70,43 +74,4 @@ export default ({ config, modules }: any) => {
 
     return content;
   };
-}
-
-export const withCache = async (cb: Function, config: { useCache: boolean | undefined, keys: string[], cachettl: number | undefined }, ...params: any[]) => {
-
-  config.useCache = config.useCache !== false;
-  config.cachettl = config.cachettl || 1000 * 60 * 10; // 10 minutes
-
-  try {
-    await createDirIfNotExists('./cache');
-    const kv = await Deno.openKv('./cache/db');
-    if (config.useCache) {
-      const cachedData: any = await get(kv, ['cache', ...config.keys])
-      if (cachedData?.value !== null) {
-        const cachedContent = new TextDecoder('utf-8').decode(cachedData.value);
-        let parsedContent;
-        try {
-          parsedContent = JSON.parse(cachedContent);
-          if (parsedContent?.error) return null;
-        } catch (_) {
-          parsedContent = cachedContent;
-        }
-        return parsedContent;
-      }
-    }
-    const data = await cb(...params);
-    if (config.useCache) {
-      const strData = JSON.stringify(data || { error: "No data" });
-      set(kv, ['cache', ...config.keys], new TextEncoder().encode(strData), { expireIn: config.cachettl });
-    }
-    return data;
-  } catch (e) {
-    console.log('ERROR', e)
-  }
-}
-
-const createDirIfNotExists = async (path: string) => {
-  try {
-    await Deno.mkdir(path, { recursive: true });
-  } catch (_) { }
 }

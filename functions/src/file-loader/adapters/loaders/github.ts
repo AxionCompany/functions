@@ -1,4 +1,4 @@
-import { withCache } from "../../main.ts";
+import withCache from "../../../utils/withCache.ts";
 
 export default ({ config }: any) => {
 
@@ -9,7 +9,7 @@ export default ({ config }: any) => {
     headers.Authorization = `token ${config.apiKey}`;
   };
 
-  const getExactRepoInfo = async (owner: string, repo: string, branch: string, environment: string = 'production') => {
+  const getExactRepoInfo = async (owner: string, repo: string, branch: string = 'main', environment: string = 'production') => {
 
     const url = `${GITHUB_API_URL}/repos/${owner}/${repo}/branches/${branch}`;
 
