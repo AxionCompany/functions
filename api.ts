@@ -13,17 +13,23 @@ self.addEventListener("unhandledrejection", event => {
 });
 
 import server from "./functions/src/servers/main.ts";
-import RequestHandler, { getSubdomain } from "./functions/src/handlers/main.ts";
+import RequestHandler from "./functions/src/handlers/main.ts";
+import { getSubdomain } from "./functions/src/utils/urlFunctions.ts";
 import Isolate from "./functions/src/isolate/main.ts";
 import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
 
 const env = getEnv();
 
+let configs = new Map<string, string>();
+let adapters;
+
 (async () => {
 
   server({
     requestHandler: async (req: Request) => {
+      env.DEBUG === 'true' && console.log('Received request in API from', req.url);
+
       const fileLoaderUrl = new URL(env.FILE_LOADER_URL || "http://localhost:9000");
 
       const subdomain = getSubdomain(req.url);
@@ -32,20 +38,25 @@ const env = getEnv();
       let functionsDir = env.FUNCTIONS_DIR || ".";
       functionsDir.endsWith('/') && (functionsDir = functionsDir.slice(0, -1));
 
-      const adapters = await import(new URL(`${functionsDir}/adapters`, fileLoaderUrl).href)
-        .then((m: any) => m.default)
-        .catch((err: any) => {
-          console.warn(
-            `Error trying to load adapters: ${err.toString()}`
-              .replaceAll(new URL(functionsDir, fileLoaderUrl).href, '')
-          )
-        }) || ((a: any) => a);
+      if (!adapters) {
+        adapters = await import(new URL(`${functionsDir}/adapters`, fileLoaderUrl).href)
+          .then((m: any) => m.default)
+          .catch((err: any) => {
+            console.warn(
+              `Error trying to load adapters: ${err.toString()}`
+                .replaceAll(new URL(functionsDir, fileLoaderUrl).href, '')
+            )
+          }) || ((a: any) => a);
+      }
 
-      const configUrl = new URL('axion.config.json', fileLoaderUrl.origin).href;
+      let config = configs.get(req.url);
 
-      let config = await fetch(configUrl)
-        .then(async (res) => await res.json())
-        .catch((err) => console.log(err)) || {};
+      if (!config) {
+        config = await fetch(new URL('axion.config.json', fileLoaderUrl).href)
+          .then(async (res) => await res.json())
+          .catch((err) => console.log(err)) || {};
+        configs.set(req.url, config);
+      }
 
       const handlerConfig = {
         middlewares: {

@@ -51,12 +51,12 @@ const createScripts = ({
       window.isServer = false;
       window.dynamicImport = async (path) => {
         return await import(
-          \`\${new URL(path,window.baseUrl).href}?bundle=true&v=\${new Date().getTime()}&shared=${shared?.length ? shared.join(',') : ''}\`
+          \`\${new URL(path,window.baseUrl).href}?bundle=true&shared=${shared?.length ? shared.join(',') : ''}\`
         )
       }
       window.metaImport = async (path) => {
         return await import(
-          \`\${new URL(path,window.baseUrl).href}?bundle=true&v=\${new Date().getTime()}&customBaseUrl=${metaUrl}\`
+          \`\${new URL(path,window.baseUrl).href}?bundle=true&customBaseUrl=${metaUrl}\`
         )
       }`
     },

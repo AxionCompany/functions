@@ -8,6 +8,10 @@ import React from "npm:react";
 import { DOMParser } from "npm:linkedom";
 
 
+const [portString, configString]: string[] = Deno.args || [];
+const port = parseInt(portString) || 3000;
+const config = JSON.parse(configString);
+
 const isServer = true;
 const metaUrl = import.meta.url.split('src')?.[0];
 const importAxion: any = (path: string, config: any = {}) => {
@@ -29,9 +33,20 @@ const indexHtml = `
 </html>
 `;
 
-const port: number = parseInt(Deno.args?.[0]) || 3500;
+const moduleExecutor = await ModuleExecution({
+    ...config,
+    metaUrl,
+    dependencies: {
+        ReactDOMServer,
+        React,
+        processCss,
+        DOMParser,
+        htmlScripts,
+        indexHtml,
+    },
+});
 
-const _config = {
+const handlerConfig = {
     middlewares: {},
     pipes: {}, // default to no pipes
     handlers: {
@@ -39,29 +54,7 @@ const _config = {
 
             if (!data) return
 
-            const { currentUrl, method, functionsDir, dirEntrypoint } = data;
-
             try {
-
-                if (!data.importUrl) {
-                    return response.send('ok');
-                }
-
-                const moduleExecutor = ModuleExecution({
-                    currentUrl,
-                    metaUrl,
-                    method,
-                    functionsDir,
-                    dirEntrypoint,
-                    dependencies: {
-                        ReactDOMServer,
-                        React,
-                        processCss,
-                        DOMParser,
-                        htmlScripts,
-                        indexHtml,
-                    },
-                });
 
                 const chunk = await moduleExecutor(data, response);
                 return chunk;
@@ -72,9 +65,7 @@ const _config = {
     },
     serializers: {},
     dependencies: {},
-    config: {},
 };
 
-const { config, ...adapters }: any = _config
 
-server({ port, requestHandler: RequestHandler(adapters), config });
+server({ port, requestHandler: RequestHandler(handlerConfig), config });

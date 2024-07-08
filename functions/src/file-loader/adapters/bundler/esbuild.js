@@ -13,7 +13,9 @@ export default async (path, { ...options } = {}) => {
         bundle: true,
         format: "esm",
         write: false,
-        minify: true,
+        minifyWhitespace: true,
+        minifyIdentifiers: false,
+        minifySyntax: true,
         jsx: "transform",
         external: ['react', 'react-dom', ...(options.shared || [])],
     };

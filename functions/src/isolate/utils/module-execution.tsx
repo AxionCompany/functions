@@ -11,9 +11,14 @@ const tryParseJSON = (str: any) => {
   }
 };
 
-export default (config: any) => {
-  let { metaUrl, loader, functionsDir, method, dependencies: remoteDependencies, ...rest } = config || {};
+export default async (config: any) => {
+  let { metaUrl, loader, functionsDir, dependencies: remoteDependencies, currentUrl, importUrl, env, isJSX } = config || {};
   if (!loader) loader = moduleLoader;
+  // load the module
+  const { mod: defaultModule, GET, POST, PUT, DELETE, dependencies: localDependencies, ...moduleExports } = await loader(
+    { importUrl, currentUrl, env, dependencies: remoteDependencies, isJSX },
+  );
+
   return async (
     data: any,
     response: any = null,
@@ -21,12 +26,7 @@ export default (config: any) => {
     try {
 
       // get the data
-      const { importUrl, currentUrl, params: requestParams, headers: requestHeaders, isJSX, __requestId__ } = data;
-
-      // load the module
-      const { mod: defaultModule, GET, POST, PUT, DELETE, dependencies: localDependencies, ...moduleExports } = await loader(
-        { importUrl, currentUrl, env: requestParams?.env, dependencies: remoteDependencies, isJSX },
-      );
+      const { env, method, params: requestParams, headers: requestHeaders, __requestId__, currentUrl } = data;
 
       // get the config
       moduleExports.config = moduleExports.config || {};
@@ -48,7 +48,7 @@ export default (config: any) => {
       const dependencies = { ...localDependencies, ...remoteDependencies };
 
       // merge path params
-      const params = { headers: requestHeaders, ...requestParams, __requestId__ };
+      const params = { env, headers: requestHeaders, ...requestParams, __requestId__ };
 
       // execute the module
       const workerRes = await moduleInstance({ mod, params, dependencies, url: currentUrl, metaUrl, isJSX, importUrl, functionsDir }, response);
@@ -190,12 +190,20 @@ const moduleInstance: any = async (
   }
 }
 
+const createDirIfNotExists = async (path: string) => {
+  try {
+    await Deno.mkdir(path, { recursive: true });
+  } catch (_) { }
+}
+
+
+await createDirIfNotExists('./cache');
+const kv = await Deno.openKv('./cache/db');
 
 const buildStyles = (dependencies: any) => async (html: string, { importUrl }: { importUrl: string }) => {
   if (dependencies.postCssConfig) {
     try {
-      await createDirIfNotExists('./cache');
-      const kv = await Deno.openKv('./cache/db');
+     
       const hash = await createHash(html);
       const cachedData: any = await get(kv, ['cache', 'styles', hash])
       if (cachedData?.value) {
@@ -209,10 +217,4 @@ const buildStyles = (dependencies: any) => async (html: string, { importUrl }: {
     } catch (e) { console.log('ERROR', e) }
   }
   return ''
-}
-
-const createDirIfNotExists = async (path: string) => {
-  try {
-    await Deno.mkdir(path, { recursive: true });
-  } catch (_) { }
 }
