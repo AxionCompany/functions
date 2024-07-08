@@ -102,11 +102,11 @@ export default (
         start: (ctlr) => {
           controller = ctlr;
         },
-        pull(ctlr) {
-          if (ctlr.desiredSize && ctlr.desiredSize > 0) {
-            controller = ctlr;
-          }
-        },
+        // pull(ctlr) {
+        //   if (ctlr.desiredSize && ctlr.desiredSize > 0) {
+        //     controller = ctlr;
+        //   }
+        // },
         cancel: () => {
           console.log('Stream cancelled', __requestId__);
           if (
