@@ -109,7 +109,9 @@ export default (
 
         cancel() {
           console.log('Stream canceled');
-          controller.close();
+          if (controller && controller?.desiredSize) {
+            controller.close();
+          }
         }
       });
 
@@ -165,7 +167,7 @@ export default (
                 }
 
                 // Close the stream if done
-                if (streamData.__done__) {
+                if (streamData.__done__ ) {
                   controller.close();
                 }
 
@@ -174,12 +176,12 @@ export default (
                   responseSent = true;
                 }
 
-              } else {
+              } else if (controller && controller?.desiredSize) {
                 return processQueue();
               }
             }
           }
-        } else{
+        } else if (controller && controller?.desiredSize){
           return processQueue();
         }
 
