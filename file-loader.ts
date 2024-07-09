@@ -9,13 +9,13 @@ import withCache from "./functions/src/utils/withCache.ts";
 
 self.addEventListener("unhandledrejection", event => {
   // Prevent this being reported (Firefox doesn't currently respect this)
-  event.preventDefault();
+  // event.preventDefault();
   console.log('FILE LOADER ERROR', event)
 
-  self.postMessage({
-    message: event.reason.message,
-    stack: event.reason.stack,
-  });
+  // self.postMessage({
+  //   message: event.reason.message,
+  //   stack: event.reason.stack,
+  // });
 });
 
 

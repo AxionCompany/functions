@@ -71,8 +71,9 @@ export default ({ config, modules }: any) => async (
     let isJSX = false;
 
     for (const key in urlMetadatas) {
+
         const pattern = new URLPattern({ pathname: key })
-        const matched = pattern.exec(importUrl.pathname);
+        const matched = pattern.exec(importUrl.href);
         if (matched) {
             urlMetadata = { ...urlMetadatas[key], params: matched.pathname.groups };
         }
@@ -104,7 +105,8 @@ export default ({ config, modules }: any) => async (
 
         const matchExt = modules.path.extname(urlMetadata?.matchPath);
         let match = matchExt ? urlMetadata?.matchPath?.replace(matchExt, '') : urlMetadata?.matchPath;
-        match = modules.path.join('.', match);
+        if (match) match = match?.startsWith('/') ? match : `/${match}`;
+        match = match?.replaceAll(/\[([^\[\]]+)\]/g, ':$1');
         urlMetadata.matchPath = match;
         urlMetadatas[match] = urlMetadata;
     }
@@ -135,15 +137,15 @@ export default ({ config, modules }: any) => async (
                     '--unstable-kv',
                     '--unstable',
                     '--no-lock',
-                    new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, 
+                    new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href,
                     `${port}`,
-                    JSON.stringify({ 
+                    JSON.stringify({
                         __requestId__: __requestId__,
                         importUrl: new URL(`${urlMetadata.matchPath}?${importSearchParams}`, importUrl.origin).href,
                         currentUrl: url.href,
                         isJSX,
                         headers,
-                        env: { ...urlMetadata.variables }, 
+                        env: { ...urlMetadata.variables },
                         ...config,
                     }),
                 ],
@@ -171,12 +173,12 @@ export default ({ config, modules }: any) => async (
             },
             body: JSON.stringify({
                 headers,
-                env: { ...urlMetadata.variables }, 
-                params:{
-                    ...params, 
-                    ...ctx, 
-                    ...urlMetadata.params, 
-                    ...queryParams, 
+                env: { ...urlMetadata.variables },
+                params: {
+                    ...params,
+                    ...ctx,
+                    ...urlMetadata.params,
+                    ...queryParams,
                     ...data,
                 },
                 method,
