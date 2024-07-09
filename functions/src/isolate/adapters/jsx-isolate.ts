@@ -59,7 +59,7 @@ const handlerConfig = {
                 const chunk = await moduleExecutor(data, response);
                 return chunk;
             } catch (err) {
-                response.error(err);
+                return response.error(err);
             }
         }
     },

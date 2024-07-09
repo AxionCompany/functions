@@ -1,10 +1,14 @@
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Configuration
-const endpoint = (i) => `https://vfssantos--hello-world--main--production.jaze.ai/?world=${i}`;
-const concurrentRequests = 100;
-const totalRequests = 100;
+const endpoint = (i) => `http://localhost:8000`;
+const concurrentRequests = 30000;
+const totalRequests = 3;
 let requestCount = 0;
+
+Deno.serve(req => new Response('ok'));
+
+await sleep(1000);
 
 
 // Function to send a single request
@@ -62,6 +66,7 @@ async function loadTest() {
     console.log(`Total errors: ${errors} `);
     console.log(`Total time: ${Date.now() - start} ms`);
     console.log(`Average response time: ${avgTime.toFixed(2)} ms`);
+    console.log(`Average requests per second: ${(times.length / ((Date.now() - start) / 1000)).toFixed(2)} `)
     console.log(`Max response time: ${maxTime} ms`);
     console.log(`Min response time: ${minTime} ms`);
 }

@@ -39,7 +39,7 @@ export default ({ config, modules }: any) => {
         path = path.replace('//', '/');
       }
       const bundleUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, customBaseUrl ? customBaseUrl : url.origin);
-      const bundleContent = await withCache(
+      const bundleContent = await modules.withCache(
         bundle,
         { cachettl: config.cachettl, useCache: config.useCache, keys: ['bundler', bundleUrl.href] },
         bundleUrl,

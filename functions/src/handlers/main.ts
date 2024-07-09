@@ -3,8 +3,9 @@ import { getSubdomain } from "../utils/urlFunctions.ts";
 
 export default (
   { handlers, middlewares, pipes, serializers }: any,
-) =>
-  async (req: Request) => {
+) => async (req: Request) => {
+
+  const handleRequest = async (req: Request) => {
     try {
       // Get Headers
       const headers = Object.fromEntries(req.headers.entries());
@@ -90,90 +91,101 @@ export default (
         },
       };
 
+      const dataQueue: any[] = [];
       let controller: any;
-      let responseSent = false;
+
       let resolveResponseHeaders: any;
+
+      let responseSent = false;
 
       const responseHeadersPromise = new Promise((resolve) => {
         resolveResponseHeaders = resolve;
       });
 
       const responseStream = new ReadableStream({
-        start: (ctlr) => {
-          controller = ctlr;
+        start(ctrl) {
+          controller = ctrl;
         },
-        // pull(ctlr) {
-        //   if (ctlr.desiredSize && ctlr.desiredSize > 0) {
-        //     controller = ctlr;
-        //   }
-        // },
-        cancel: () => {
-          console.log('Stream cancelled', __requestId__);
-          if (
-            !responseSent
-            && controller.desiredSize
-            // && controller.desiredSize > 0
-          ) {
-            responseSent = true;
-            controller.close();
-          }
+
+        cancel() {
+          console.log('Stream canceled');
+          controller.close();
         }
       });
 
-      const streamCallback = async (streamData: any) => {
+      const processQueue = async (data) => {
+        if (!controller) return;
+        data && dataQueue.push(data);
 
-        if (streamData.options) {
-          options = {
-            ...options,
-            ...streamData.options,
-            headers: {
-              ...options.headers,
-              ...streamData.options.headers,
-            },
-          };
+        if (controller?.desiredSize && controller.desiredSize > 0) {
+
+          if (dataQueue?.length) {
+
+            while (dataQueue.length > 0) {
+              if (controller.desiredSize > 0) {
+
+                const streamData = dataQueue.shift() || {};
+
+                if (streamData.options) {
+                  options = {
+                    ...options,
+                    ...streamData.options,
+                    headers: {
+                      ...options.headers,
+                      ...streamData.options.headers,
+                    },
+                  };
+                }
+
+                let serializedResponse = streamData?.chunk;
+
+                for (const key in serializers) {
+                  const serializer = serializers[key];
+                  serializedResponse = await serializer(
+                    data,
+                    ctx,
+                    serializedResponse,
+                  );
+                }
+
+                if (
+                  serializedResponse &&
+                  typeof serializedResponse === "object"
+                ) {
+                  serializedResponse = JSON.stringify(serializedResponse);
+                  options.headers = {
+                    ...options.headers,
+                    "content-type": "application/json",
+                  };
+                }
+
+                if (serializedResponse) {
+                  const encoded = new TextEncoder().encode(serializedResponse);
+                  controller.enqueue(encoded);
+                }
+
+                // Close the stream if done
+                if (streamData.__done__) {
+                  controller.close();
+                }
+
+                if (!responseSent) {
+                  resolveResponseHeaders();
+                  responseSent = true;
+                }
+
+              } else {
+                return processQueue();
+              }
+            }
+          }
+        } else{
+          return processQueue();
         }
 
-        let serializedResponse = streamData?.chunk;
-
-        for (const key in serializers) {
-          const serializer = serializers[key];
-          serializedResponse = await serializer(
-            data,
-            ctx,
-            serializedResponse,
-          );
-        }
-
-        if (
-          serializedResponse &&
-          typeof serializedResponse === "object"
-        ) {
-          serializedResponse = JSON.stringify(serializedResponse);
-          options.headers = {
-            ...options.headers,
-            "content-type": "application/json",
-          };
-        }
-
-        if (serializedResponse
-          && !responseSent
-          && controller.desiredSize
-        ) {
-          const encoded = new TextEncoder().encode(serializedResponse);
-          controller.enqueue(encoded);
-        }
-
-        // Close the stream if done
-        if (streamData.__done__
-          && !responseSent
-        ) {
-          responseSent = true;
-          controller.close();
-        }
-        resolveResponseHeaders();
       }
 
-      const responseFn = responseCallback(__requestId__, streamCallback);
+      const responseFn = responseCallback(__requestId__, processQueue);
       handler(
         { url, subdomain, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
         responseFn,
@@ -220,4 +232,8 @@ export default (
       );
     }
   };
+
+
+  return handleRequest(req);
+}
 

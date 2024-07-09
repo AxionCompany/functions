@@ -1,16 +1,16 @@
 /// <reference lib="deno.unstable" />
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 
-self.addEventListener("unhandledrejection", event => {
-  // Prevent this being reported (Firefox doesn't currently respect this)
-  event.preventDefault();
-  console.log(event)
+// self.addEventListener("unhandledrejection", event => {
+//   // Prevent this being reported (Firefox doesn't currently respect this)
+//   // event.preventDefault();
+//   console.log(event)
 
-  self.postMessage({
-    message: event.reason.message,
-    stack: event.reason.stack,
-  });
-});
+//   // self.postMessage({
+//   //   message: event.reason.message,
+//   //   stack: event.reason.stack,
+//   // });
+// });
 
 import server from "./functions/src/servers/main.ts";
 import RequestHandler from "./functions/src/handlers/main.ts";
@@ -18,6 +18,7 @@ import { getSubdomain } from "./functions/src/utils/urlFunctions.ts";
 import Isolate from "./functions/src/isolate/main.ts";
 import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
+import withCache from "./functions/src/utils/withCache.ts";
 
 const env = getEnv();
 
