@@ -1,8 +1,8 @@
 import { SEPARATOR, basename, extname, join } from "https://deno.land/std/path/mod.ts";
 
-export default ({ config }: any) => {
+export default ({ config, modules }: any) => {
 
-    const loaderFunctionsPromise = import(`./${config.loaderType}.ts`).then(m => m.default({ config }));
+    const loaderFunctionsPromise = import(`./${config.loaderType}.ts`).then(m => m.default({ config, modules }));
 
     return async function findFile(
         { path, currentPath = ".", params = {}, fullPath }:
