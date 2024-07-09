@@ -35,7 +35,11 @@ let adapters;
 
       const subdomain = getSubdomain(req.url);
 
-      fileLoaderUrl.hostname = [subdomain, fileLoaderUrl.hostname].filter(Boolean).join('.');
+      const subdomainRedirect = env.SUBDOMAIN_REDIRECT === 'true';
+      if(subdomainRedirect){
+        fileLoaderUrl.hostname = [subdomain, fileLoaderUrl.hostname].filter(Boolean).join('.');
+      }
+      
       let functionsDir = env.FUNCTIONS_DIR || ".";
       functionsDir.endsWith('/') && (functionsDir = functionsDir.slice(0, -1));
 
