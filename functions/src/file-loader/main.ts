@@ -4,7 +4,7 @@ import bundle from './adapters/bundler/esbuild.js';
 
 export default ({ config, modules }: any) => {
 
-  const fileLoader = FileLoader({ config });
+  const fileLoader = FileLoader({ config, modules });
 
   return async ({ pathname, url, headers, queryParams }: any, res: any) => {
     const { bundle: shouldBundle, customBaseUrl, shared, ...searchParams } = queryParams;
