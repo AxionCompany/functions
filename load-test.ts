@@ -1,15 +1,10 @@
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Configuration
-const endpoint = (i) => `http://localhost:8000`;
-const concurrentRequests = 30000;
-const totalRequests = 3;
+const endpoint = (i) => `http://localhost:9002/examples/hello/1/teste`;
+const concurrentRequests = 1000;
+const totalRequests = 10;
 let requestCount = 0;
-
-Deno.serve(req => new Response('ok'));
-
-await sleep(1000);
-
 
 // Function to send a single request
 async function sendRequest(i) {
