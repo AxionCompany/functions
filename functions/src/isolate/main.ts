@@ -1,7 +1,7 @@
 
 
 const isolates: any = {};
-const urlMetadatas: any = {};
+const urlMetadatas: Map<string, any> = new Map();
 
 const getAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
     for (let port = startPort; port <= endPort; port++) {
@@ -70,12 +70,12 @@ export default ({ config, modules }: any) => async (
     let urlMetadata;
     let isJSX = false;
 
-    for (const key in urlMetadatas) {
 
+    for (const key of urlMetadatas.keys()) {
         const pattern = new URLPattern({ pathname: key })
         const matched = pattern.exec(importUrl.href);
         if (matched) {
-            urlMetadata = { ...urlMetadatas[key], params: matched.pathname.groups };
+            urlMetadata = { ...urlMetadatas.get(key), params: matched.pathname.groups };
         }
     }
 
@@ -107,8 +107,10 @@ export default ({ config, modules }: any) => async (
         let match = matchExt ? urlMetadata?.matchPath?.replace(matchExt, '') : urlMetadata?.matchPath;
         if (match) match = match?.startsWith('/') ? match : `/${match}`;
         match = match?.replaceAll(/\[([^\[\]]+)\]/g, ':$1');
+        const dirEntrypointIndex = match?.lastIndexOf(`/${config?.dirEntrypoint}`)
+        match = dirEntrypointIndex > -1 ? match.slice(0, dirEntrypointIndex) : match;
         urlMetadata.matchPath = match;
-        urlMetadatas[match] = urlMetadata;
+        urlMetadatas.set(match, urlMetadata);
     }
 
     const ext = modules.path.extname(urlMetadata?.path);
@@ -212,19 +214,20 @@ export default ({ config, modules }: any) => async (
 
             // value for fetch streams is a Uint8Array
             const chunk = new TextDecoder('utf-8').decode(value);
+
             // stream the chunk to the response
             response.stream(chunk);
 
             // if it's done, then stop reading
             if (done) {
-                resolver.resolve(chunk);
-                return;
+                return resolver.resolve(chunk);
             }
 
             // Read some more, and call this function again
             return reader.read().then(processText);
         });
         await resolved;
+
         return;
 
     } catch (error) {

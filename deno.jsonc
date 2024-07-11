@@ -1,6 +1,6 @@
 {
     "tasks": {
-        "start": "deno run -A -r --no-lock --unstable --unstable-kv --unstable-sloppy-imports main.ts",
+        "start": "deno run -A --reload=http://localhost:9000,http://locahost:9002 --no-lock --unstable --unstable-kv --unstable-sloppy-imports main.ts",
         "dev": "PORT=9002 deno run -A -r --no-lock --unstable --unstable-kv --unstable-sloppy-imports main.ts",
         "file-loader": "deno run -A -r --no-lock --unstable file-loader.ts",
         "api": "deno run -A -r --no-lock --unstable file-loader.ts"

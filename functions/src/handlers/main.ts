@@ -1,9 +1,10 @@
 import responseCallback from "../utils/responseCallback.ts";
 import { getSubdomain } from "../utils/urlFunctions.ts";
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default (
   { handlers, middlewares, pipes, serializers }: any,
-) => async (req: Request) => {
+) => (req: Request) => {
 
   const handleRequest = async (req: Request) => {
     try {
@@ -102,92 +103,87 @@ export default (
         resolveResponseHeaders = resolve;
       });
 
+
       const responseStream = new ReadableStream({
         start(ctrl) {
           controller = ctrl;
         },
-
         cancel() {
           console.log('Stream canceled');
           if (controller && controller?.desiredSize) {
             controller.close();
           }
-        }
+        },
       });
+      let counter = 0
 
-      const processQueue = async (data) => {
-        if (!controller) return;
-        data && dataQueue.push(data);
-
-        if (controller?.desiredSize && controller.desiredSize > 0) {
-
-          if (dataQueue?.length) {
-
-            while (dataQueue.length > 0) {
-              if (controller.desiredSize > 0) {
-
-                const streamData = dataQueue.shift() || {};
-
-                if (streamData.options) {
-                  options = {
-                    ...options,
-                    ...streamData.options,
-                    headers: {
-                      ...options.headers,
-                      ...streamData.options.headers,
-                    },
-                  };
-                }
-
-                let serializedResponse = streamData?.chunk;
-
-                for (const key in serializers) {
-                  const serializer = serializers[key];
-                  serializedResponse = await serializer(
-                    data,
-                    ctx,
-                    serializedResponse,
-                  );
-                }
-
-                if (
-                  serializedResponse &&
-                  typeof serializedResponse === "object"
-                ) {
-                  serializedResponse = JSON.stringify(serializedResponse);
-                  options.headers = {
-                    ...options.headers,
-                    "content-type": "application/json",
-                  };
-                }
-
-                if (serializedResponse) {
-                  const encoded = new TextEncoder().encode(serializedResponse);
-                  controller.enqueue(encoded);
-                }
-
-                // Close the stream if done
-                if (streamData.__done__ ) {
-                  controller.close();
-                }
-
-                if (!responseSent) {
-                  resolveResponseHeaders();
-                  responseSent = true;
-                }
-
-              } else if (controller && controller?.desiredSize) {
-                return processQueue();
-              }
-            }
+      const processQueue = async () => {
+        while (dataQueue.length > 0) {
+          if (controller.desiredSize === 0 && dataQueue.length !== 0) {
+            await sleep(1000)
+            return processQueue();
           }
-        } else if (controller && controller?.desiredSize){
-          return processQueue();
+
+          const streamData = dataQueue.shift() || {};
+
+          if (streamData.options) {
+            options = {
+              ...options,
+              ...streamData.options,
+              headers: {
+                ...options.headers,
+                ...streamData.options.headers,
+              },
+            };
+          }
+
+          let serializedResponse = streamData?.chunk;
+
+          for (const key in serializers) {
+            const serializer = serializers[key];
+            serializedResponse = await serializer(
+              data,
+              ctx,
+              serializedResponse,
+            );
+          }
+
+          if (
+            serializedResponse &&
+            typeof serializedResponse === "object"
+          ) {
+            serializedResponse = JSON.stringify(serializedResponse);
+            options.headers = {
+              ...options.headers,
+              "content-type": "application/json",
+            };
+          }
+
+          if (serializedResponse) {
+            const encoded = new TextEncoder().encode(serializedResponse);
+            controller.enqueue(encoded);
+          }
+
+          if (!responseSent) {
+            resolveResponseHeaders();
+            responseSent = true;
+          }
+
+          // Close the stream if done
+          if (streamData.__done__ || streamData.__error__) {
+            return controller.close();
+          }
+
         }
 
       }
 
-      const responseFn = responseCallback(__requestId__, processQueue);
+      const responseFn = responseCallback(__requestId__, async (e) => {
+        dataQueue.push(e)
+        processQueue();
+        return
+      });
+
       handler(
         { url, subdomain, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
         responseFn,

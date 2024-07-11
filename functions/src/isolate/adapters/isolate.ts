@@ -27,7 +27,7 @@ const handlerConfig = {
     middlewares: {},
     pipes: {}, // default to no pipes
     handlers: {
-        "/(.*)+": async ({ data }: any, response: any) => {
+        "/(.*)+": async function executor({ data }: any, response: any) {
             if (!data) return
 
             try {
