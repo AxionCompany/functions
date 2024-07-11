@@ -10,6 +10,7 @@ import { DOMParser } from "npm:linkedom";
 
 const [portString, configString]: string[] = Deno.args || [];
 const port = parseInt(portString) || 3000;
+console.log('PORT in JSX', port);
 const config = JSON.parse(configString);
 
 const isServer = true;

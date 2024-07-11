@@ -69,6 +69,7 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
   );
 
   try {
+    console.log('Loading Module:', importUrl)
     // Load target module
     const ESModule = await import(importUrl).then(mod => mod).catch(err => {
       throw { message: `Error Importing Module \`${importUrl}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, '/'), status: 401 };
