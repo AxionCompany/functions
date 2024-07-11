@@ -1,16 +1,16 @@
 /// <reference lib="deno.unstable" />
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 
-// self.addEventListener("unhandledrejection", event => {
-//   // Prevent this being reported (Firefox doesn't currently respect this)
-//   // event.preventDefault();
-//   console.log(event)
+self.addEventListener("unhandledrejection", event => {
+  // Prevent this being reported (Firefox doesn't currently respect this)
+  event.preventDefault();
+  console.log('API UNHANDLED ERROR', event)
 
-//   // self.postMessage({
-//   //   message: event.reason.message,
-//   //   stack: event.reason.stack,
-//   // });
-// });
+  self.postMessage({
+    message: event.reason.message,
+    stack: event.reason.stack,
+  });
+});
 
 import server from "./functions/src/servers/main.ts";
 import RequestHandler from "./functions/src/handlers/main.ts";
@@ -36,10 +36,10 @@ let adapters;
       const subdomain = getSubdomain(req.url);
 
       const subdomainRedirect = env.SUBDOMAIN_REDIRECT === 'true';
-      if(subdomainRedirect){
+      if (subdomainRedirect) {
         fileLoaderUrl.hostname = [subdomain, fileLoaderUrl.hostname].filter(Boolean).join('.');
       }
-      
+
       let functionsDir = env.FUNCTIONS_DIR || ".";
       functionsDir.endsWith('/') && (functionsDir = functionsDir.slice(0, -1));
 
@@ -59,9 +59,21 @@ let adapters;
       if (!config) {
         config = await fetch(new URL('axion.config.json', fileLoaderUrl).href)
           .then(async (res) => await res.json())
-          .catch((err) => console.log(err)) || {};
+          .catch((_) => null) || {};
         configs.set(req.url, config);
       }
+
+      const isolateExecutor = Isolate({
+        config: {
+          loaderUrl: fileLoaderUrl.href,
+          dirEntrypoint: env.DIR_ENTRYPOINT || "index",
+          functionsDir: functionsDir,
+          ...config
+        },
+        modules: {
+          path: { SEPARATOR, basename, extname, join, dirname }
+        }
+      })
 
       const handlerConfig = {
         middlewares: {
@@ -72,17 +84,7 @@ let adapters;
           path: { SEPARATOR, basename, extname, join, dirname }
         },
         handlers: {
-          "/(.*)+": Isolate({
-            config: {
-              loaderUrl: fileLoaderUrl.href,
-              dirEntrypoint: env.DIR_ENTRYPOINT || "index",
-              functionsDir: functionsDir,
-              ...config
-            },
-            modules: {
-              path: { SEPARATOR, basename, extname, join, dirname }
-            }
-          }),
+          "/(.*)+": isolateExecutor,
         },
         serializers: {},
         dependencies: {},

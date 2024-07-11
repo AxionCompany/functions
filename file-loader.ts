@@ -9,13 +9,13 @@ import withCache from "./functions/src/utils/withCache.ts";
 
 self.addEventListener("unhandledrejection", event => {
   // Prevent this being reported (Firefox doesn't currently respect this)
-  // event.preventDefault();
-  console.log('FILE LOADER ERROR', event)
+  event.preventDefault();
+  console.log('FILE LOADER UNHANDLED ERROR', event)
 
-  // self.postMessage({
-  //   message: event.reason.message,
-  //   stack: event.reason.stack,
-  // });
+  self.postMessage({
+    message: event.reason.message,
+    stack: event.reason.stack,
+  });
 });
 
 
@@ -23,8 +23,10 @@ const env = getEnv();
 
 server({
   requestHandler: (req: Request) => {
+
     const debug = env.DEBUG === 'true';
     debug && console.log('Received request in File Loader from', req.url);
+    console.log('Received request in File Loader from', req.url);
     const url = new URL(req.url);
     let useCache;
     try {
