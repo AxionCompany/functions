@@ -15,4 +15,3 @@ export const GET = () => {
   );
 }; // If a GET request is sent, this is the response
 
-// you can also use POST, PUT, and DELETE methods by exporting them as well.
