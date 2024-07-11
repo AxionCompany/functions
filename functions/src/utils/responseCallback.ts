@@ -46,6 +46,7 @@ export default (__requestId__: string, cb: Function) => {
           stack: chunk.stack,
         }
       }
+      console.log('ERROR', error, __requestId__, options,)
 
       return cb({ chunk: { error }, __requestId__, __error__: true, options, __done__: true });
     }
