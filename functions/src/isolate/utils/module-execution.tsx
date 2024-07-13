@@ -89,7 +89,7 @@ const moduleInstance: any = async (
       // set html content type headers
       response.headers({ "content-type": "text/html; charset=utf-8" });
       // generate layouts
-      const Layout = dependencies.LayoutModules.reduce(
+      const Layout = dependencies.LayoutModules?.reduce(
         (AccLayout: any, CurrLayout: any) => {
           if (!CurrLayout) return AccLayout
           return (props: any) => dependencies.React.createElement(AccLayout, props, CurrLayout(props))
