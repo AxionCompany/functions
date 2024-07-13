@@ -17,33 +17,40 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
     indexHtml && (dependencies.indexHtml = indexHtml);
     layoutUrls = await getAllFiles({ url: importUrl, name: 'layout', extensions: ['jsx', 'tsx'], returnProp: 'matchPath' });
 
-
     // Load layout modules
-    const LayoutModulesPromise = Promise.all(
-      layoutUrls.map((url) =>
-        import(new URL(url, new URL(importUrl).origin).href)
+    const LayoutModulesPromise = await Promise.all(
+      layoutUrls.map((url) => {
+        return import(new URL(url, new URL(importUrl).origin).href)
           .then((mod) => mod.default)
-      )
+      })
     );
 
     // Load layout bundles
+    const layoutBundleUrl = new URL(importUrl);
+    layoutBundleUrl.searchParams.append('bundle', true);
+
     const bundledLayoutsPromise = getAllFiles({
-      url: currentUrl + '?bundle=true',
+      url: layoutBundleUrl.href,
       name: 'layout',
       extensions: ['jsx', 'tsx'],
       returnProp: 'matchPath'
-    }).then(res => Promise.all(
-      res.map((url: string) => fetchDynamicImportFiles(new URL(url, currentUrl).href, import.meta.url.split('/src')[0], 10))
-    ));
+    }).then(res => {
+      return Promise.all(
+        res.map((url: string) => fetchDynamicImportFiles(new URL(url, new URL(importUrl).origin).href, import.meta.url.split('/src')[0], 10))
+      )
+    }
+    );
 
     // Load module bundles
-    const bundledModulePromise = fetchDynamicImportFiles(currentUrl, import.meta.url.split('/src')[0], 10)
+    const bundledModulePromise = fetchDynamicImportFiles(importUrl, import.meta.url.split('/src')[0], 10)
     // Await all promises
-    resolvedJsxData = await Promise.all([
-      LayoutModulesPromise,
-      bundledLayoutsPromise,
-      bundledModulePromise
-    ])
+    resolvedJsxData = await Promise.all(
+      [
+        LayoutModulesPromise,
+        bundledLayoutsPromise,
+        bundledModulePromise
+      ]
+    )
   }
   const [LayoutModules, bundledLayouts, bundledModule] = resolvedJsxData;
   // Load shared modules
@@ -69,7 +76,6 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
   );
 
   try {
-    console.log('Loading Module:', importUrl)
     // Load target module
     const ESModule = await import(importUrl).then(mod => mod).catch(err => {
       throw { message: `Error Importing Module \`${importUrl}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, '/'), status: 401 };
@@ -117,6 +123,7 @@ async function fetchDynamicImportFiles(url: string, customBaseUrl: string, maxRe
 
     customBaseUrl && urlWithParams.searchParams.append('customBaseUrl', customBaseUrl);
     urlWithParams.searchParams.append('bundle', 'true');
+    console.log('URL DYNAMIC IMPORTS', urlWithParams)
     const response = await fetch(urlWithParams.toString());
     if (!response.ok) {
       throw new Error(`Failed to fetch ${urlWithParams.toString()}: ${response.statusText}`);

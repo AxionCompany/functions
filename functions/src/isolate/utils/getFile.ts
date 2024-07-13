@@ -7,7 +7,6 @@ const getFile = async (
     if (!res.ok) throw new Error(`Failed to fetch ${url}`);
 
     const data = await res.json();
-    console.log(`Fetched ${url} in ${Date.now() - start}ms`);
 
     if (ext && typeof ext === 'string' && !data.matchPath?.split('.')?.pop()?.split('?')?.[0]?.includes(ext)) {
         throw new Error(`Matched file does not contain .${ext} extension`);

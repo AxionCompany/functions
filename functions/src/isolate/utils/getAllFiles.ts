@@ -1,6 +1,6 @@
 import getFile from './getFile.ts';
 
-const getAllFiles = async ({ url, name, extensions, returnProp }: any) => {
+const getAllFiles = async ({ url, name, extensions, returnProp , ...rest}: any) => {
     returnProp = returnProp || 'content';
     const urlData = new URL(url);
     const possibleFileUrls: string[] = []

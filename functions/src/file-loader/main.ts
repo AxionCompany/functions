@@ -46,7 +46,6 @@ export default ({ config, modules }: any) => {
         { shared: shared?.split(',') }
       ).then(res => res).catch(console.log);
 
-      bundle(bundleUrl, { shared: shared?.split(',') }).then(res => res).catch(console.log);
       if (bundleContent) {
         return { content: bundleContent, params, path, matchPath };;
       }
