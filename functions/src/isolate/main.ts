@@ -1,6 +1,6 @@
 
 
-const isolates: any = {};
+const isolates: Map<string, any> = new Map();
 const urlMetadatas: Map<string, any> = new Map();
 
 const getAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
@@ -33,17 +33,26 @@ const waitForServer = async (url: string, timeout: number = 1000 * 60): Promise<
 };
 
 const getPortFromIsolateId = (isolateId: string): number => {
-    return parseInt(isolates[isolateId].port);
+    return parseInt(isolates.get(isolateId).port);
 }
 
-const cleanupIsolate = (isolateId: string): void => {
-    if (isolates[isolateId]) {
+const cleanupIsolate = async (isolateId: string): void => {
+    if (isolates.get(isolateId)) {
         // kill process
-        // Deno.kill(isolates[isolateId].pid, Deno.Signal.SIGKILL);
-        // delete isolate
-        delete isolates[isolateId];
+        console.log("Killing isolate", isolateId);
+        Deno.kill(isolates.get(isolateId)?.pid, 'SIGTERM');
+        // delete isolate and its references
+        isolates.delete(isolateId);
+        urlMetadatas.delete(isolateId);
+
     }
 };
+
+export const cleanupIsolates = (): void => {
+    for (const isolateId of isolates.keys()) {
+        cleanupIsolate(isolateId);
+    }
+}
 
 export default ({ config, modules }: any) => async (
     { url, pathname, headers, subdomain, method, data, ctx, params, queryParams, __requestId__ }: {
@@ -69,12 +78,15 @@ export default ({ config, modules }: any) => async (
 
     let urlMetadata;
     let isJSX = false;
+    let isolateId;
 
 
     for (const key of urlMetadatas.keys()) {
-        const pattern = new URLPattern({ pathname: key })
+        const { pathname, hostname } = new URL(key);
+        const pattern = new URLPattern({ pathname, hostname })
         const matched = pattern.exec(importUrl.href);
         if (matched) {
+            isolateId = key;
             urlMetadata = { ...urlMetadatas.get(key), params: matched.pathname.groups };
         }
     }
@@ -109,16 +121,16 @@ export default ({ config, modules }: any) => async (
         match = match?.replaceAll(/\[([^\[\]]+)\]/g, ':$1');
         const dirEntrypointIndex = match?.lastIndexOf(`/${config?.dirEntrypoint}`)
         match = dirEntrypointIndex > -1 ? match.slice(0, dirEntrypointIndex) : match;
+        isolateId = new URL(match, url.origin).href
         urlMetadata.matchPath = match;
-        urlMetadatas.set(match, urlMetadata);
+        urlMetadatas.set(isolateId, urlMetadata);
     }
 
     const ext = modules.path.extname(urlMetadata?.path);
     isJSX = ext === ".jsx" || ext === ".tsx";
 
-    const isolateId = urlMetadata.matchPath;
 
-    if (!isolates[isolateId]) {
+    if (!isolates.get(isolateId)) {
         try {
             console.log("Spawning isolate", isolateId);
             const port = await getAvailablePort(3500, 4000);
@@ -133,8 +145,8 @@ export default ({ config, modules }: any) => async (
                     '--deny-sys',
                     '--deny-env',
                     '--allow-net',
-                    '--allow-read=/cache',
-                    '--allow-write=/cache',
+                    '--allow-read=./cache',
+                    '--allow-write=./cache',
                     '--unstable-sloppy-imports',
                     '--unstable-kv',
                     '--unstable',
@@ -153,11 +165,11 @@ export default ({ config, modules }: any) => async (
                 ],
             });
             const process = command.spawn();
-            isolates[isolateId] = {
+            isolates.set(isolateId, {
                 port,
                 pid: process.pid,
                 process,
-            };
+            });
             await waitForServer(`http://localhost:${port}`);
         } catch (error) {
             console.error(`Failed to spawn isolate: ${isolateId}`, error);

@@ -1,21 +1,28 @@
 /// <reference lib="deno.unstable" />
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 
-self.addEventListener("unhandledrejection", event => {
+self.addEventListener("unhandledrejection", async event => {
   // Prevent this being reported (Firefox doesn't currently respect this)
   event.preventDefault();
   console.log('API UNHANDLED ERROR', event)
+
+  // clean up isolates
+  const cmd = new Deno.Command("./kill_zombie_processes.sh");
+  let { code, stdout, stderr } = await cmd.output();
+  // stdout & stderr are a Uint8Array
+  console.log('AQUII', new TextDecoder().decode(stdout));
 
   self.postMessage({
     message: event.reason.message,
     stack: event.reason.stack,
   });
+
 });
 
 import server from "./functions/src/servers/main.ts";
 import RequestHandler from "./functions/src/handlers/main.ts";
 import { getSubdomain } from "./functions/src/utils/urlFunctions.ts";
-import Isolate from "./functions/src/isolate/main.ts";
+import Isolate, { cleanupIsolates } from "./functions/src/isolate/main.ts";
 import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
 import withCache from "./functions/src/utils/withCache.ts";
@@ -109,6 +116,8 @@ async function watchFiles(env: any) {
     if (event.kind === "modify" && event.paths.some(path => /\.(html|js|jsx|tsx|ts)$/.test(path))) {
       const dir = Deno.cwd();
       const files = event.paths.map(path => path.split(dir).join(''));
+      // clean up isolates
+      await cleanupIsolates();
       event.paths.forEach(path => {
         self.postMessage({ message: `Files modified: ${files}` });
       })
