@@ -8,7 +8,7 @@
     "imports": {
         "react": "npm:react",
         "react-dom/server": "npm:react-dom/server",
-        "axion-components/":"http://AxionCompany--axions-web--main:***REMOVED***@localhost:9000/src/components/",
+        "axion-components/":"http://AxionCompany--axions-web--main{{GIT_API_KEY}}@localhost:9000/src/components/",
         "axion-modules/":"https://raw.githubusercontent.com/AxionCompany/functions/develop/functions/modules/",
         "postcss": "npm:postcss",
         "react-icons/hi": "npm:react-icons/hi",
