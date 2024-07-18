@@ -1,7 +1,6 @@
 const getFile = async (
     url: string,
-    { ext, fileName }: { ext?: Array<string> | string, fileName?: string },
-    returnProp = 'content') => {
+    { ext, fileName }: { ext?: Array<string> | string, fileName?: string }, returnProp) => {
     const start = Date.now();
     const res = await fetch(url, { headers: { 'content-type': 'application/json' } });
     if (!res.ok) throw new Error(`Failed to fetch ${url}`);
@@ -16,7 +15,7 @@ const getFile = async (
     } else if (fileName && data.matchPath?.split('/')?.pop()?.split('?')[0]?.split('.')?.[0] !== fileName) {
         throw new Error(`Matched file does not contain ${fileName} in its path`);
     }
-    return data[returnProp];
+    return returnProp ? data[returnProp] : data;
 }
 
 export default getFile;

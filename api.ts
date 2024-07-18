@@ -6,11 +6,9 @@ self.addEventListener("unhandledrejection", async event => {
   event.preventDefault();
   console.log('API UNHANDLED ERROR', event)
 
-  // clean up isolates
-  const cmd = new Deno.Command("./kill_zombie_processes.sh");
+  // // clean up isolates
+  const cmd = new Deno.Command(`${import.meta.dirname}/kill_zombie_processes.sh`);
   let { code, stdout, stderr } = await cmd.output();
-  // stdout & stderr are a Uint8Array
-  console.log('AQUII', new TextDecoder().decode(stdout));
 
   self.postMessage({
     message: event.reason.message,
@@ -26,10 +24,12 @@ import Isolate, { cleanupIsolates } from "./functions/src/isolate/main.ts";
 import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
 import withCache from "./functions/src/utils/withCache.ts";
+import axionDenoConfig from "./deno.json" with { type: "json" };
 
-const env = getEnv();
+const env = await getEnv();
 
-let configs = new Map<string, string>();
+let axionConfigs = new Map<string, string>();
+let denoConfigs = new Map<string, any>();
 let adapters;
 
 (async () => {
@@ -39,13 +39,12 @@ let adapters;
       env.DEBUG === 'true' && console.log('Received request in API from', req.url);
 
       const fileLoaderUrl = new URL(env.FILE_LOADER_URL || "http://localhost:9000");
+      const { hostname } = new URL(req.url);
 
       const subdomain = getSubdomain(req.url);
 
-      const subdomainRedirect = env.SUBDOMAIN_REDIRECT === 'true';
-      if (subdomainRedirect) {
-        fileLoaderUrl.hostname = [subdomain, fileLoaderUrl.hostname].filter(Boolean).join('.');
-      }
+      fileLoaderUrl.username = subdomain;
+      fileLoaderUrl.password = env.GIT_API_KEY || '';
 
       let functionsDir = env.FUNCTIONS_DIR || ".";
       functionsDir.endsWith('/') && (functionsDir = functionsDir.slice(0, -1));
@@ -61,21 +60,45 @@ let adapters;
           }) || ((a: any) => a);
       }
 
-      let config = configs.get(req.url);
+      let axionConfig = axionConfigs.get(new URL(req.url).origin);
 
-      if (!config) {
-        config = await fetch(new URL('axion.config.json', fileLoaderUrl).href)
+      if (!axionConfig) {
+        axionConfig = await fetch(new URL('axion.config.json', fileLoaderUrl).href)
           .then(async (res) => await res.json())
           .catch((_) => null) || {};
-        configs.set(req.url, config);
+        axionConfigs.set(new URL(req.url).origin, axionConfig);
       }
+
+      let denoConfig = denoConfigs.get(new URL(req.url).origin) || {};
+      if (!denoConfig) {
+        denoConfig = await fetch(new URL('deno.json', fileLoaderUrl).href)
+          .then(async (res) => await res.json())
+          .catch((_) => null) || {};
+        denoConfig.imports = denoConfig?.imports || {};
+        denoConfig.scopes = denoConfig?.scopes || {};
+        const nodeConfig = await fetch(new URL('package.json', fileLoaderUrl).href)
+          .then(async (res) => await res.json())
+          .catch((_) => null) || {};
+        Object.entries(nodeConfig?.dependencies || {}).map(([key, value]) => {
+          if (value.startsWith('http') || value.startsWith('file') || value.startsWith('npm:') || value.startsWith('node:')) {
+            denoConfig.imports[key] = value;
+          } else {
+            denoConfig.imports[key] = `npm:${value}`;
+          }
+        });
+        denoConfigs.set(new URL(req.url).origin, { ...denoConfig });
+      };
+
+      denoConfig.imports = { ...axionDenoConfig.imports, ...denoConfig.imports };
+      denoConfig.scopes = { ...axionDenoConfig.scopes, ...denoConfig.scopes };
 
       const isolateExecutor = Isolate({
         config: {
           loaderUrl: fileLoaderUrl.href,
           dirEntrypoint: env.DIR_ENTRYPOINT || "index",
           functionsDir: functionsDir,
-          ...config
+          ...axionConfig,
+          denoConfig,
         },
         modules: {
           path: { SEPARATOR, basename, extname, join, dirname }

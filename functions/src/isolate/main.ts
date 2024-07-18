@@ -39,7 +39,7 @@ const getPortFromIsolateId = (isolateId: string): number => {
 const cleanupIsolate = async (isolateId: string): void => {
     if (isolates.get(isolateId)) {
         // kill process
-        console.log("Killing isolate", isolateId);
+        console.log("SIGTERM issued. Terminating isolate with ID:", isolateId);
         Deno.kill(isolates.get(isolateId)?.pid, 'SIGTERM');
         // delete isolate and its references
         isolates.delete(isolateId);
@@ -97,7 +97,9 @@ export default ({ config, modules }: any) => async (
             headers: {
                 "content-type": "application/json",
             },
-        })
+            method: "POST",
+            body: JSON.stringify({ denoConfig: config?.denoConfig })
+        });
 
         if (!urlMetadata.ok) {
             response.status(urlMetadata.status)
@@ -108,11 +110,11 @@ export default ({ config, modules }: any) => async (
 
         if (queryParams.bundle) {
             response.headers({ "content-type": "text/javascript" });
-            if (!urlMetadata?.content?.code) {
+            if (!urlMetadata?.content) {
                 response.status(404)
                 response.statusText("Module not found")
             }
-            return urlMetadata?.content?.code;
+            return urlMetadata?.content;
         }
 
         const matchExt = modules.path.extname(urlMetadata?.matchPath);
@@ -135,22 +137,23 @@ export default ({ config, modules }: any) => async (
             console.log("Spawning isolate", isolateId);
             const port = await getAvailablePort(3500, 4000);
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null
+            console.log('importMap', JSON.stringify({ imports: config?.denoConfig?.imports, scope: config?.denoConfig?.scope }));
             const command = new Deno.Command(Deno.execPath(), {
                 args: [
                     'run',
                     `--reload=${[importUrl.origin, url.origin, metaUrl].filter(Boolean).join(',')}`,
-                    '-A',
-                    '--deny-read',
-                    '--deny-write',
-                    '--deny-sys',
-                    '--deny-env',
+                    '--allow-env=DENO_AUTH_TOKENS',
+                    '--deny-run',
                     '--allow-net',
-                    '--allow-read=./cache',
-                    '--allow-write=./cache',
+                    '--allow-sys=cpus,osRelease',
+                    '--allow-read',
+                    '--allow-write=./cache/',
                     '--unstable-sloppy-imports',
                     '--unstable-kv',
                     '--unstable',
                     '--no-lock',
+                    '--no-prompt',
+                    '--importmap=' + `data:application/json,${JSON.stringify({ imports: config?.denoConfig?.imports, scope: config?.denoConfig?.scope })}`,
                     new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href,
                     `${port}`,
                     JSON.stringify({
@@ -162,6 +165,9 @@ export default ({ config, modules }: any) => async (
                         env: { ...urlMetadata.variables },
                         ...config,
                     }),
+                    JSON.stringify({
+                        DENO_AUTH_TOKENS: urlMetadata.variables.DENO_AUTH_TOKENS,
+                    })
                 ],
             });
             const process = command.spawn();
@@ -202,14 +208,16 @@ export default ({ config, modules }: any) => async (
         });
 
         response.headers(Object.fromEntries(moduleResponse.headers.entries()));
+        response.status(moduleResponse.status);
+        response.statusText(moduleResponse.statusText);
 
         if (!moduleResponse.ok) {
-            const errorResponse = await moduleResponse.text()
-            console.log("Error response", isolateId, errorResponse);
+            const errorResponse = await moduleResponse.text();
             try {
-                return JSON.parse(errorResponse);
+                const errorMessage = JSON.parse(errorResponse);
+                return errorMessage;
             } catch (_) {
-                return errorResponse
+                return errorResponse;
             }
         }
 

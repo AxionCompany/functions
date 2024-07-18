@@ -1,7 +1,7 @@
 
 import getEnv from "./functions/src/utils/environmentVariables.ts";
 
-const env = getEnv();
+const env = await getEnv();
 
 let fileLoaderStarted: any;
 
