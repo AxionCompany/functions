@@ -18,7 +18,7 @@ const createScripts = ({
     {
       type: 'importmap',
       content: environment === 'development'
-        ? `{
+        ? JSON.stringify({
           "imports": {
             "react": "https://ga.jspm.io/npm:react@18.3.1/dev.index.js",
             "react-dom/client": "https://ga.jspm.io/npm:react-dom@18.3.1/dev.client.js"
@@ -29,8 +29,8 @@ const createScripts = ({
               "scheduler": "https://ga.jspm.io/npm:scheduler@0.23.2/dev.index.js"
             }
           }
-        }`
-        : `{
+        })
+        : JSON.stringify({
           "imports": {
             "react": "https://ga.jspm.io/npm:react@18.3.1/index.js",
             "react-dom/client": "https://ga.jspm.io/npm:react-dom@18.3.1/client.js"
@@ -41,7 +41,7 @@ const createScripts = ({
               "scheduler": "https://ga.jspm.io/npm:scheduler@0.23.2/index.js"
             }
           }
-        }`
+        })
     },
     {
       type: 'text/javascript',

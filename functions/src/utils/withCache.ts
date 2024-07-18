@@ -11,6 +11,31 @@ const createDirIfNotExists = async (path: string) => {
 await createDirIfNotExists('./cache/');
 const kv = await Deno.openKv('./cache/db');
 
+export const getCache = async (keys: string[]) => {
+    const cachedData: any = await get(kv, ['cache', ...keys])
+    if (cachedData?.value !== null) {
+        const cachedContent = new TextDecoder('utf-8').decode(cachedData.value);
+        let parsedContent;
+        try {
+            parsedContent = JSON.parse(cachedContent);
+            if (parsedContent?.error) return null;
+        } catch (_) {
+            parsedContent = cachedContent;
+        }
+        return parsedContent;
+    }
+    return null;
+}
+
+export const setCache = async (keys: string[], data: any, options: any) => {
+    let strData = data;
+    if (typeof strData !== 'string') {
+        strData = JSON.stringify(strData || { error: "No data" });
+    };
+
+    set(kv, ['cache', ...keys], new TextEncoder().encode(strData), { expireIn: options?.cachettl });
+}
+
 export default async (cb: Function, config: { useCache: boolean | undefined, keys: string[], cachettl: number | undefined }, ...params: any[]) => {
 
     config.useCache = config.useCache !== false;
@@ -18,23 +43,12 @@ export default async (cb: Function, config: { useCache: boolean | undefined, key
 
     try {
         if (config.useCache) {
-            const cachedData: any = await get(kv, ['cache', ...config.keys])
-            if (cachedData?.value !== null) {
-                const cachedContent = new TextDecoder('utf-8').decode(cachedData.value);
-                let parsedContent;
-                try {
-                    parsedContent = JSON.parse(cachedContent);
-                    if (parsedContent?.error) return null;
-                } catch (_) {
-                    parsedContent = cachedContent;
-                }
-                return parsedContent;
-            }
+            const cachedData = await getCache(config.keys);
+            if (cachedData) return cachedData;
         }
         const data = await cb(...params);
         if (config.useCache) {
-            const strData = JSON.stringify(data || { error: "No data" });
-            set(kv, ['cache', ...config.keys], new TextEncoder().encode(strData), { expireIn: config.cachettl });
+            setCache(config.keys, data, config);
         }
         return data;
     } catch (e) {

@@ -1,7 +1,7 @@
 export default (__requestId__: string, cb: Function) => {
   return {
     send: (chunk: string) => cb({ __requestId__, chunk, __done__: true }),
-    redirect: (url: string) =>
+    redirect: (url: string, headers={}) =>
       cb({
         __requestId__,
         options: {

@@ -1,7 +1,7 @@
 import getFile from './getFile.ts';
 
 const getAllFiles = async ({ url, name, extensions, returnProp , ...rest}: any) => {
-    returnProp = returnProp || 'content';
+
     const urlData = new URL(url);
     const possibleFileUrls: string[] = []
     urlData.pathname.split('/')

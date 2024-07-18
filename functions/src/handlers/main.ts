@@ -14,15 +14,15 @@ export default (
 
       // Get Body
       const body = await req
-        .text()
-        .then((_body: any) => {
+        ?.text()
+        ?.then((_body: any) => {
           try {
             return JSON.parse(_body);
           } catch (_) {
             return _body;
           }
         })
-        .catch((_: Error) => (null));
+        ?.catch((_: Error) => (null));
 
       // Get Query parameters
       const url = new URL(req.url);
@@ -142,6 +142,7 @@ export default (
           for (const key in serializers) {
             const serializer = serializers[key];
             serializedResponse = await serializer(
+              url,
               data,
               ctx,
               serializedResponse,

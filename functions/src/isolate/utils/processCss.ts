@@ -1,5 +1,5 @@
 import getAllFiles from './getAllFiles.ts';
-import postcss from "npm:postcss";
+import postcss from "postcss";
 
 const processCss = async (config: any, html: string, importUrl: string) => {
 
@@ -10,7 +10,7 @@ const processCss = async (config: any, html: string, importUrl: string) => {
         config = {};
     }
 
-    const css = (await getAllFiles({ url: importUrl, name: 'globals', extensions: ['css'] })).join('\n')
+    const css = (await getAllFiles({ url: importUrl, name: 'globals', extensions: ['css'], returnProp: 'content' })).join('\n')
 
     const plugins: any = Object.entries(config.plugins).map(([_, plugin]) => plugin).filter(Boolean) || [];
     if (plugins?.length) {

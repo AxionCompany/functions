@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'npm:uuid';
+import { uuid } from 'npm:uuidv4';
 
 let tasks = [];
 
@@ -9,7 +9,7 @@ export const GET = () => {
 
 // Add a new task
 export const POST = ({ name }) => {
-    const task = { id: uuidv4(), name };
+    const task = { id: uuid(), name };
     tasks.push(task);
     return task;
 };
