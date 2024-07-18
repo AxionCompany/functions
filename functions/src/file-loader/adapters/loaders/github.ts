@@ -46,13 +46,16 @@ export default ({ config, modules }: any) => {
     );
 
     // get github environment variables
-    const environmentVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/environments/${gitInfo.environment}/variables`;
-    const environmetVariablesPromises = withCache(
-      (url: string, options: any) => fetch(url, options).then(res => res.status === 200 ? res.json() : ""),
-      { keys: ['github', environmentVariablesUrl], cachettl: config.cachettl, useCache: config.useCache, },
-      environmentVariablesUrl,
-      { headers }
-    );
+    let environmetVariablesPromises;
+    if (gitInfo.environment) {
+      const environmentVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/environments/${gitInfo.environment}/variables`;
+      environmetVariablesPromises = withCache(
+        (url: string, options: any) => fetch(url, options).then(res => res.status === 200 ? res.json() : ""),
+        { keys: ['github', environmentVariablesUrl], cachettl: config.cachettl, useCache: config.useCache, },
+        environmentVariablesUrl,
+        { headers }
+      );
+    }
 
     const [repoVariables, environmentVariables] = await Promise.all([repoVariablesPromise, environmetVariablesPromises]);
 
@@ -80,7 +83,7 @@ export default ({ config, modules }: any) => {
 
     const content = atob(response.content);
 
-    return { content, variables };
+    return { content, variables: { ENV: config.environment, ...variables } };
 
   };
 

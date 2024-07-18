@@ -55,6 +55,19 @@ This configuration defines two tasks:
 - start: Runs the application on port 8000.
 - dev: Runs the application in development mode with hot-reloading enabled.
 
+### Add Configuration File
+```json
+// axion.config.json
+{
+    "functionsDir": ".",
+    "dirEntrypoint": "main"
+}
+```
+
+This configuration specifies that the current directory (.) should be served as the root directory for modules and components, and the default entry point for directories is main.
+
+### Start the Application
+
 To start the application, run:
 
 ```sh
@@ -90,6 +103,7 @@ npm run dev
 Both methods will pull Axion Functions' code from GitHub and execute it on your local machine, starting the server.
 
 * p.s.: even if using npm commands, you still need to have Deno installed on your machine. *
+
 
 ## Usage
 

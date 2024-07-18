@@ -2,68 +2,63 @@ import getAllFiles from "./getAllFiles.ts";
 
 export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) => {
 
-  const sharedModuleUrls = await getAllFiles({
+  let layoutUrls = [];
+  let resolvedJsxData: any = [];
+  const bundleUrl = new URL(importUrl);
+  bundleUrl.searchParams.append('bundle', true);
+
+  const importPromises = [];
+
+  // Get shared module bundles
+  importPromises.push(getAllFiles({
     url: importUrl,
     name: 'shared',
     extensions: ['js', 'ts'],
-    returnProp: 'matchPath'
-  });
+  }));
 
-  let layoutUrls = [];
-  let resolvedJsxData: any = [];
+  // Get module bundle 
+  importPromises.push(fetch(bundleUrl.href).then(res => res.json()).catch(err => console.log(err.toString)));
 
   if (isJSX) {
-    const indexHtml = (await getAllFiles({ url: importUrl, name: 'index', extensions: ['html'], returnProp: 'content' })).slice(-1)[0];
-    indexHtml && (dependencies.indexHtml = indexHtml);
-    layoutUrls = await getAllFiles({ url: importUrl, name: 'layout', extensions: ['jsx', 'tsx'], returnProp: 'matchPath' });
-
-    // Load layout modules
-    const LayoutModulesPromise = await Promise.all(
-      layoutUrls.map((url) => {
-        return import(new URL(url, new URL(importUrl).origin).href)
-          .then((mod) => mod.default)
-      })
-    );
-
-    // Load layout bundles
-    const layoutBundleUrl = new URL(importUrl);
-    layoutBundleUrl.searchParams.append('bundle', true);
-
-    const bundledLayoutsPromise = getAllFiles({
-      url: layoutBundleUrl.href,
-      name: 'layout',
-      extensions: ['jsx', 'tsx'],
-      returnProp: 'matchPath'
-    }).then(res => {
-      return Promise.all(
-        res.map((url: string) => fetchDynamicImportFiles(new URL(url, new URL(importUrl).origin).href, import.meta.url.split('/src')[0], 10))
-      )
-    }
-    );
-
-    // Load module bundles
-    const bundledModulePromise = fetchDynamicImportFiles(importUrl, import.meta.url.split('/src')[0], 10)
-    // Await all promises
-    resolvedJsxData = await Promise.all(
-      [
-        LayoutModulesPromise,
-        bundledLayoutsPromise,
-        bundledModulePromise
-      ]
-    )
+    // get index.html files
+    importPromises.push(getAllFiles({ url: importUrl, name: 'index', extensions: ['html'], returnProp: 'content' }));
+    // Get Layout Bundles
+    importPromises.push(getAllFiles({ url: bundleUrl, name: 'layout', extensions: ['jsx', 'tsx'] }));
   }
-  const [LayoutModules, bundledLayouts, bundledModule] = resolvedJsxData;
+
+  // Await all import promises
+  const [bundledSharedModules, bundledModule, indexHtmlFiles, bundledLayouts] = await Promise.all(importPromises);
+
+  const loadPromises = [];
+
   // Load shared modules
-  const SharedModules = await Promise.all(
-    sharedModuleUrls.map((url) =>
-      import(new URL(url, new URL(importUrl).origin).href)
+  loadPromises.push(Promise.all(
+    bundledSharedModules.map((file) => {
+      // return import(`data:application/javascript,${file.content}`)
+      return import(new URL(`/${file?.matchPath}`, importUrl).href)
         .then((mod) => mod.default)
         .catch(err => {
-          console.log(`Error Importing Shared Module \`${url}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, '/'));
-          throw { message: `Error Importing Shared Module \`${url}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, '/'), status: 401 };
+          console.log(`Error Importing Shared Module \`${file?.matchPath}\`: ${err.toString()}`);
+          throw { message: `Error Importing Shared Module \`${file?.matchPath}\`: ${err.toString()}`, status: 401 };
         })
-    )
-  );
+    })
+  ));
+
+  if (isJSX) {
+    // Load layout modules
+    loadPromises.push(Promise.all(
+      bundledLayouts.map((file) => {
+        return import(new URL(`/${file?.matchPath}`, importUrl).href)
+          .then((mod) => mod.default)
+          .catch(err => {
+            console.log(`Error Importing Layout Module \`${file?.matchPath}\`: ${err.toString()}`);
+            throw { message: `Error Importing Layout Module \`${file?.matchPath}\`: ${err.toString()}`, status: 401 };
+          })
+      })
+    ));
+  }
+
+  const [SharedModules, LayoutModules] = await Promise.all(loadPromises);
 
   // Instantiate shared modules
   dependencies = SharedModules.reduce(
@@ -72,18 +67,27 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
       return Dependencies({ ...acc })
     },
     // Initial dependencies
-    { env, ...dependencies, LayoutModules, layoutUrls, bundledLayouts, bundledModule }
+    {
+      env, ...dependencies, LayoutModules,
+      indexHtml: indexHtmlFiles?.slice(-1)?.[0]?.content,
+      layoutUrls: bundledLayouts?.map(file => file.path),
+      bundledLayouts: bundledLayouts?.map(file => file.content),
+      bundledModule: bundledModule.content
+    }
   );
 
   try {
     // Load target module
-    const ESModule = await import(importUrl).then(mod => mod).catch(err => {
-      throw { message: `Error Importing Module \`${importUrl}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, '/'), status: 401 };
+    // const ESModule = await import(`data:application/javascript,${bundledModule.content}`).then(mod => mod).catch(err => {
+    const ESModule = await import(new URL(`/${bundledModule?.matchPath}`, importUrl).href).then(mod => mod).catch(err => {
+      throw {
+        message: `Error Importing Module \`${importUrl}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, ''),
+        status: 401
+      };
     });
 
     // Check if module is not found
     if (typeof ESModule === "string") throw { message: "Module Not Found", status: 404 };
-
 
     // Destructure module methods and exported properties
     const { default: mod, GET, POST, PUT, DELETE, _matchPath: matchedPath, config } = ESModule;
@@ -115,54 +119,3 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
     throw err;
   }
 };
-
-async function fetchDynamicImportFiles(url: string, customBaseUrl: string, maxRecursions: number) {
-  // Helper function to perform GET requests with query parameters
-  async function getRequest(url: string, customBaseUrl: string | null) {
-    const urlWithParams = new URL(url);
-
-    customBaseUrl && urlWithParams.searchParams.append('customBaseUrl', customBaseUrl);
-    urlWithParams.searchParams.append('bundle', 'true');
-    console.log('URL DYNAMIC IMPORTS', urlWithParams)
-    const response = await fetch(urlWithParams.toString());
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${urlWithParams.toString()}: ${response.statusText}`);
-    }
-    return response.text();
-  }
-
-  // Helper function to find importAxion statements and extract paths
-  function findImportAxionPaths(code: string) {
-    const regex = /importAxion\(['"]([^'"]+)['"]\)/g;
-    let match;
-    const paths = [];
-    while ((match = regex.exec(code)) !== null) {
-      paths.push(match[1]);
-    }
-    return paths;
-  }
-
-  // Recursive function to fetch code with a maximum recursion limit
-  async function recursiveFetch(url: string, customBaseUrl: string, recursionCount: number, maxRecursions: number, combinedCode = '') {
-    if (recursionCount > maxRecursions) {
-      return combinedCode;
-    }
-    let code;
-    try {
-      code = await getRequest(url, recursionCount > 1 ? customBaseUrl : null);
-    } catch (error) {
-      console.error(error);
-      return combinedCode;
-    }
-    combinedCode += code + '\n';
-    const paths = findImportAxionPaths(code);
-    for (const path of paths) {
-      const newUrl = new URL(path, customBaseUrl).toString();
-      combinedCode = await recursiveFetch(newUrl, customBaseUrl, recursionCount + 1, maxRecursions, combinedCode);
-    }
-    return combinedCode;
-  }
-
-  // Start the recursive fetching process
-  return await recursiveFetch(url, customBaseUrl, 1, maxRecursions);
-}

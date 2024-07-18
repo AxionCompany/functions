@@ -1,0 +1,17 @@
+{
+    "tasks": {
+        "start": "ENV=production deno run -A --reload=http://localhost:9000 --no-lock --unstable --unstable-kv --unstable-sloppy-imports main.ts",
+        "dev": "ENV=development WATCH=true PORT=9002 deno run -A -r --no-lock --unstable --unstable-kv --unstable-sloppy-imports main.ts",
+        "file-loader": "deno run -A -r --no-lock --unstable file-loader.ts",
+        "api": "deno run -A -r --no-lock --unstable file-loader.ts"
+    },
+    "imports": {
+        "react": "npm:react",
+        "react-dom/server": "npm:react-dom/server",
+        "axion-components/":"http://AxionCompany--axions-web--main:***REMOVED***@localhost:9000/src/components/",
+        "axion-modules/":"https://raw.githubusercontent.com/AxionCompany/functions/develop/functions/modules/",
+        "postcss": "npm:postcss",
+        "react-icons/hi": "npm:react-icons/hi",
+        "react-icons/fa": "npm:react-icons/fa"
+    }
+}

@@ -4,9 +4,14 @@ import server from "../../servers/main.ts";
 import RequestHandler from "../../handlers/main.ts";
 import ModuleExecution from "../utils/module-execution.tsx";
 
-const [portString, configString]: string[] = Deno.args || [];
+const [portString, configString, envString]: string[] = Deno.args || [];
 const port = parseInt(portString) || 3000;
 const config = JSON.parse(configString);
+const env = JSON.parse(envString);
+
+for (const key in env) {
+    Deno.env.set(key, env[key]);
+}
 
 const isServer = true;
 const metaUrl = import.meta.url.split('src')?.[0];

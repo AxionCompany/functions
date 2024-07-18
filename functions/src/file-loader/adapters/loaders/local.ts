@@ -5,7 +5,7 @@ export default ({ config }: any) => {
   const readTextFile = async (path: string) => {
     try {
       const content = await Deno.readTextFile(path || "");
-      const variables = getEnv();
+      const variables = await getEnv();
       return ({ content, variables });
     } catch (_) {
       return null;

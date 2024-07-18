@@ -5,10 +5,10 @@ import FileLoader from "./functions/src/file-loader/main.ts";
 import server from "./functions/src/servers/main.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
-import withCache from "./functions/src/utils/withCache.ts";
+import withCache, { getCache, setCache } from "./functions/src/utils/withCache.ts";
+import denoConfig from "./deno.json" with { type: "json" };
 
 self.addEventListener("unhandledrejection", event => {
-  // Prevent this being reported (Firefox doesn't currently respect this)
   event.preventDefault();
   console.log('FILE LOADER UNHANDLED ERROR', event)
 
@@ -18,16 +18,20 @@ self.addEventListener("unhandledrejection", event => {
   // });
 });
 
+let axionConfigs = new Map<string, string>();
+let denoConfigs = new Map<string, any>();
 
-const env = getEnv();
+const env = await getEnv();
 
 server({
-  requestHandler: (req: Request) => {
-
+  requestHandler: async (req: Request) => {
     const debug = env.DEBUG === 'true';
-    debug && console.log('Received request in File Loader from', req.url);
     const url = new URL(req.url);
     let useCache;
+    const authorizationEncoded = req.headers.get('authorization')?.slice(6);
+    const [username, password] = authorizationEncoded ? atob(authorizationEncoded).split(':') : [];
+    debug && console.log('Received request in File Loader from', req.url);
+
     try {
       useCache = JSON.parse(env.USE_CACHE || 'true');
     } catch (err) {
@@ -38,13 +42,10 @@ server({
       repo?: string,
       branch?: string,
       environment?: string
-    } = {}
-    if (url.hostname === 'localhost') {
-      url.hostname = 'example.com';
-    }
-    const sub = getSubdomain(url.href);
+    } = {};
 
-    const [owner, repo, branch, environment] = sub?.split('--') || [];
+    // const sub = username && getSubdomain(username);
+    const [owner, repo, branch, environment] = username?.split('--') || [];
     const getRepoData = (owner: string, repo: string, branch: string, environment: string) => ({
       owner,
       repo,
@@ -54,6 +55,82 @@ server({
     Object.assign(gitInfo, getRepoData(owner, repo, branch, environment));
 
     debug && console.log('gitInfo', gitInfo)
+
+    const fileLoaderWithAxionConfig = async ({ config, modules }) => async (params, res) => {
+
+      const axionConfigUrl = new URL('/axion.config.json', params.url);
+      const denoConfigUrl = new URL('/deno.json', params.url);
+
+      username && (axionConfigUrl.username = username);
+      password && (axionConfigUrl.password = password);
+
+      let axionConfig = axionConfigs.get(axionConfigUrl.href);
+      let denoConfig = denoConfigs.get(denoConfigUrl.href);
+
+      const responseMock = Object.entries(res).reduce((acc, [key, value]) => {
+        acc[key] = (() => { });
+        return acc;
+      }, {})
+
+      if (!axionConfig) {
+        console.log('axion.config.json not found in cache for', axionConfigUrl.href, 'fetching from server...')
+        axionConfig = await (FileLoader({ config, modules }))({
+          queryParams: {},
+          headers: { 'content-type': 'text/plain' },
+          pathname: axionConfigUrl.pathname,
+          url: axionConfigUrl.href,
+        }, responseMock);
+        axionConfig = JSON.parse(axionConfig || '{}')
+        axionConfigs.set(axionConfigUrl.href, axionConfig);
+      }
+
+      if (!denoConfig) {
+        console.log('deno.json not found in cache for', axionConfigUrl.href, 'fetching from server...')
+        denoConfig = await (FileLoader({ config, modules }))({
+          queryParams: {},
+          headers: { 'content-type': 'text/plain' },
+          pathname: '/deno.json',
+          url: axionConfigUrl.href,
+        }, responseMock);
+        denoConfig = JSON.parse(denoConfig || '{}')
+        const nodeConfig = await (FileLoader({ config, modules }))({
+          queryParams: {},
+          headers: { 'content-type': 'text/plain' },
+          pathname: '/package.json',
+          url: axionConfigUrl.href,
+        }, responseMock);
+        const nodeConfigJson = JSON.parse(nodeConfig || '{}');
+        Object.entries(nodeConfigJson?.dependencies || {}).forEach(([key, value]) => {
+          if (value.startsWith('http') || value.startsWith('file') || value.startsWith('npm:') || value.startsWith('node:')) {
+            denoConfig.imports[key] = value;
+          } else {
+            denoConfig.imports[key] = `npm:${key}@${value}`;
+          }
+        });
+        denoConfigs.set(denoConfigUrl.href, denoConfig);
+      }
+
+      if (req.url === axionConfigUrl.href) {
+        return axionConfig;
+      }
+
+      if (req.url === denoConfigUrl.href) {
+        return denoConfig;
+      }
+
+      // console.log('axionConfig', { ...config, ...axionConfig, }, 'for', req.url)
+      // console.log('denoConfig', denoConfig, 'for', req.url)
+
+      const urlWithBasicAuth = new URL(params.url.href);
+      username && (urlWithBasicAuth.username = username);
+      password && (urlWithBasicAuth.password = password);
+
+      return FileLoader({
+        config: { ...config, ...axionConfig },
+        modules
+      })({ ...params, url: urlWithBasicAuth, data: { ...params?.data, denoConfig: { ...params?.data?.denoConfig, ...denoConfig } } }, res);
+    }
+
     return RequestHandler({
       middlewares: {},
       pipes: {},
@@ -61,9 +138,9 @@ server({
         path: { SEPARATOR, basename, extname, join, dirname }
       },
       handlers: {
-        "/(.*)+": FileLoader({
+        "/(.*)+": await fileLoaderWithAxionConfig({
           config: {
-            dirEntrypoint: env.DIR_ENTRYPOINT || "main",
+            dirEntrypoint: env.DIR_ENTRYPOINT || "index",
             loaderType: (gitInfo?.owner && gitInfo?.repo) ? 'github' : (env.DEFAULT_LOADER_TYPE || "local"),
             debug,
             useCache,
@@ -72,18 +149,18 @@ server({
             repo: gitInfo?.repo || env.GIT_REPO,
             branch: gitInfo?.branch || env.GIT_BRANCH, // or any other branch you want to fetch files froM
             environment: gitInfo?.environment || env.ENV,
-            apiKey: env.GIT_API_KEY
+            apiKey: env.GIT_API_KEY,
           },
           modules: {
             path: {
               SEPARATOR, basename, extname, join, dirname
             },
-            withCache,
+            withCache
           }
         }),
-      },
-      serializers: {},
-    })(req)
+        serializers: {}
+      }
+    })(req);
   },
   config: {
     PORT: env.FILE_LOADER_PORT || 9000,
