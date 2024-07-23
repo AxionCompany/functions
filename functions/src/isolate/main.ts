@@ -22,7 +22,6 @@ const getAvailablePort = async (startPort: number, endPort: number): Promise<num
 const waitForServer = async (url: string, timeout: number = 1000 * 60): Promise<void> => {
     const startTime = Date.now();
     while (Date.now() - startTime < timeout) {
-        console.log("Waiting for server:", url);
         try {
             await fetch(url);
             return;
@@ -160,7 +159,7 @@ export default ({ config, modules }: any) => async (
                 args: [
                     'run',
                     `--reload=${[importUrl.origin, url.origin, metaUrl].filter(Boolean).join(',')}`,
-                    '--allow-env=DENO_AUTH_TOKENS',
+                    `--allow-env=${permissions?.['allow-env'] === true ? '' : '=' + ['DENO_AUTH_TOKENS', ...(permissions?.['allow-env'] || [])].join(',') || ''}`,
                     '--deny-run',
                     '--allow-net',
                     `--allow-sys${permissions?.['allow-sys'] === true ? '' : '=' + ['cpus', 'osRelease', ...(permissions?.['allow-sys'] || [])].join(',') || ''}`,
