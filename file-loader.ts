@@ -103,6 +103,7 @@ server({
           url: axionConfigUrl,
         }, responseMock);
         const nodeConfigJson = JSON.parse(nodeConfig || '{}');
+        _denoConfig.imports = _denoConfig?.imports || {};
         Object.entries(nodeConfigJson?.dependencies || {}).forEach(([key, value]) => {
           if (value.startsWith('http') || value.startsWith('file') || value.startsWith('npm:') || value.startsWith('node:')) {
             _denoConfig.imports[key] = value;
