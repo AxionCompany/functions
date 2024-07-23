@@ -165,7 +165,7 @@ export default ({ config, modules }: any) => async (
                     '--allow-net',
                     `--allow-sys${permissions?.['allow-sys'] === true ? '' : '=' + ['cpus', 'osRelease', ...(permissions?.['allow-sys'] || [])].join(',') || ''}`,
                     '--allow-read',
-                    '--allow-write=./cache/',
+                    `--allow-write${permissions?.['allow-write'] === true ? '' : '=' + ['./cache/', ...(permissions?.['allow-write'] || [])].join(',') || ''}`,
                     '--unstable-sloppy-imports',
                     '--unstable-kv',
                     '--unstable',
