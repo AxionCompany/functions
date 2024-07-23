@@ -1,9 +1,9 @@
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Configuration
-const endpoint = (i) => `http://localhost:9002/examples/api/tasks`;
-const concurrentRequests = 1000;
-const totalRequests = 10;
+const endpoint = (i) => `http://localhost:9002/examples/bench`;
+const concurrentRequests = 30;
+const totalRequests = 300;
 let requestCount = 0;
 
 // Function to send a single request
@@ -48,7 +48,7 @@ async function loadTest() {
         times.push(...results);
 
         // Optional: Delay between batches
-        await sleep(100);
+        // await sleep(100);
     }
 
     // Calculate and display statistics

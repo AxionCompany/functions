@@ -1,12 +1,15 @@
 
 import FileLoader from "./adapters/loaders/main.ts";
-import bundle from './adapters/bundler/esbuild.js';
+import bundler from './adapters/bundler/esbuild.js';
+import Transformer from "./adapters/transformers/higherOrderFunction.js";
 
 export default ({ config, modules }: any) => {
 
   const fileLoader = FileLoader({ config, modules });
+  const transformer = Transformer({ config, modules });
 
-  return async ({ pathname, url, headers, queryParams, data, ...rest }: any, res: any) => {
+  return async ({ pathname, url, headers, queryParams, data, __requestId__ }: any, res: any) => {
+
     const { bundle: shouldBundle, customBaseUrl, shared, ...searchParams } = queryParams;
     // check if headers type is application/json
     const contentTypeHeaders = headers["content-type"];
@@ -41,10 +44,10 @@ export default ({ config, modules }: any) => {
       }
       const bundleUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, customBaseUrl ? customBaseUrl : url.origin);
       const bundleContent = await modules.withCache(
-        bundle,
+        bundler,
         { cachettl: config.cachettl, useCache: false, keys: ['bundler', bundleUrl.href] },
         bundleUrl,
-        { shared: shared?.split(','), ...data, environment: config.environment }
+        { shared: shared?.split(','), ...variables, ...data, ...params, environment: config.environment }
       ).then(res => res).catch(console.log);
 
       if (bundleContent) {
@@ -57,7 +60,8 @@ export default ({ config, modules }: any) => {
       // logic for redirecting to the new path, so the loader will get the correct file extension from the path in URL.
       // Downside is that there will be an overhead of another request being made to the new path.
       if (!path.startsWith('/')) path = `/${path}`;
-      const redirectUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, url.origin);
+      const redirectUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, url.href);
+      redirectUrl.pathname = path;
       config.debug && console.log(`Redirecting to ${redirectUrl.href}`);
       return res.redirect(redirectUrl.href);
     }
@@ -72,6 +76,15 @@ export default ({ config, modules }: any) => {
       }
       content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\', '/')}"`;
 
+      // transform the content
+      if (['js', 'ts'].includes(pathname.split('.').pop())) {
+        content = transformer({
+          __requestId__, code: content, url,
+          beforeRun: withModules((options, ...args) => console.log('Executing Function:', options.name, '| URL:', options.url, '| Request ID:', options.__requestId__, '| Execution ID:',options.executionId, '| Input:', JSON.stringify(args))),
+          afterRun: withModules((options, result) => console.log('Function Executed:', options.name, '| URL:', options.url, '| Request ID:', options.__requestId__, '| Execution ID:',options.executionId, '| Duration:', options.duration, '| Output:', typeof result !== 'string' ? JSON.stringify(result) : result))
+        });
+      }
+
       // ISSUE: Some projects may have .js or .ts files that actually contain .jsx or .tsx code.
       // CURRENT SOLUTION: Set a fixed content type for stating that the file is .tsx type (should work for parsing .js, .ts, .jsx, .tsx files as well). 
       // TO DO: This is probably *not* the best idea, as there's an overhead in Deno Compiler. Think about how to improve it the future. 
@@ -82,3 +95,19 @@ export default ({ config, modules }: any) => {
     return content;
   };
 }
+
+const withModules = hook => {
+  return `
+(...args) => {
+  const __hook__ = ${hook.toString()}; 
+  const [options] = args;
+  const { mod: fn } = options;
+  if (
+    !String(fn).includes('React') // does not deal with React
+  ) {
+    return __hook__(...args);
+  };
+  return args;
+}`;
+}
+
