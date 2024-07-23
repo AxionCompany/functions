@@ -100,11 +100,12 @@ let adapters: any;
           functionsDir: functionsDir,
           ...axionConfig,
           denoConfig,
+          permissions: adapters()?.permissions,
         },
         modules: {
           path: { SEPARATOR, basename, extname, join, dirname },
           template: replaceTemplate
-        }
+        },
       })
 
       const handlerConfig = {
@@ -134,7 +135,7 @@ let adapters: any;
   });
   self?.postMessage && self?.postMessage({ message: { 'status': 'ok' } });
   Deno.env.get('WATCH') && watchFiles(env);
-  return 
+  return
 })();
 
 async function watchFiles(env: any) {
@@ -149,7 +150,7 @@ async function watchFiles(env: any) {
       })
     }
   }
-  return 
+  return
 }
 
 
