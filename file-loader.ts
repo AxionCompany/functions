@@ -1,14 +1,13 @@
 /// <reference lib="deno.unstable" />
-import { getSubdomain } from "./functions/src/utils/urlFunctions.ts";
 import RequestHandler from "./functions/src/handlers/main.ts";
 import FileLoader from "./functions/src/file-loader/main.ts";
 import server from "./functions/src/servers/main.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
-import withCache, { getCache, setCache } from "./functions/src/utils/withCache.ts";
+import withCache from "./functions/src/utils/withCache.ts";
 import denoConfig from "./deno.json" with { type: "json" };
 
-self.addEventListener("unhandledrejection", event => {
+self?.addEventListener("unhandledrejection", event => {
   event.preventDefault();
   console.log('FILE LOADER UNHANDLED ERROR', event)
 
@@ -65,61 +64,54 @@ server({
       password && (axionConfigUrl.password = password);
 
       let axionConfig = axionConfigs.get(axionConfigUrl.href);
-      let denoConfig = denoConfigs.get(denoConfigUrl.href);
+      let _denoConfig = denoConfigs.get(denoConfigUrl.href);
 
       const responseMock = Object.entries(res).reduce((acc, [key, value]) => {
         acc[key] = (() => { });
         return acc;
       }, {})
 
+      const fileLoader =  FileLoader({ config, modules });
+
       if (!axionConfig) {
         console.log('axion.config.json not found in cache for', axionConfigUrl.href, 'fetching from server...')
-        axionConfig = await (FileLoader({ config, modules }))({
+        axionConfig = await fileLoader({
           queryParams: {},
           headers: { 'content-type': 'text/plain' },
           pathname: axionConfigUrl.pathname,
-          url: axionConfigUrl.href,
+          url: axionConfigUrl,
         }, responseMock);
+
         axionConfig = JSON.parse(axionConfig || '{}')
         axionConfigs.set(axionConfigUrl.href, axionConfig);
       }
 
-      if (!denoConfig) {
+      if (!_denoConfig) {
         console.log('deno.json not found in cache for', axionConfigUrl.href, 'fetching from server...')
-        denoConfig = await (FileLoader({ config, modules }))({
+        _denoConfig = await fileLoader({
           queryParams: {},
           headers: { 'content-type': 'text/plain' },
           pathname: '/deno.json',
-          url: axionConfigUrl.href,
+          url: axionConfigUrl,
         }, responseMock);
-        denoConfig = JSON.parse(denoConfig || '{}')
-        const nodeConfig = await (FileLoader({ config, modules }))({
+
+        _denoConfig = JSON.parse(_denoConfig || '{}')
+        const nodeConfig = await fileLoader({
           queryParams: {},
           headers: { 'content-type': 'text/plain' },
           pathname: '/package.json',
-          url: axionConfigUrl.href,
+          url: axionConfigUrl,
         }, responseMock);
         const nodeConfigJson = JSON.parse(nodeConfig || '{}');
         Object.entries(nodeConfigJson?.dependencies || {}).forEach(([key, value]) => {
           if (value.startsWith('http') || value.startsWith('file') || value.startsWith('npm:') || value.startsWith('node:')) {
-            denoConfig.imports[key] = value;
+            _denoConfig.imports[key] = value;
           } else {
-            denoConfig.imports[key] = `npm:${key}@${value}`;
+            _denoConfig.imports[key] = `npm:${key}@${value}`;
           }
         });
-        denoConfigs.set(denoConfigUrl.href, denoConfig);
+        denoConfigs.set(denoConfigUrl.href, {...denoConfig, ..._denoConfig});
       }
-
-      if (req.url === axionConfigUrl.href) {
-        return axionConfig;
-      }
-
-      if (req.url === denoConfigUrl.href) {
-        return denoConfig;
-      }
-
-      // console.log('axionConfig', { ...config, ...axionConfig, }, 'for', req.url)
-      // console.log('denoConfig', denoConfig, 'for', req.url)
 
       const urlWithBasicAuth = new URL(params.url.href);
       username && (urlWithBasicAuth.username = username);
@@ -168,4 +160,4 @@ server({
   }
 });
 
-self.postMessage({ message: { 'status': 'ok' } });
+self?.postMessage && self?.postMessage({ message: { 'status': 'ok' } });
