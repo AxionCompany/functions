@@ -32,11 +32,14 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
   // Load shared modules
   loadPromises.push(Promise.all(
     bundledSharedModules.map((file) => {
-      return import(new URL(`/${file?.matchPath}`, importUrl).href)
+      const sharedModulesUrl = new URL(`/${file?.matchPath}`, importUrl);
+      // remove search params
+      sharedModulesUrl.search = '';
+      return import(sharedModulesUrl.href)
         .then((mod) => mod.default)
         .catch(err => {
-          console.log(`Error Importing Shared Module \`${file?.matchPath}\`: ${err.toString()}`);
-          throw { message: `Error Importing Shared Module \`${file?.matchPath}\`: ${err.toString()}`, status: 401 };
+          console.log(`Error Importing Shared Module \`${sharedModulesUrl}\`: ${err.toString()}`);
+          throw { message: `Error Importing Shared Module \`${sharedModulesUrl}\`: ${err.toString()}`, status: 401 };
         })
     })
   ));
