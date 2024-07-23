@@ -71,6 +71,8 @@ export default ({ config, modules }: any) => async (
         __requestId__: string;
     }, response: any) => {
 
+    const { permissions } = config;
+
     const importUrl = !queryParams?.customBaseUrl ? new URL(modules.path.join(config.loaderUrl, config.functionsDir)) : new URL(config.loaderUrl);
     importUrl.pathname = modules.path.join(importUrl.pathname, pathname);
     importUrl.search = url.search;
@@ -161,7 +163,7 @@ export default ({ config, modules }: any) => async (
                     '--allow-env=DENO_AUTH_TOKENS',
                     '--deny-run',
                     '--allow-net',
-                    '--allow-sys=cpus,osRelease',
+                    `--allow-sys=cpus,osRelease,${permissions?.['allow-sys']?.join(',') || ''}`,
                     '--allow-read',
                     '--allow-write=./cache/',
                     '--unstable-sloppy-imports',
