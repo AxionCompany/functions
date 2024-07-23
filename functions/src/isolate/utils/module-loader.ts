@@ -2,8 +2,6 @@ import getAllFiles from "./getAllFiles.ts";
 
 export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) => {
 
-  let layoutUrls = [];
-  let resolvedJsxData: any = [];
   const bundleUrl = new URL(importUrl);
   bundleUrl.searchParams.append('bundle', true);
 
@@ -34,7 +32,6 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
   // Load shared modules
   loadPromises.push(Promise.all(
     bundledSharedModules.map((file) => {
-      // return import(`data:application/javascript,${file.content}`)
       return import(new URL(`/${file?.matchPath}`, importUrl).href)
         .then((mod) => mod.default)
         .catch(err => {
@@ -72,14 +69,13 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
       indexHtml: indexHtmlFiles?.slice(-1)?.[0]?.content,
       layoutUrls: bundledLayouts?.map(file => file.path),
       bundledLayouts: bundledLayouts?.map(file => file.content),
-      bundledModule: bundledModule.content
+      bundledModule: bundledModule?.content
     }
   );
 
   try {
     // Load target module
-    // const ESModule = await import(`data:application/javascript,${bundledModule.content}`).then(mod => mod).catch(err => {
-    const ESModule = await import(new URL(`/${bundledModule?.matchPath}`, importUrl).href).then(mod => mod).catch(err => {
+    const ESModule = await import(importUrl).then(mod => mod).catch(err => {
       throw {
         message: `Error Importing Module \`${importUrl}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, ''),
         status: 401

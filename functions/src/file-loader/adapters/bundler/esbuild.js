@@ -1,25 +1,30 @@
-import { build } from "npm:esbuild";
+import { context } from "npm:esbuild";
 import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader/mod.ts";
+import replaceTemplate from "../../../utils/template.ts";
 import denoConfig from "../../../../../deno.json" with { type: "json" };
 
 export default async (path, { ...options } = {}) => {
+
+    // Define Import Map;
     const { imports } = denoConfig;
+    const importMap = replaceTemplate(JSON.stringify({ imports: { ...imports, ...options?.denoConfig?.imports } }), options)
+    const importMapURL = `data:application/json,${importMap}`;
 
-    const importMapURL = `data:application/json,${JSON.stringify({ imports: { ...imports, ...options?.denoConfig?.imports } })}`;
-
-    const [denoResolver, denoLoader] = denoPlugins({ importMapURL });
+    // Define Deno Loader Plugins;
+    let [denoResolver, denoLoader] = denoPlugins({ importMapURL });
 
     const config = {
         plugins: [
             denoResolver,
             denoLoader,
+            refreshServer
         ],
         bundle: true,
         format: "esm",
         write: false,
-        minifyWhitespace: true,
-        minifyIdentifiers: false,
-        minifySyntax: true,
+        // minifyWhitespace: true,
+        // minifyIdentifiers: false,
+        // minifySyntax: true,
         jsx: "transform",
         platform: "browser",
         external: ['react', 'react-dom', ...(options.shared || [])],
@@ -29,9 +34,30 @@ export default async (path, { ...options } = {}) => {
 
     config.entryPoints = [path.href];
 
-    const result = await build(config);
+    let ctx = await context(config);
+    const result = await ctx.rebuild();
+    ctx.dispose();
 
-    const code = result?.outputFiles?.[0]?.text;
+    ctx = null;
 
-    return code;
+    return result?.outputFiles?.[0]?.text;
+};
+
+
+const refreshServer = {
+    name: "refresh-server",
+    setup(build) {
+        build.onEnd((result) => {
+            if (build.initialOptions.incremental) {
+                console.log(`refresh-server: Clearing Cache for ${build.initialOptions.entryPoints.join(", ")}...`);
+                // Remove all items from the cache (this will force node to reload all of the built artifacts)
+                Object.keys(require.cache).forEach(function (key) {
+                    const resolvedPath = require.resolve(key);
+                    if (resolvedPath.includes(build.initialOptions.outdir)) {
+                        delete require.cache[key];
+                    }
+                });
+            }
+        });
+    },
 };

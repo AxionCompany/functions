@@ -1,238 +1,253 @@
 import responseCallback from "../utils/responseCallback.ts";
 import { getSubdomain } from "../utils/urlFunctions.ts";
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+interface DataChunk {
+  options?: { [key: string]: string };
+  chunk: string;
+  __requestId__?: string;
+  __done__?: boolean;
+  __error__?: boolean;
+}
 
 export default (
   { handlers, middlewares, pipes, serializers }: any,
-) => (req: Request) => {
+) => {
 
-  const handleRequest = async (req: Request) => {
-    try {
-      // Get Headers
-      const headers = Object.fromEntries(req.headers.entries());
-      const __requestId__ = crypto.randomUUID();
+  function createStreamBuffer(highWaterMark: number = 1, { processData, sendOptions }: any) {
 
-      // Get Body
-      const body = await req
-        ?.text()
-        ?.then((_body: any) => {
-          try {
-            return JSON.parse(_body);
-          } catch (_) {
-            return _body;
-          }
-        })
-        ?.catch((_: Error) => (null));
+    let buffer: Uint8Array[] = [];
+    let controller: ReadableStreamDefaultController<Uint8Array>;
+    let headersSent = false;
+    let shouldClose = false;
 
-      // Get Query parameters
-      const url = new URL(req.url);
-      const subdomain = getSubdomain(req.url);
-      const queryParams = Object.fromEntries(url.searchParams.entries());
-      const method = req.method;
+    const readableStream = new ReadableStream<Uint8Array>({
+      start(ctrl) {
+        controller = ctrl;
+      },
+      pull() {
+        flushBuffer();
+      },
+      cancel() {
+        buffer = [];
+        headersSent = false;
+        shouldClose = false;
+      }
+    }, {
+      highWaterMark
+    });
 
-      // Get Path name
-      let pathname = new URL(req.url).pathname;
+    function enqueue(data: DataChunk) {
 
-      // Match Handler
-      let handler: any;
-      let pathParams: any;
-      let pathMatch: string;
-      for (const key in handlers) {
-        const routehandler = new URLPattern({ pathname: key });
-        const _match = routehandler.exec(new URL(req.url))
-        const pathData = { params: _match?.pathname?.groups };
-        if (pathData?.params) {
-          const pathParts = pathData.params["0"] ? pathData?.params["0"] : '';
-          pathname = ("/" + pathParts).replace(/\/{2,}/g, "/");
-          handler = handlers[key];
-          pathParams = pathData.params;
-          pathMatch = key;
-          break;
-        }
+      data = processData(data);
+
+      const encodedChunk = new TextEncoder().encode(data.chunk);
+      if (controller.desiredSize! > 0) {
+        controller.enqueue(encodedChunk);
+      } else {
+        buffer.push(encodedChunk);
       }
 
-      // Handle OPTIONS request
-      if (req.method === "OPTIONS") {
-        return new Response(null, {
+      if (data.__done__ || data.__error__) {
+        shouldClose = true;
+        flushBuffer();
+
+      }
+
+      if (!headersSent && data.options) {
+        headersSent = true;
+        sendOptions(data.options);
+      }
+
+    }
+
+    function flushBuffer() {
+      while (buffer.length > 0 && controller.desiredSize! > 0) {
+        const chunk: any = buffer.shift();
+        controller.enqueue(chunk);
+      }
+      if (shouldClose && buffer.length === 0) {
+        controller.close();
+      }
+    }
+
+    function getStream(): ReadableStream<Uint8Array> {
+      return readableStream;
+    }
+
+    return { enqueue, getStream };
+  }
+
+  return (req: Request) => {
+
+    const handleRequest = async (req: Request) => {
+      try {
+        // Get Headers
+        const headers = Object.fromEntries(req.headers.entries());
+        const __requestId__ = crypto.randomUUID();
+
+        // Get Body
+        const body = await req
+          ?.text()
+          ?.then((_body: any) => {
+            try {
+              return JSON.parse(_body);
+            } catch (_) {
+              return _body;
+            }
+          })
+          ?.catch((_: Error) => (null));
+
+        // Get Query parameters
+        const url = new URL(req.url);
+        const subdomain = getSubdomain(req.url);
+        const queryParams = Object.fromEntries(url.searchParams.entries());
+        const method = req.method;
+
+        // Get Path name
+        let pathname = new URL(req.url).pathname;
+
+        // Match Handler
+        let handler: any;
+        let pathParams: any;
+        let pathMatch: string;
+
+        for (const key in handlers) {
+          const routehandler = new URLPattern({ pathname: key });
+          const _match = routehandler.exec(new URL(req.url))
+          const pathData = { params: _match?.pathname?.groups };
+          if (pathData?.params) {
+            const pathParts = pathData.params["0"] ? pathData?.params["0"] : '';
+            pathname = ("/" + pathParts).replace(/\/{2,}/g, "/");
+            handler = handlers[key];
+            pathParams = pathData.params;
+            pathMatch = key;
+            break;
+          }
+        }
+
+        // Handle OPTIONS request
+        if (req.method === "OPTIONS") {
+          return new Response(null, {
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Headers":
+                "authorization, x-client-info, apikey, content-type",
+              "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
+            },
+          });
+        }
+
+        let data: any;
+        if (body) {
+          data = typeof body === "string" ? { data: body } : { ...body };
+        }
+        let ctx: any = {};
+
+        // Adding Middlewares
+        for (const key in middlewares) {
+          const middleware = middlewares[key];
+          const addedContext = await middleware(req);
+          ctx = { ...ctx, ...addedContext };
+        }
+
+        // Adding Pipes
+        for (const key in pipes) {
+          const pipe = pipes[key];
+          const pipeData = await pipe(data, ctx);
+          data = { ...data, ...pipeData };
+        }
+
+
+        let sendOptions: any
+
+        let responseHeadersPromise: any = new Promise((resolve) => {
+          return sendOptions = (options: any) => resolve({
+            status: options?.status || 200,
+            statusText: options?.statusText || "OK",
+            ...options,
+            headers: {
+              "access-control-allow-origin": "*",
+              "content-type": "text/plain",
+              "x-content-type-options": "nosniff",
+              ...options?.headers,
+            },
+          })
+        });
+
+        const processData = ({ chunk, options, __requestId__, __done__ }: any) => {
+
+          options = options || {};
+
+          for (const key in serializers) {
+            const serializer = serializers[key];
+            chunk = serializer(url, data, ctx, chunk);
+          }
+          if (chunk && typeof chunk === "object") {
+            chunk = JSON.stringify(chunk);
+
+            options.headers = {
+              ...options?.headers,
+              "content-type": "application/json",
+            };
+          }
+
+          return { chunk, options, __requestId__, __done__ };
+        }
+
+        const { getStream, enqueue } = createStreamBuffer(1, { processData, sendOptions });
+
+        const responseFn = responseCallback(__requestId__, enqueue);
+
+        handler(
+          { url, subdomain, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
+          responseFn,
+        ).then(responseFn.send).catch(responseFn.error);
+
+        const options = await responseHeadersPromise;
+        responseHeadersPromise = null;
+
+        return new Response(getStream(), options);
+      } catch (err) {
+
+        const options: any = {
+          status: 500,
+          statusText: "Internal Server Error",
           headers: {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers":
               "authorization, x-client-info, apikey, content-type",
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
-          },
-        });
-      }
-
-      let data: any;
-      if (body) {
-        data = typeof body === "string" ? { data: body } : { ...body };
-      }
-      let ctx: any = {};
-      // Adding Middlewares
-      for (const key in middlewares) {
-        const middleware = middlewares[key];
-        const addedContext = await middleware(req);
-        ctx = { ...ctx, ...addedContext };
-      }
-
-      // Adding Pipes
-      for (const key in pipes) {
-        const pipe = pipes[key];
-        const pipeData = await pipe(data, ctx);
-        data = { ...data, ...pipeData };
-      }
-
-      let options = {
-        status: 200,
-        statusText: "OK",
-        headers: {
-          "access-control-allow-origin": "*",
-          "content-type": "text/plain",
-          "x-content-type-options": "nosniff",
-        },
-      };
-
-      const dataQueue: any[] = [];
-      let controller: any;
-
-      let resolveResponseHeaders: any;
-
-      let responseSent = false;
-
-      const responseHeadersPromise = new Promise((resolve) => {
-        resolveResponseHeaders = resolve;
-      });
-
-
-      const responseStream = new ReadableStream({
-        start(ctrl) {
-          controller = ctrl;
-        },
-        cancel() {
-          console.log('Stream canceled');
-          if (controller && controller?.desiredSize) {
-            controller.close();
+            "content-type": "application/json"
           }
-        },
-      });
-      let counter = 0
-
-      const processQueue = async () => {
-        while (dataQueue.length > 0) {
-          if (controller.desiredSize === 0 && dataQueue.length !== 0) {
-            await sleep(1000)
-            return processQueue();
-          }
-
-          const streamData = dataQueue.shift() || {};
-
-          if (streamData.options) {
-            options = {
-              ...options,
-              ...streamData.options,
-              headers: {
-                ...options.headers,
-                ...streamData.options.headers,
-              },
-            };
-          }
-
-          let serializedResponse = streamData?.chunk;
-
-          for (const key in serializers) {
-            const serializer = serializers[key];
-            serializedResponse = await serializer(
-              url,
-              data,
-              ctx,
-              serializedResponse,
-            );
-          }
-
-          if (
-            serializedResponse &&
-            typeof serializedResponse === "object"
-          ) {
-            serializedResponse = JSON.stringify(serializedResponse);
-            options.headers = {
-              ...options.headers,
-              "content-type": "application/json",
-            };
-          }
-
-          if (serializedResponse) {
-            const encoded = new TextEncoder().encode(serializedResponse);
-            controller.enqueue(encoded);
-          }
-
-          if (!responseSent) {
-            resolveResponseHeaders();
-            responseSent = true;
-          }
-
-          // Close the stream if done
-          if (streamData.__done__ || streamData.__error__) {
-            return controller.close();
-          }
-
         }
 
-      }
-
-      const responseFn = responseCallback(__requestId__, async (e) => {
-        dataQueue.push(e)
-        processQueue();
-        return
-      });
-
-      handler(
-        { url, subdomain, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
-        responseFn,
-      )
-        .then(responseFn.send)
-        .catch(responseFn.error);
-
-      await responseHeadersPromise;
-
-      return new Response(responseStream, options);
-    } catch (err) {
-
-      const options: any = {
-        status: 500,
-        statusText: "Internal Server Error",
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers":
-            "authorization, x-client-info, apikey, content-type",
-          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
-          "content-type": "application/json"
+        if (typeof err === "object") {
+          options.status = err.status || options.status;
+          options.statusText = err.message || err.statusText || options.statusText;
         }
-      }
 
-      if (typeof err === "object") {
-        options.status = err.status || options.status;
-        options.statusText = err.message || err.statusText || options.statusText;
-      }
-
-      let error: any = {}
-      if (typeof err === "string") {
-        error.message = err
-      } else {
-        error = {
-          message: err.message || err.statusText,
-          status: err.status || options.status,
-          stack: err.stack,
+        let error: any = {}
+        if (typeof err === "string") {
+          error.message = err
+        } else {
+          error = {
+            message: err.message || err.statusText,
+            status: err.status || options.status,
+            stack: err.stack,
+          }
         }
+
+        return new Response(
+          JSON.stringify({ error }),
+          options
+        );
       }
-
-      return new Response(
-        JSON.stringify({ error }),
-        options
-      );
-    }
-  };
+    };
 
 
-  return handleRequest(req);
+    return handleRequest(req);
+  }
 }
+
+
 

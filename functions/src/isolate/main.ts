@@ -1,11 +1,11 @@
-
-
 const isolates: Map<string, any> = new Map();
 const urlMetadatas: Map<string, any> = new Map();
+
 
 const getAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
     for (let port = startPort; port <= endPort; port++) {
         try {
+            console.log('Checking port:', port);
             const listener = Deno.listen({ port });
             listener.close();
             return port;
@@ -22,6 +22,7 @@ const getAvailablePort = async (startPort: number, endPort: number): Promise<num
 const waitForServer = async (url: string, timeout: number = 1000 * 60): Promise<void> => {
     const startTime = Date.now();
     while (Date.now() - startTime < timeout) {
+        console.log("Waiting for server:", url);
         try {
             await fetch(url);
             return;
@@ -37,10 +38,11 @@ const getPortFromIsolateId = (isolateId: string): number => {
 }
 
 const cleanupIsolate = async (isolateId: string): void => {
+    console.log("Cleaning up isolate with ID:", isolateId);
     if (isolates.get(isolateId)) {
         // kill process
-        console.log("SIGTERM issued. Terminating isolate with ID:", isolateId);
-        Deno.kill(isolates.get(isolateId)?.pid, 'SIGTERM');
+        console.log("SIGKILL issued. Terminating isolate with ID:", isolateId);
+        Deno.kill(isolates.get(isolateId)?.pid, 'SIGKILL');
         // delete isolate and its references
         isolates.delete(isolateId);
         urlMetadatas.delete(isolateId);
@@ -49,6 +51,7 @@ const cleanupIsolate = async (isolateId: string): void => {
 };
 
 export const cleanupIsolates = (): void => {
+    console.log("Cleaning up isolates");
     for (const isolateId of isolates.keys()) {
         cleanupIsolate(isolateId);
     }
@@ -80,8 +83,14 @@ export default ({ config, modules }: any) => async (
     let isJSX = false;
     let isolateId;
 
-
-    for (const key of urlMetadatas.keys()) {
+    // get array of possible urls to match
+    let possibleUrls = Array.from(urlMetadatas.keys());
+    // the more path params the url has, more towards the end of the array it will be
+    possibleUrls = possibleUrls?.sort((a, b) => {
+        const matchesParams = (url: string) => url.split('/').filter((part) => part.startsWith(':')).length;
+        return matchesParams(b) - matchesParams(a);
+    })
+    for (const key of possibleUrls) {
         const { pathname, hostname } = new URL(key);
         const pattern = new URLPattern({ pathname, hostname })
         const matched = pattern.exec(importUrl.href);
@@ -106,7 +115,12 @@ export default ({ config, modules }: any) => async (
             response.statusText(urlMetadata.statusText)
             return { error: urlMetadata.statusText }
         }
-        urlMetadata = await urlMetadata.json();
+        urlMetadata = await urlMetadata.text();
+        try {
+            urlMetadata = JSON.parse(urlMetadata);
+        } catch (err) {
+            console.log('error parsing json urlMetadata', importUrl.href, urlMetadata)
+        }
 
         if (queryParams.bundle) {
             response.headers({ "content-type": "text/javascript" });
@@ -123,10 +137,13 @@ export default ({ config, modules }: any) => async (
         match = match?.replaceAll(/\[([^\[\]]+)\]/g, ':$1');
         const dirEntrypointIndex = match?.lastIndexOf(`/${config?.dirEntrypoint}`)
         match = dirEntrypointIndex > -1 ? match.slice(0, dirEntrypointIndex) : match;
-        isolateId = new URL(match, url.origin).href
+        isolateId = new URL(importUrl.href)
+        isolateId.pathname = match;
+        isolateId = isolateId.href;
         urlMetadata.matchPath = match;
         urlMetadatas.set(isolateId, urlMetadata);
     }
+
 
     const ext = modules.path.extname(urlMetadata?.path);
     isJSX = ext === ".jsx" || ext === ".tsx";
@@ -137,7 +154,6 @@ export default ({ config, modules }: any) => async (
             console.log("Spawning isolate", isolateId);
             const port = await getAvailablePort(3500, 4000);
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null
-            console.log('importMap', JSON.stringify({ imports: config?.denoConfig?.imports, scope: config?.denoConfig?.scope }));
             const command = new Deno.Command(Deno.execPath(), {
                 args: [
                     'run',
@@ -153,7 +169,7 @@ export default ({ config, modules }: any) => async (
                     '--unstable',
                     '--no-lock',
                     '--no-prompt',
-                    '--importmap=' + `data:application/json,${JSON.stringify({ imports: config?.denoConfig?.imports, scope: config?.denoConfig?.scope })}`,
+                    '--importmap=' + `data:application/json,${modules.template(JSON.stringify({ imports: config?.denoConfig?.imports, scope: config?.denoConfig?.scope }), urlMetadata.variables)}`,
                     new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href,
                     `${port}`,
                     JSON.stringify({
@@ -231,9 +247,8 @@ export default ({ config, modules }: any) => async (
         const reader = moduleResponse?.body?.getReader();
 
         reader?.read()?.then(function processText({ done, value }): any {
-
             // value for fetch streams is a Uint8Array
-            const chunk = new TextDecoder('utf-8').decode(value);
+            const chunk = new TextDecoder('utf-8').decode(value, { stream: true });
 
             // stream the chunk to the response
             response.stream(chunk);

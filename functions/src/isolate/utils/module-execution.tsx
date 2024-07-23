@@ -48,7 +48,7 @@ export default async (config: any) => {
       const dependencies = { ...localDependencies, ...remoteDependencies };
 
       // merge path params
-      const params = { env, headers: requestHeaders, ...requestParams, __requestId__ };
+      const params = { headers: requestHeaders, env, ...requestParams, __requestId__ };
 
       // execute the module
       const workerRes = await moduleInstance({ mod, params, dependencies, url: currentUrl, metaUrl, isJSX, importUrl, functionsDir }, response);
@@ -75,13 +75,16 @@ const moduleInstance: any = async (
   let workerRes: any;
   try {
 
+    const { env, headers, __requestId__, ..._params } = params;
+    params = _params;
+
     if (dependencies?.config?.isFactory) {
       mod = await mod({
         ...dependencies,
         ...params,
       }, response);
     } else {
-      Object.assign(mod, { ...dependencies, url });
+      Object.assign(mod, { ...dependencies, env, headers, __requestId__, url });
     }
 
     if (isJSX) {
@@ -153,25 +156,21 @@ const moduleInstance: any = async (
       });
       // render the html template
       workerRes = document.toString();
-      // stream the response
-      for (let chunk of workerRes.split("\n")) {
-        // stream up to the main element for readly availability of SSR content 
-        const endIndex = chunk.indexOf('</body>');
-        if (endIndex > -1) {
-          const endChunk = chunk.slice(0, endIndex);
-          response.stream(endChunk + '\n')
-          // then, stream script for updating the style tag
-          await completeCss.then((css: string) =>
-            css && response.stream(`
+      // stream up to the main element for readly availability of SSR content 
+      const endIndex = workerRes.indexOf('</body>');
+      if (endIndex > -1) {
+        const endChunk = workerRes.slice(0, endIndex);
+        response.stream(endChunk + '\n')
+        // then, stream script for updating the style tag
+        await completeCss.then((css: string) =>
+          css && response.stream(`
           <script>
           const style = document.querySelector('style');
           style.textContent += ${JSON.stringify(css)};
           </script>
           `))
-          chunk = chunk.slice(endIndex);
-        }
-        // stream the rest of the content
-        response.stream(chunk + '\n')
+        workerRes = workerRes.slice(endIndex);
+        response.stream(workerRes + '\n')
       }
       // the end
       return;
@@ -203,7 +202,7 @@ const kv = await Deno.openKv('./cache/db');
 const buildStyles = (dependencies: any) => async (html: string, { importUrl }: { importUrl: string }) => {
   if (dependencies.postCssConfig) {
     try {
-     
+
       const hash = await createHash(html);
       const cachedData: any = await get(kv, ['cache', 'styles', hash])
       if (cachedData?.value) {

@@ -1,16 +1,16 @@
 /// <reference lib="deno.unstable" />
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 
-self.addEventListener("unhandledrejection", async event => {
+self?.postMessage && self?.addEventListener("unhandledrejection", async event => {
   // Prevent this being reported (Firefox doesn't currently respect this)
   event.preventDefault();
   console.log('API UNHANDLED ERROR', event)
 
   // // clean up isolates
-  const cmd = new Deno.Command(`${import.meta.dirname}/kill_zombie_processes.sh`);
-  let { code, stdout, stderr } = await cmd.output();
+  // const cmd = new Deno.Command(`${import.meta.url.slice(0,import.meta.url.lastIndexOf('/'))}/kill_zombie_processes.sh`);
+  // let { code, stdout, stderr } = await cmd.output();
 
-  self.postMessage({
+  self?.postMessage({
     message: event.reason.message,
     stack: event.reason.stack,
   });
@@ -23,14 +23,13 @@ import { getSubdomain } from "./functions/src/utils/urlFunctions.ts";
 import Isolate, { cleanupIsolates } from "./functions/src/isolate/main.ts";
 import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
-import withCache from "./functions/src/utils/withCache.ts";
+import replaceTemplate from "./functions/src/utils/template.ts";
 import axionDenoConfig from "./deno.json" with { type: "json" };
-
 const env = await getEnv();
 
-let axionConfigs = new Map<string, string>();
-let denoConfigs = new Map<string, any>();
-let adapters;
+const axionConfigs = new Map<string, string>();
+const denoConfigs = new Map<string, any>();
+let adapters: any;
 
 (async () => {
 
@@ -41,6 +40,8 @@ let adapters;
       const fileLoaderUrl = new URL(env.FILE_LOADER_URL || "http://localhost:9000");
       const { hostname } = new URL(req.url);
 
+      // lets consider that the hostname is the project name;
+      const project = hostname;
       const subdomain = getSubdomain(req.url);
 
       fileLoaderUrl.username = subdomain;
@@ -60,7 +61,7 @@ let adapters;
           }) || ((a: any) => a);
       }
 
-      let axionConfig = axionConfigs.get(new URL(req.url).origin);
+      let axionConfig: any = axionConfigs.get(new URL(req.url).origin);
 
       if (!axionConfig) {
         axionConfig = await fetch(new URL('axion.config.json', fileLoaderUrl).href)
@@ -79,7 +80,7 @@ let adapters;
         const nodeConfig = await fetch(new URL('package.json', fileLoaderUrl).href)
           .then(async (res) => await res.json())
           .catch((_) => null) || {};
-        Object.entries(nodeConfig?.dependencies || {}).map(([key, value]) => {
+        Object.entries(nodeConfig?.dependencies || {}).map(([key, value]: any) => {
           if (value.startsWith('http') || value.startsWith('file') || value.startsWith('npm:') || value.startsWith('node:')) {
             denoConfig.imports[key] = value;
           } else {
@@ -101,7 +102,8 @@ let adapters;
           denoConfig,
         },
         modules: {
-          path: { SEPARATOR, basename, extname, join, dirname }
+          path: { SEPARATOR, basename, extname, join, dirname },
+          template: replaceTemplate
         }
       })
 
@@ -130,8 +132,9 @@ let adapters;
       PORT: env.PORT || 9002,
     }
   });
-  self.postMessage({ message: { 'status': 'ok' } });
+  self?.postMessage && self?.postMessage({ message: { 'status': 'ok' } });
   Deno.env.get('WATCH') && watchFiles(env);
+  return 
 })();
 
 async function watchFiles(env: any) {
@@ -142,10 +145,11 @@ async function watchFiles(env: any) {
       // clean up isolates
       await cleanupIsolates();
       event.paths.forEach(path => {
-        self.postMessage({ message: `Files modified: ${files}` });
+        self?.postMessage && self?.postMessage({ message: `Files modified: ${files}` });
       })
     }
   }
+  return 
 }
 
 
