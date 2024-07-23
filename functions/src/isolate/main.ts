@@ -163,7 +163,7 @@ export default ({ config, modules }: any) => async (
                     '--allow-env=DENO_AUTH_TOKENS',
                     '--deny-run',
                     '--allow-net',
-                    `--allow-sys=cpus,osRelease,${permissions?.['allow-sys']?.join(',') || ''}`,
+                    `--allow-sys${permissions?.['allow-sys'] === true ? '' : '=' + ['cpus', 'osRelease', ...(permissions?.['allow-sys'] || [])].join(',') || ''}`,
                     '--allow-read',
                     '--allow-write=./cache/',
                     '--unstable-sloppy-imports',

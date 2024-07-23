@@ -1,1 +1,1 @@
-export default (adapters: any) => adapters;
+export default (adapters: any) => ({ ...adapters, permission: { "allow-sys": true } });
