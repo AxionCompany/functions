@@ -159,7 +159,7 @@ export default ({ config, modules }: any) => async (
                 args: [
                     'run',
                     `--reload=${[importUrl.origin, url.origin, metaUrl].filter(Boolean).join(',')}`,
-                    `--allow-env=${permissions?.['allow-env'] === true ? '' : '=' + ['DENO_AUTH_TOKENS', ...(permissions?.['allow-env'] || [])].join(',') || ''}`,
+                    `--allow-env${permissions?.['allow-env'] === true ? '' : '=' + ['DENO_AUTH_TOKENS', ...(permissions?.['allow-env'] || [])].join(',') || ''}`,
                     '--deny-run',
                     '--allow-net',
                     `--allow-sys${permissions?.['allow-sys'] === true ? '' : '=' + ['cpus', 'osRelease', ...(permissions?.['allow-sys'] || [])].join(',') || ''}`,
