@@ -154,7 +154,8 @@ export default ({ config, modules }: any) => async (
         try {
             console.log("Spawning isolate", isolateId);
             const port = await getAvailablePort(3500, 4000);
-            const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null
+            const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null;
+            config.debug && console.log('PERMISSIONS', permissions)
             const command = new Deno.Command(Deno.execPath(), {
                 args: [
                     'run',
