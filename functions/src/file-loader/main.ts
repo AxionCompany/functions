@@ -2,7 +2,6 @@
 import FileLoader from "./adapters/loaders/main.ts";
 import bundler from './adapters/bundler/esbuild.js';
 import Transformer from "./adapters/transformers/higherOrderFunction.js";
-import request from "../../modules/connectors/request.js";
 
 export default ({ config, modules }: any) => {
 
@@ -10,7 +9,6 @@ export default ({ config, modules }: any) => {
   const transformer = Transformer({ config, modules });
 
   return async ({ pathname, url, headers, queryParams, data, __requestId__ }: any, res: any) => {
-    console.log(headers)
 
     const { bundle: shouldBundle, customBaseUrl, shared, ...searchParams } = queryParams;
     // check if headers type is application/json
@@ -82,8 +80,8 @@ export default ({ config, modules }: any) => {
       if (['js', 'ts'].includes(pathname.split('.').pop())) {
         content = transformer({
           __requestId__, code: content, url,
-          beforeRun: withModules((options, ...args) => console.log('Executing Function:', options.name, '| URL:', options.url, '| Request ID:', options.__requestId__, '| Execution ID:',options.executionId, '| Input:', JSON.stringify(args))),
-          afterRun: withModules((options, result) => console.log('Function Executed:', options.name, '| URL:', options.url, '| Request ID:', options.__requestId__, '| Execution ID:',options.executionId, '| Duration:', options.duration, '| Output:', typeof result !== 'string' ? JSON.stringify(result) : result))
+          // beforeRun: withModules((options, ...args) => console.log('Executing Function:', options.name, '| URL:', options.url, '| Request ID:', options.__requestId__, '| Execution ID:', options.executionId, '| Input:', JSON.stringify(args))),
+          // afterRun: withModules((options, result) => console.log('Function Executed:', options.name, '| URL:', options.url, '| Request ID:', options.__requestId__, '| Execution ID:', options.executionId, '| Duration:', options.duration, '| Output:', typeof result !== 'string' ? JSON.stringify(result) : result))
         });
       }
 
@@ -103,9 +101,11 @@ const withModules = hook => {
 (...args) => {
   const __hook__ = ${hook.toString()}; 
   const [options] = args;
-  const { mod: fn } = options;
+  const { mod: fn, config } = options;
+
   if (
-    !String(fn).includes('React') // does not deal with React
+    !String(fn).includes('React') ||  // does not deal with React
+    !config?.isFactory
   ) {
     return __hook__(...args);
   };

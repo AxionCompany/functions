@@ -1,57 +1,71 @@
-// import { Database } from "jsr:@db/sqlite@0.11";
+const userSchema = {
+    _id: "_id",
+    name: "string",
+    email: "string",
+    age: "number"
+};
 
-// // Open a database
-// const db = new Database("test.db");
+const postSchema = {
+    _id: "_id",
+    title: "string",
+    content: "string",
+    user: "_id->User"  // Foreign key referencing User._id
+};
 
-// db.exec("pragma journal_mode = WAL");
-// db.exec("pragma synchronous = normal");
-// db.exec("pragma temp_store = memory");
+const schemas = {
+    User: userSchema,
+    Post: postSchema
+};
+const Validator = (schema, data, options) => {
+    return data;  // In a real application, this would validate data against the schema
+};
 
-// // Create a table
-// db.exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)");
+import { Database } from "jsr:@db/sqlite@0.11";
+// const db = new Database(":memory:");  // In-memory database for testing
+const db = new Database("./data/test.db");  // In-memory database for testing
+db.exec("pragma journal_mode = WAL");
+db.exec("pragma synchronous = normal");
+db.exec("pragma temp_store = memory");
 
-// // Insert a row
-// db.exec("INSERT INTO users (name) VALUES (?)", ["Alice"]);
-'use strict';
+import createmodels from './functions/modules/connectors/sqliteCrud.js';  // Assuming the models module is in modelsModule.js
 
-function callerFunction() {
-    console.log("Caller function is called");
-    calledFunction("arg1", "arg2");
-}
+const models = createmodels({ config: {}, db, schemas, Validator });
 
-function calledFunction() {
-    console.log("Called function is called");
+// Create Users
+const user1 = await models.User.create({ name: "Alice", email: "alice@example.com", age: 30 });
+console.log("User 1:", user1);
+const user2 = await models.User.create({ name: "Bob", email: "bob@example.com", age: 25 });
+console.log("User 2:", user2);
+const users3and4 = await models.User.createMany([
+    { name: "Charlie", email: "charlie@example.com", age: 35 },
+    { name: "David", email: "david@example.com", age: 40 }
+]);
+console.log("Users 3 and 4:", users3and4);
 
-    // Get the stack trace
-    const stack = new Error().stack;
-    // console.log("Stack trace:", stack);
+// Create Posts
+const post1 = await models.Post.create({ title: "First Post", content: "This is the first post", user: 1 });
+console.log("Post 1:", post1);
+const post2 = await models.Post.create({ title: "Second Post", content: "This is the second post", user: 2 });
+console.log("Post 2:", post2);
 
-    // Extract the caller function information using a regular expression
-    const stackLines = stack.split('\n');
-    const callerInfo = stackLines[2]; // The caller is on the third line of the stack trace
+// Find all Users
+const users = await models.User.find({});
+console.log("Users:", users);
 
-    const regex = /at (\S+) \((.*):(\d+):(\d+)\)/;
-    const match = callerInfo.match(regex);
+// Find all Posts
+const posts = await models.Post.find({});
+console.log("Posts:", posts);
 
-    if (match) {
-        const callerFunctionName = match[1];
-        const callerFilePath = match[2];
-        const callerLineNumber = match[3];
-        const callerColumnNumber = match[4];
+// Find a User and populate their Posts
+const userWithPosts = await models.Post.find({}, { populate: ["user"] });
+console.log("User with Posts:", userWithPosts);
 
-        console.log("Caller function name:", callerFunctionName);
-        console.log("Caller function path:", callerFilePath);
-        console.log("Caller function line number:", callerLineNumber);
-        console.log("Caller function column number:", callerColumnNumber);
-    } else {
-        console.log("Could not parse caller information");
-    }
+// Update a User
+const updatedUser = await models.User.update({ _id: 1 }, { age: 31 });
+// const updatedUser = await models.User.findOne({ _id: 1 });
+console.log("Updated User:", updatedUser);
 
-    // Get the arguments of this function
-    console.log("Arguments of called function:", ...arguments);
-}
-
-callerFunction();
-
-
-
+// Delete a Post
+await models.Post.delete({ _id: 1 });
+const remainingPosts = await models.Post.find({});
+console.log("Remaining Posts:", remainingPosts);
