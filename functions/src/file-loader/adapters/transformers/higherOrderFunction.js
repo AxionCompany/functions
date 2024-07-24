@@ -16,19 +16,19 @@ const withWrapper = (name,fn) => {
   const mod = (...args) => {
     const executionId = crypto.randomUUID();
     Object.assign(fn, mod)
-    _beforeRun && _beforeRun({url:"${url.href}",name, requestId:"${__requestId__}", executionId, mod:fn, ...mod}, ...args);
+    _beforeRun && _beforeRun({url:"${url.href}",name, requestId:mod.__requestId__, executionId, mod:fn, ...mod}, ...args);
     const startTime = Date.now();
     let result = fn(...args);
     if (_afterRun){
         if (result?.then) {
           result = result.then((resolved) => {
             const duration = Date.now() - startTime;
-            _afterRun({url:"${url.href}",name, duration, requestId:"${__requestId__}", executionId, mod:fn, ...mod}, resolved);
+            _afterRun({url:"${url.href}",name, duration, requestId:mod.__requestId__, executionId, mod:fn, ...mod}, resolved);
             return resolved;
           });
         } else {
           const duration = Date.now() - startTime;
-          _afterRun({url:"${url.href}",name, duration, requestId:"${__requestId__}", executionId, mod:fn, ...mod},result);
+          _afterRun({url:"${url.href}",name, duration, requestId:mod.__requestId__, executionId, mod:fn, ...mod},result);
         }
     }
     return result
