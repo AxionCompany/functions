@@ -2,9 +2,6 @@ import getAllFiles from "./getAllFiles.ts";
 
 export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) => {
 
-  const bundleUrl = new URL(importUrl);
-  bundleUrl.searchParams.append('bundle', true);
-
   const importPromises = [];
 
   // Get shared module bundles
@@ -14,10 +11,13 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
     extensions: ['js', 'ts'],
   }));
 
-  // Get module bundle 
-  importPromises.push(fetch(bundleUrl.href).then(res => res.json()).catch(err => console.log(err.toString)));
+  const bundleUrl = new URL(importUrl);
+  bundleUrl.searchParams.append('bundle', true);
+
 
   if (isJSX) {
+    // Get module bundle 
+    importPromises.push(fetch(bundleUrl.href).then(res => res.json()).catch(err => console.log(err.toString)));
     // get index.html files
     importPromises.push(getAllFiles({ url: importUrl, name: 'index', extensions: ['html'], returnProp: 'content' }));
     // Get Layout Bundles
@@ -32,14 +32,11 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
   // Load shared modules
   loadPromises.push(Promise.all(
     bundledSharedModules.map((file) => {
-      const sharedModulesUrl = new URL(`/${file?.matchPath}`, importUrl);
-      // remove search params
-      sharedModulesUrl.search = '';
-      return import(sharedModulesUrl.href)
+      return import(new URL(`/${file?.matchPath}`, importUrl).href)
         .then((mod) => mod.default)
         .catch(err => {
-          console.log(`Error Importing Shared Module \`${sharedModulesUrl}\`: ${err.toString()}`);
-          throw { message: `Error Importing Shared Module \`${sharedModulesUrl}\`: ${err.toString()}`, status: 401 };
+          console.log(`Error Importing Shared Module \`${file?.matchPath}\`: ${err.toString()}`);
+          throw { message: `Error Importing Shared Module \`${file?.matchPath}\`: ${err.toString()}`, status: 401 };
         })
     })
   ));

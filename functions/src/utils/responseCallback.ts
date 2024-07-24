@@ -9,6 +9,7 @@ const responseCallback = (__requestId__: string, cb: Function) => {
           statusText: "Temporary Redirect",
           headers: {
             location: url,
+            ...headers,
           },
         },
         chunk: ""
