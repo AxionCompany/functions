@@ -35,10 +35,20 @@ const withWrapper = (name,fn) => {
   }
   return mod
 };
+
+const withRequestId = (fn, requestId) => {
+  if (typeof fn !== 'function') {
+    return fn;
+  }
+  return (...args) => {
+    Object.assign(fn, { requestId });
+    return fn.apply(this, args);
+  };
+};
 `;
 
     // Collect all export declarations
-    let exportsList = [];
+    const exportsList = [];
 
     // Helper function to get code slice
     const getCodeSlice = (node) => code.slice(node.range[0], node.range[1]);
@@ -99,7 +109,7 @@ const withWrapper = (name,fn) => {
             return '';
         }
         return getCodeSlice(node);
-    };
+    };      
 
     const transformedCode = [
         `const _beforeRun = ${beforeRun}`,
@@ -113,5 +123,3 @@ const withWrapper = (name,fn) => {
     return transformedCode;
 
 }
-
-
