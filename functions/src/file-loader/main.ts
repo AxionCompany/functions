@@ -2,6 +2,7 @@
 import FileLoader from "./adapters/loaders/main.ts";
 import bundler from './adapters/bundler/esbuild.js';
 import Transformer from "./adapters/transformers/higherOrderFunction.js";
+import request from "../../modules/connectors/request.js";
 
 export default ({ config, modules }: any) => {
 
@@ -9,6 +10,7 @@ export default ({ config, modules }: any) => {
   const transformer = Transformer({ config, modules });
 
   return async ({ pathname, url, headers, queryParams, data, __requestId__ }: any, res: any) => {
+    console.log(headers)
 
     const { bundle: shouldBundle, customBaseUrl, shared, ...searchParams } = queryParams;
     // check if headers type is application/json
