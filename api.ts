@@ -93,20 +93,6 @@ let adapters: any;
       denoConfig.imports = { ...axionDenoConfig.imports, ...denoConfig.imports };
       denoConfig.scopes = { ...axionDenoConfig.scopes, ...denoConfig.scopes };
 
-      const isolateExecutor = Isolate({
-        config: {
-          loaderUrl: fileLoaderUrl.href,
-          dirEntrypoint: env.DIR_ENTRYPOINT || "index",
-          functionsDir: functionsDir,
-          ...axionConfig,
-          denoConfig,
-          permissions: adapters()?.permissions,
-        },
-        modules: {
-          path: { SEPARATOR, basename, extname, join, dirname },
-          template: replaceTemplate
-        },
-      })
 
       const handlerConfig = {
         middlewares: {
@@ -116,17 +102,34 @@ let adapters: any;
         modules: {
           path: { SEPARATOR, basename, extname, join, dirname }
         },
-        handlers: {
-          "/(.*)+": isolateExecutor,
-        },
+        handlers: {},
         serializers: {},
         dependencies: {},
         env,
       }
 
+      adapters = await adapters(handlerConfig);
+
       return RequestHandler({
-        handlerConfig,
-        ...(await adapters(handlerConfig))
+        ...adapters,
+        handlers: {
+          ...adapters.handlers,
+          "/(.*)+": Isolate({
+            config: {
+              loaderUrl: fileLoaderUrl.href,
+              dirEntrypoint: env.DIR_ENTRYPOINT || "index",
+              functionsDir: functionsDir,
+              ...axionConfig,
+              denoConfig,
+              permissions: adapters?.permissions,
+            },
+            modules: {
+              path: { SEPARATOR, basename, extname, join, dirname },
+              template: replaceTemplate
+            },
+          }),
+        },
+
       })(req)
     },
     config: {
