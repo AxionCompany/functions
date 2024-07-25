@@ -1,5 +1,10 @@
 
+import { toSqlQuery, toSqlWrite } from "./sqlUtils.js";
+import SchemaValidator from "../validator.js";
+
 export default ({ db, schemas, Validator }) => {
+
+    Validator = Validator || SchemaValidator;
     const models = {};
 
     const createTable = async (schema, tableName) => {
@@ -10,8 +15,8 @@ export default ({ db, schemas, Validator }) => {
             if (type === "number") return `${key} REAL`;
             if (type === "boolean") return `${key} INTEGER`;
             if (type === "date") return `${key} TEXT`;
-            if (type === "any") return `${key} TEXT`;   
-            // Add more type mappings as needed
+            if (type === "any" || typeof type === 'object') return `${key} TEXT`;
+            // Add more type mappings 
         })?.filter(Boolean)?.join(", ");
         await db.exec(`CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`);
     };
@@ -48,6 +53,7 @@ export default ({ db, schemas, Validator }) => {
 
         return { dynamicPopulate, joins, selectFields };
     };
+
     for (const key in schemas) {
         const schema = schemas[key];
         createTable(schema, key);  // Ensure table creation
@@ -58,22 +64,21 @@ export default ({ db, schemas, Validator }) => {
                     path: `create_input:${key}`,
                     clean: false,
                 });
-
-                const columns = Object.keys(validatedData);
-                const placeholders = columns.map((col) => `:${col}`).join(", ");
-                const sql = `INSERT INTO ${key} (${columns.join(", ")}) VALUES (${placeholders})`;
-
+                console.log(validatedData, schema, data);
 
                 return db.transaction(() => {
-                    const insertStmt = db.prepare(sql);
-                    insertStmt.run(validatedData);
+                    const insertSql = `INSERT INTO ${key} ${toSqlWrite('insert', validatedData)}`;
+                    const insertStmt = db.prepare(insertSql);
+                    insertStmt.run();
                     insertStmt.finalize();
                     const queryStmt = db.prepare(`SELECT * FROM ${key} WHERE _id = last_insert_rowid()`)
                     const insertedRow = queryStmt.get();
                     queryStmt.finalize();
+                    console.log(insertedRow, schema);
                     const validatedResponse = Validator(schema, insertedRow, {
                         path: `create_output:${key}`,
                     });
+
                     return validatedResponse;
                 })();
             },
@@ -82,14 +87,13 @@ export default ({ db, schemas, Validator }) => {
                     path: `createMany_input:${key}`,
                 });
 
-                const columns = Object.keys(validatedData[0]).join(", ");
-                const sql = `INSERT INTO ${key} (${columns}) VALUES (${Object.keys(validatedData[0]).map((col) => `:${col}`).join(", ")})`;
-
                 return db.transaction(() => {
-                    const insertStmt = db.prepare(sql);
                     const queryStmt = db.prepare(`SELECT * FROM ${key} WHERE _id = last_insert_rowid()`);
                     const inserted = [];
+                    let insertStmt;
                     for (const row of validatedData) {
+                        const insertSql = `INSERT INTO ${key} ${toSqlWrite('insert', validatedData[0])}`;
+                        insertStmt = db.prepare(insertSql);
                         insertStmt.run(row);
                         const insertedRow = queryStmt.get();
                         inserted.push(insertedRow);
@@ -104,14 +108,19 @@ export default ({ db, schemas, Validator }) => {
             },
             find: async (query, options) => {
 
-                const whereClauses = Object.entries(query).map(([k, v]) => `${k} = :${k}`).join(" AND ");
+                const validatedQuery = Validator(schema, query, {
+                    query: true,
+                    path: `find_input:${key}`,
+                });
+
+                const whereClauses = toSqlQuery(validatedQuery);
                 const sqlParams = { ...query };
 
                 let sql = `SELECT ${key}.*`;
 
                 if (options?.populate) {
                     const { joins, selectFields } = populate(schema, options.populate);
-                    sql += `, ${selectFields.join(", ")} FROM ${key} ${joins.join(" ")}  ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
+                    sql += `, ${selectFields.join(", ")} FROM ${key} ${joins.join(" ")} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
                 } else {
                     sql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
                 }
@@ -126,11 +135,12 @@ export default ({ db, schemas, Validator }) => {
                 }
 
                 if (options?.skip) {
-
                     sql += ` OFFSET ${options.skip}`;
                 }
+
                 const stmt = db.prepare(sql);
                 const responses = stmt.all(sqlParams);
+                stmt.finalize();
                 const validatedResponse = Validator([schema], responses, {
                     path: `find_output:${key}`,
                 });
@@ -138,18 +148,23 @@ export default ({ db, schemas, Validator }) => {
                 return validatedResponse;
             },
             findOne: async (query, options) => {
-                const whereClauses = Object.entries(query).map(([k, v]) => `${k} = :${k}`).join(" AND ");
+                const validatedQuery = Validator(schema, query, {
+                    query: true,
+                    path: `findOne_input:${key}`,
+                });
+                const whereClauses = toSqlQuery(validatedQuery);
                 const sqlParams = { ...query };
 
                 let sql = `SELECT ${key}.*`;
                 if (options?.populate) {
                     const { joins, selectFields } = populate(schema, options.populate);
-                    sql += `, ${selectFields.join(", ")} FROM ${key} ${joins.join(" ")}  ${whereClauses ? `WHERE ${whereClauses}` : ""} LIMIT 1`;
+                    sql += `, ${selectFields.join(", ")} FROM ${key} ${joins.join(" ")} ${whereClauses ? `WHERE ${whereClauses}` : ""} LIMIT 1`;
                 } else {
-                    sql += ` FROM ${key}  ${whereClauses ? `WHERE ${whereClauses}` : ""} LIMIT 1`;
+                    sql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""} LIMIT 1`;
                 }
                 const stmt = db.prepare(sql);
-                const [response] = stmt.all(sqlParams) || [null];
+                const response = stmt.get(sqlParams) || null;
+                stmt.finalize();
                 const validatedResponse = Validator(schema, response, {
                     path: `findOne_output:${key}`,
                 });
@@ -165,17 +180,17 @@ export default ({ db, schemas, Validator }) => {
                     path: `update_inputData:${key}`,
                 });
 
-                const setClauses = Object.keys(validatedData).map(k => `${k} = :${k}`).join(", ");
-                const whereClauses = Object.entries(validatedQuery).map(([k, v]) => `${k} = :${k}`).join(" AND ");
+                const setClauses = toSqlWrite('update', validatedData, { table: key, dialect: 'sqlite' });
+                const whereClauses = toSqlQuery(validatedQuery);
                 const sqlParams = { ...validatedData, ...validatedQuery };
 
                 return db.transaction(() => {
-                    const updateSql = `UPDATE ${key} SET ${setClauses} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses}  LIMIT 1)` : ""}`;
-                    const querySql = `SELECT * FROM ${key} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses}  LIMIT 1)` : ""}`;
+                    const updateSql = `UPDATE ${key} ${setClauses} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
+                    const querySql = `SELECT * FROM ${key} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
                     const updateStmt = db.prepare(updateSql);
                     const queryStmt = db.prepare(querySql);
                     updateStmt.run(sqlParams);
-                    const updatedRow = queryStmt.get(validatedQuery);
+                    const updatedRow = queryStmt.get();
                     updateStmt.finalize();
                     queryStmt.finalize();
                     const validatedResponse = Validator(schema, updatedRow, {
@@ -185,6 +200,7 @@ export default ({ db, schemas, Validator }) => {
                 })();
             },
             updateMany: async (query, data, options) => {
+
                 const validatedQuery = Validator(schema, query, {
                     query: true,
                     path: `updateMany_inputQuery:${key}`,
@@ -193,19 +209,19 @@ export default ({ db, schemas, Validator }) => {
                     path: `updateMany_inputData:${key}`,
                 });
 
-                const setClauses = Object.keys(validatedData).map(k => `${k} = :${k}`).join(", ");
-                const whereClauses = Object.entries(validatedQuery).map(([k, v]) => `${k} = :${k}`).join(" AND ");
+                const setClauses = toSqlQuery(validatedData);
+                const whereClauses = toSqlQuery(validatedQuery);
                 const sqlParams = { ...validatedData, ...validatedQuery };
 
                 return db.transaction(() => {
-                    const updateSql = `UPDATE ${key} SET ${setClauses}  ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
-                    const querysql = `SELECT * FROM ${key}  ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
+                    const updateSql = `UPDATE ${key} SET ${setClauses} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
+                    const querySql = `SELECT * FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
                     const updateStmt = db.prepare(updateSql);
-                    const queryStmt = db.prepare(querysql);
+                    const queryStmt = db.prepare(querySql);
                     updateStmt.run(sqlParams);
+                    const updatedRows = queryStmt.all(validatedQuery);
                     updateStmt.finalize();
                     queryStmt.finalize();
-                    const updatedRows = queryStmt.all(validatedQuery);
                     const validatedResponse = Validator([schema], updatedRows, {
                         path: `updateMany_output:${key}`,
                     });
@@ -218,12 +234,33 @@ export default ({ db, schemas, Validator }) => {
                     path: `delete_input:${key}`,
                 });
 
-                const whereClauses = Object.entries(validatedQuery).map(([k, v]) => `${k} = :${k}`).join(" AND ");
+                const whereClauses = toSqlQuery(validatedQuery);
                 const sqlParams = { ...validatedQuery };
 
                 return db.transaction(() => {
-                    const sql = `DELETE FROM ${key} WHERE ${whereClauses}`;
-                    const deleteStmt = db.prepare(sql);
+                    const deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
+                    const deleteStmt = db.prepare(deleteSql);
+                    deleteStmt.run(sqlParams);
+                    deleteStmt.finalize();
+
+                    const validatedResponse = Validator(schema, { success: true }, {
+                        path: `delete_output:${key}`,
+                    });
+                    return validatedResponse;
+                })();
+            },
+            deleteMany: async (query, options) => {
+                const validatedQuery = Validator(schema, query, {
+                    query: true,
+                    path: `delete_input:${key}`,
+                });
+
+                const whereClauses = toSqlQuery(validatedQuery);
+                const sqlParams = { ...validatedQuery };
+
+                return db.transaction(() => {
+                    const deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
+                    const deleteStmt = db.prepare(deleteSql);
                     deleteStmt.run(sqlParams);
                     deleteStmt.finalize();
 
@@ -236,6 +273,7 @@ export default ({ db, schemas, Validator }) => {
             customQuery: async (queryStatement) => {
                 const stmt = db.prepare(queryStatement);
                 const response = stmt.all();
+                stmt.finalize();
                 // Add validation if needed
                 return response;
             },
