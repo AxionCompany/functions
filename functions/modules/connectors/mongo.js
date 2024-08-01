@@ -1,4 +1,4 @@
-import { MongoClient, MongoNetworkError } from "npm:mongodb@6.7.0";
+import { MongoClient, MongoNetworkError } from "npm:mongodb";
 const clients = {};
 
 export default async ({ config }) => {
