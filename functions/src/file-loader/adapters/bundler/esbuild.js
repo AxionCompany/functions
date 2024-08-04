@@ -22,15 +22,13 @@ export default async (path, { ...options } = {}) => {
         bundle: true,
         format: "esm",
         write: false,
-        // minifyWhitespace: true,
-        // minifyIdentifiers: false,
-        // minifySyntax: true,
+        minifyWhitespace: true,
+        minifyIdentifiers: false,
+        minifySyntax: true,
         jsx: "transform",
         platform: "browser",
         external: ['react', 'react-dom', ...(options.shared || [])],
     };
-
-    options.environment !== 'production' && path.searchParams.set('v', new Date().getTime());
 
     config.entryPoints = [path.href];
 

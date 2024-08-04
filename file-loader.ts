@@ -25,56 +25,48 @@ const env = await getEnv();
 server({
   requestHandler: async (req: Request) => {
     const debug = env.DEBUG === 'true';
-    const url = new URL(req.url);
+
     let useCache;
     const authorizationEncoded = req.headers.get('authorization')?.slice(6);
     const [username, password] = authorizationEncoded ? atob(authorizationEncoded).split(':') : [];
-    debug && console.log('Received request in File Loader from', req.url);
+    debug && console.log('Received request in File Loader from', req.url, username, password);
 
     try {
       useCache = JSON.parse(env.USE_CACHE || 'true');
     } catch (err) {
       useCache = true;
     }
-    const gitInfo: {
-      owner?: string,
-      repo?: string,
-      branch?: string,
-      environment?: string
-    } = {};
 
-    // const sub = username && getSubdomain(username);
-    const [owner, repo, branch, environment] = username?.split('--') || [];
-    const getRepoData = (owner: string, repo: string, branch: string, environment: string) => ({
-      owner,
-      repo,
-      branch,
-      environment
-    });
-    Object.assign(gitInfo, getRepoData(owner, repo, branch, environment));
-
-    debug && console.log('gitInfo', gitInfo)
+    const [provider, org, repo, branch, environment] = username?.split('--') || [];
 
     const fileLoaderWithAxionConfig = async ({ config, modules }) => async (params, res) => {
 
       const axionConfigUrl = new URL('/axion.config.json', params.url);
       const denoConfigUrl = new URL('/deno.json', params.url);
+      const urlWithBasicAuth = new URL(params.url);
 
-      username && (axionConfigUrl.username = username);
-      password && (axionConfigUrl.password = password);
-
-      let axionConfig = axionConfigs.get(axionConfigUrl.href);
-      let _denoConfig = denoConfigs.get(denoConfigUrl.href);
+      if (username) {
+        axionConfigUrl.username = username;
+        denoConfigUrl.username = username;
+        urlWithBasicAuth.username = username;
+      }
+      if (password) {
+        axionConfigUrl.password = password;
+        denoConfigUrl.password = password;
+        urlWithBasicAuth.password = password;
+      };
+      let axionConfig = axionConfigs.get(axionConfigUrl.origin);
+      let _denoConfig = denoConfigs.get(denoConfigUrl.origin);
 
       const responseMock = Object.entries(res).reduce((acc, [key, value]) => {
         acc[key] = (() => { });
         return acc;
       }, {})
 
-      const fileLoader =  FileLoader({ config, modules });
+      const fileLoader = FileLoader({ config, modules });
 
       if (!axionConfig) {
-        console.log('axion.config.json not found in cache for', axionConfigUrl.href, 'fetching from server...')
+        debug && console.log('axion.config.json not found in cache for', axionConfigUrl.origin, 'fetching from server...')
         axionConfig = await fileLoader({
           queryParams: {},
           headers: { 'content-type': 'text/plain' },
@@ -83,16 +75,16 @@ server({
         }, responseMock);
 
         axionConfig = JSON.parse(axionConfig || '{}')
-        axionConfigs.set(axionConfigUrl.href, axionConfig);
+        axionConfigs.set(axionConfigUrl.origin, axionConfig);
       }
 
       if (!_denoConfig) {
-        console.log('deno.json not found in cache for', axionConfigUrl.href, 'fetching from server...')
+        debug && console.log('deno.json not found in cache for', denoConfigUrl.origin, 'fetching from server...')
         _denoConfig = await fileLoader({
           queryParams: {},
           headers: { 'content-type': 'text/plain' },
           pathname: '/deno.json',
-          url: axionConfigUrl,
+          url: denoConfigUrl,
         }, responseMock);
 
         _denoConfig = JSON.parse(_denoConfig || '{}')
@@ -100,7 +92,7 @@ server({
           queryParams: {},
           headers: { 'content-type': 'text/plain' },
           pathname: '/package.json',
-          url: axionConfigUrl,
+          url: denoConfigUrl,
         }, responseMock);
         const nodeConfigJson = JSON.parse(nodeConfig || '{}');
         _denoConfig.imports = _denoConfig?.imports || {};
@@ -111,12 +103,14 @@ server({
             _denoConfig.imports[key] = `npm:${key}@${value}`;
           }
         });
-        denoConfigs.set(denoConfigUrl.href, {...denoConfig, ..._denoConfig});
+        denoConfigs.set(denoConfigUrl.origin, { ...denoConfig, ..._denoConfig });
       }
 
-      const urlWithBasicAuth = new URL(params.url.href);
-      username && (urlWithBasicAuth.username = username);
-      password && (urlWithBasicAuth.password = password);
+      // const urlWithBasicAuth = new URL(params.url.href);
+      // username && (urlWithBasicAuth.username = username);
+      // password && (urlWithBasicAuth.password = password);
+
+
 
       return FileLoader({
         config: { ...config, ...axionConfig },
@@ -134,15 +128,15 @@ server({
         "/(.*)+": await fileLoaderWithAxionConfig({
           config: {
             dirEntrypoint: env.DIR_ENTRYPOINT || "index",
-            loaderType: (gitInfo?.owner && gitInfo?.repo) ? 'github' : (env.DEFAULT_LOADER_TYPE || "local"),
             debug,
             useCache,
             cachettl: Number(env.CACHE_TTL) || 1000 * 60 * 10,
-            owner: gitInfo?.owner || env.GIT_OWNER,
-            repo: gitInfo?.repo || env.GIT_REPO,
-            branch: gitInfo?.branch || env.GIT_BRANCH, // or any other branch you want to fetch files froM
-            environment: gitInfo?.environment || env.ENV,
-            apiKey: env.GIT_API_KEY,
+            loaderType: provider || env.DEFAULT_LOADER_TYPE || 'local', //(gitInfo?.owner && gitInfo?.repo) ? 'github' : (env.DEFAULT_LOADER_TYPE || "local"),
+            owner: org || env.GIT_OWNER,
+            repo: repo || env.GIT_REPO,
+            branch: branch || env.GIT_BRANCH, // or any other branch you want to fetch files froM
+            environment: environment || env.ENV,
+            apiKey: password || env.GIT_API_KEY,
           },
           modules: {
             path: {

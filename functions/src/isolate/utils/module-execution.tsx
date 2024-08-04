@@ -15,15 +15,21 @@ export default async (config: any) => {
   let { metaUrl, loader, functionsDir, dependencies: remoteDependencies, currentUrl, importUrl, env, isJSX } = config || {};
   if (!loader) loader = moduleLoader;
   // load the module
-  const { mod: defaultModule, GET, POST, PUT, DELETE, dependencies: localDependencies, ...moduleExports } = await loader(
+  const { mod: defaultModule, GET, POST, PUT, DELETE, middlewares, dependencies: localDependencies, ...moduleExports } = await loader(
     { importUrl, currentUrl, env, dependencies: remoteDependencies, isJSX },
   );
 
-  return async (
+  const execute = async (
     data: any,
     response: any = null,
   ) => {
     try {
+
+      // merge dependencies
+      const dependencies = { ...localDependencies, ...remoteDependencies };
+      // run middlewares
+      Object.assign(middlewares, dependencies)
+      data = await middlewares({ ...data, url: data?.currentUrl });
 
       // get the data
       const { env, method, params: requestParams, headers: requestHeaders, __requestId__, currentUrl } = data;
@@ -44,9 +50,6 @@ export default async (config: any) => {
         return "Module Not Found"
       }
 
-      // merge dependencies
-      const dependencies = { ...localDependencies, ...remoteDependencies };
-
       // merge path params
       const params = { headers: requestHeaders, env, ...requestParams, __requestId__ };
 
@@ -64,6 +67,7 @@ export default async (config: any) => {
       throw err;
     }
   };
+  return execute
 };
 
 const moduleInstance: any = async (
