@@ -75,8 +75,7 @@ export default ({ config, modules }: any) => async (
     const importUrl = !queryParams?.customBaseUrl ? new URL(modules.path.join(config.loaderUrl, config.functionsDir)) : new URL(config.loaderUrl);
     importUrl.pathname = modules.path.join(importUrl.pathname, pathname);
     importUrl.search = url.search;
-    importUrl.username = url.username;
-    importUrl.password = url.password;
+
 
     const importSearchParams = new URL(importUrl).searchParams.toString();
 
@@ -87,21 +86,25 @@ export default ({ config, modules }: any) => async (
     // get array of possible urls to match
     let possibleUrls = Array.from(urlMetadatas.keys());
     // the more path params the url has, more towards the end of the array it will be
+    const matchesParams = (url: string) => url.split('/').filter((part) => part.startsWith(':')).length;
     possibleUrls = possibleUrls?.sort((a, b) => {
-        const matchesParams = (url: string) => url.split('/').filter((part) => part.startsWith(':')).length;
         return matchesParams(b) - matchesParams(a);
     })
+
+    let hasMatchParams;
     for (const key of possibleUrls) {
         const { pathname, hostname } = new URL(key);
         const pattern = new URLPattern({ pathname, hostname })
         const matched = pattern.exec(importUrl.href);
         if (matched) {
+            hasMatchParams = Object.keys(matched?.pathname?.groups || {}).length; // if has matched params, cannot always use the cached match, because it's possible to match other fixed routes
             isolateId = key;
             urlMetadata = { ...urlMetadatas.get(key), params: matched.pathname.groups };
         }
     }
 
-    if (!urlMetadata || queryParams.bundle) {
+
+    if (!urlMetadata || queryParams.bundle || hasMatchParams) {
         urlMetadata = await fetch(importUrl.href, {
             redirect: "follow",
             headers: {
@@ -110,6 +113,7 @@ export default ({ config, modules }: any) => async (
             method: "POST",
             body: JSON.stringify({ denoConfig: config?.denoConfig })
         });
+
 
         if (!urlMetadata.ok) {
             response.status(urlMetadata.status)
@@ -160,12 +164,13 @@ export default ({ config, modules }: any) => async (
                 args: [
                     'run',
                     `--reload=${[importUrl.origin, url.origin, metaUrl].filter(Boolean).join(',')}`,
-                    `--allow-env${permissions?.['allow-env'] === true ? '' : '=' + ['DENO_AUTH_TOKENS', ...(permissions?.['allow-env'] || [])].join(',') || ''}`,
                     '--deny-run',
-                    '--allow-net',
+                    `--allow-env${permissions?.['allow-env'] === true ? '' : '=' + ['DENO_AUTH_TOKENS', ...(permissions?.['allow-env'] || [])].join(',') || ''}`,
                     `--allow-sys${permissions?.['allow-sys'] === true ? '' : '=' + ['cpus', 'osRelease', ...(permissions?.['allow-sys'] || [])].join(',') || ''}`,
-                    '--allow-read',
                     `--allow-write${permissions?.['allow-write'] === true ? '' : '=' + ['./cache/', ...(permissions?.['allow-write'] || [])].join(',') || ''}`,
+                    '--allow-read',
+                    '--allow-net',
+                    '--allow-ffi',
                     '--unstable-sloppy-imports',
                     '--unstable-kv',
                     '--unstable',
@@ -176,7 +181,7 @@ export default ({ config, modules }: any) => async (
                     `${port}`,
                     JSON.stringify({
                         __requestId__: __requestId__,
-                        importUrl: new URL(`${urlMetadata.matchPath}?${importSearchParams}`, importUrl.origin).href,
+                        importUrl: isolateId,
                         currentUrl: url.href,
                         isJSX,
                         headers,

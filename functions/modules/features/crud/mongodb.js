@@ -1,42 +1,6 @@
-import { get, remove, set } from "https://deno.land/x/kv_toolbox/blob.ts";
-import { createHash } from '../hash.js';
-const kv = await Deno.openKv();
-
-const getCache = async (model, query) => {
-
-  const cacheKey = [
-    "dbResponse",
-    model,
-    await createHash(JSON.stringify(query)),
-  ].filter((i) => i);
-
-  // Try to retrieve the response from cache
-  let cachedResponse;
-  try {
-    const cachedData = await get(kv, cacheKey);
-    cachedResponse = new TextDecoder().decode(cachedData.value);
-  } catch (_) { }
-
-  if (cachedResponse) {
-    return JSON.parse(cachedResponse);
-  } else {
-    return null;
-  }
-}
-
-const setCache = async (model, query, data, options) => {
-  const cacheKey = [
-    "dbResponse",
-    model,
-    await createHash(JSON.stringify(query)),
-  ].filter((i) => i);
-  await set(kv, cacheKey, new TextEncoder().encode(data), { expireIn: options.TTL });
-}
-
+  
 export default ({ config, db, schemas, Validator }) => {
   const models = {};
-
-  const canCache = config?.canCache || (() => false)
 
   const populate = (schema, populateKeys,) => {
     // add lookup pipeline for populate options
@@ -116,13 +80,6 @@ export default ({ config, db, schemas, Validator }) => {
       },
       find: async (query, options) => {
 
-        const willCache = canCache({ model: key, query })
-
-        if (willCache) {
-          const cached = await getCache(key, query);
-          if (cached) return cached;
-        }
-
         db = await db;
         const now = Date.now();
         let lookup = [];
@@ -179,20 +136,9 @@ export default ({ config, db, schemas, Validator }) => {
           path: `find_output:${key}`,
         });
 
-        // console.log('Find', key, JSON.stringify(pipeline), ': Response time', Date.now() - now, 'Response:', JSON.stringify(validatedResponse));
-
-        if (validatedResponse && willCache) {
-          setCache(key, query, JSON.stringify(validatedResponse), { TTL: 60 * 60 * 1000 });
-        }
-
         return validatedResponse;
       },
       findOne: async (query, options) => {
-        const willCache = canCache({ model: key, query })
-        if (willCache) {
-          const cached = await getCache(key, query);
-          if (cached) return cached;
-        }
 
         db = await db;
         let lookup = [];
@@ -248,11 +194,6 @@ export default ({ config, db, schemas, Validator }) => {
         const validatedResponse = Validator(schema, response, {
           path: `findOne_output:${key}`,
         });
-
-        // console.log('FindOne', key, JSON.stringify(pipeline), ': Response time', Date.now() - now, 'Response:', JSON.stringify(validatedResponse));
-        if (validatedResponse && willCache) {
-          setCache(key, query, JSON.stringify(validatedResponse), { TTL: 60 * 60 * 1000 });
-        }
 
         return validatedResponse;
       },

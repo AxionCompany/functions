@@ -1,5 +1,5 @@
 import { z } from "https://deno.land/x/zod/mod.ts";
-import { ObjectId } from "npm:mongodb";
+import { ObjectId } from "npm:mongodb@6.7.0";
 
 const customTypes = {
   "objectId": () =>
