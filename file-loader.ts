@@ -106,12 +106,6 @@ server({
         denoConfigs.set(denoConfigUrl.origin, { ...denoConfig, ..._denoConfig });
       }
 
-      // const urlWithBasicAuth = new URL(params.url.href);
-      // username && (urlWithBasicAuth.username = username);
-      // password && (urlWithBasicAuth.password = password);
-
-
-
       return FileLoader({
         config: { ...config, ...axionConfig },
         modules
