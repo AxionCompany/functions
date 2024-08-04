@@ -50,12 +50,10 @@ let adapters: any;
         handlers: {},
         serializers: {},
         dependencies: {},
-        permissions:{},
         env,
         url: req.url,
         headers: req.headers
       };
-
 
       if (!adapters) {
         env.DEBUG === 'true' && console.log('Loading Adapters', new URL(`${functionsDir}/adapters`, fileLoaderUrl).href);
@@ -70,7 +68,7 @@ let adapters: any;
       }
 
       const _adapters = await adapters(handlerConfig);
-      const { loaderConfig } = _adapters;
+      const { loaderConfig, permissions } = _adapters || {};
 
       loaderConfig?.username && (fileLoaderUrl.username = loaderConfig.username);
       loaderConfig?.password && (fileLoaderUrl.password = loaderConfig.password);
@@ -121,7 +119,7 @@ let adapters: any;
               functionsDir: functionsDir,
               ...axionConfig,
               denoConfig,
-              permissions: _adapters?.permissions,
+              permissions,
             },
             modules: {
               path: { SEPARATOR, basename, extname, join, dirname },
