@@ -50,6 +50,7 @@ let adapters: any;
         handlers: {},
         serializers: {},
         dependencies: {},
+        permissions:{},
         env,
         url: req.url,
         headers: req.headers
