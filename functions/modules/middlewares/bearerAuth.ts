@@ -14,8 +14,8 @@ export default ({ validateAuth, publicPaths, privatePaths }: any) => {
       if (publicPathMatch && !privatePathMatch) {
         return {}
       }
-
-      const authorization = req.headers.get("authorization");
+      // const authorization = req.headers.get("authorization");
+      const authorization = req.headers["authorization"];
       if (authorization) {
         const match = authorization.match(/^Bearer\s+(.*)$/);
         if (match) {

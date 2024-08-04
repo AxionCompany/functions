@@ -19,7 +19,6 @@ self?.postMessage && self?.addEventListener("unhandledrejection", async event =>
 
 import server from "./functions/src/servers/main.ts";
 import RequestHandler from "./functions/src/handlers/main.ts";
-import { getSubdomain } from "./functions/src/utils/urlFunctions.ts";
 import Isolate, { cleanupIsolates } from "./functions/src/isolate/main.ts";
 import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
@@ -38,28 +37,42 @@ let adapters: any;
       env.DEBUG === 'true' && console.log('Received request in API from', req.url);
 
       const fileLoaderUrl = new URL(env.FILE_LOADER_URL || "http://localhost:9000");
-      const { hostname } = new URL(req.url);
-
-      // lets consider that the hostname is the project name;
-      const project = hostname;
-      const subdomain = getSubdomain(req.url);
-
-      fileLoaderUrl.username = subdomain;
-      fileLoaderUrl.password = env.GIT_API_KEY || '';
 
       let functionsDir = env.FUNCTIONS_DIR || ".";
       functionsDir.endsWith('/') && (functionsDir = functionsDir.slice(0, -1));
 
+      const handlerConfig = {
+        middlewares: {
+          "bearerAuth": BearerAuth,
+        },
+        pipes: {}, // default to no pipes
+        modules: {},
+        handlers: {},
+        serializers: {},
+        dependencies: {},
+        env,
+        url: req.url,
+        headers: req.headers
+      };
+
+
       if (!adapters) {
+        env.DEBUG === 'true' && console.log('Loading Adapters', new URL(`${functionsDir}/adapters`, fileLoaderUrl).href);
         adapters = await import(new URL(`${functionsDir}/adapters`, fileLoaderUrl).href)
           .then((m: any) => m.default)
           .catch((err: any) => {
-            console.warn(
+            console.log(
               `Error trying to load adapters: ${err.toString()}`
                 .replaceAll(new URL(functionsDir, fileLoaderUrl).href, '')
             )
           }) || ((a: any) => a);
       }
+
+      const _adapters = await adapters(handlerConfig);
+      const { loaderConfig } = _adapters;
+
+      loaderConfig?.username && (fileLoaderUrl.username = loaderConfig.username);
+      loaderConfig?.password && (fileLoaderUrl.password = loaderConfig.password);
 
       let axionConfig: any = axionConfigs.get(new URL(req.url).origin);
 
@@ -70,8 +83,11 @@ let adapters: any;
         axionConfigs.set(new URL(req.url).origin, axionConfig);
       }
 
+      functionsDir = axionConfig?.functionsDir || functionsDir;
+
       let denoConfig = denoConfigs.get(new URL(req.url).origin) || {};
-      if (!denoConfig) {
+
+      if (!Object.keys(denoConfig).length) {
         denoConfig = await fetch(new URL('deno.json', fileLoaderUrl).href)
           .then(async (res) => await res.json())
           .catch((_) => null) || {};
@@ -93,27 +109,10 @@ let adapters: any;
       denoConfig.imports = { ...axionDenoConfig.imports, ...denoConfig.imports };
       denoConfig.scopes = { ...axionDenoConfig.scopes, ...denoConfig.scopes };
 
-
-      const handlerConfig = {
-        middlewares: {
-          "bearerAuth": BearerAuth,
-        },
-        pipes: {}, // default to no pipes
-        modules: {
-          path: { SEPARATOR, basename, extname, join, dirname }
-        },
-        handlers: {},
-        serializers: {},
-        dependencies: {},
-        env,
-      }
-
-      adapters = await adapters(handlerConfig);
-
       return RequestHandler({
-        ...adapters,
+        ..._adapters,
         handlers: {
-          ...adapters.handlers,
+          ..._adapters.handlers,
           "/(.*)+": Isolate({
             config: {
               loaderUrl: fileLoaderUrl.href,
@@ -121,7 +120,7 @@ let adapters: any;
               functionsDir: functionsDir,
               ...axionConfig,
               denoConfig,
-              permissions: adapters?.permissions,
+              permissions: _adapters?.permissions,
             },
             modules: {
               path: { SEPARATOR, basename, extname, join, dirname },

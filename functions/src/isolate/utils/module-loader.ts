@@ -11,6 +11,14 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
     extensions: ['js', 'ts'],
   }));
 
+  // Get middleware modules
+  importPromises.push(getAllFiles({
+    url: importUrl,
+    name: 'middleware',
+    extensions: ['js', 'ts']
+  }));
+
+
   const bundleUrl = new URL(importUrl);
   bundleUrl.searchParams.append('bundle', true);
 
@@ -25,18 +33,30 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
   }
 
   // Await all import promises
-  const [bundledSharedModules, bundledModule, indexHtmlFiles, bundledLayouts] = await Promise.all(importPromises);
+  const [sharedModulesData, middlewaresData, bundledModule, indexHtmlFiles, bundledLayouts] = await Promise.all(importPromises);
 
   const loadPromises = [];
 
   // Load shared modules
   loadPromises.push(Promise.all(
-    bundledSharedModules.map((file) => {
+    sharedModulesData.map((file) => {
       return import(new URL(`/${file?.matchPath}`, importUrl).href)
         .then((mod) => mod.default)
         .catch(err => {
           console.log(`Error Importing Shared Module \`${file?.matchPath}\`: ${err.toString()}`);
           throw { message: `Error Importing Shared Module \`${file?.matchPath}\`: ${err.toString()}`, status: 401 };
+        })
+    })
+  ));
+
+  // Load middleware modules
+  loadPromises.push(Promise.all(
+    middlewaresData.map((file) => {
+      return import(new URL(`/${file?.matchPath}`, importUrl).href)
+        .then((mod) => mod.default)
+        .catch(err => {
+          console.log(`Error Importing Middleware Module \`${file?.matchPath}\`: ${err.toString()}`);
+          throw { message: `Error Importing Middleware Module \`${file?.matchPath}\`: ${err.toString()}`, status: 401 };
         })
     })
   ));
@@ -55,7 +75,7 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
     ));
   }
 
-  const [SharedModules, LayoutModules] = await Promise.all(loadPromises);
+  const [SharedModules, Middlewares, LayoutModules] = await Promise.all(loadPromises);
 
   // Instantiate shared modules
   dependencies = SharedModules.reduce(
@@ -65,12 +85,21 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
     },
     // Initial dependencies
     {
+      url: currentUrl,
       env, ...dependencies, LayoutModules,
       indexHtml: indexHtmlFiles?.slice(-1)?.[0]?.content,
       layoutUrls: bundledLayouts?.map(file => file.path),
       bundledLayouts: bundledLayouts?.map(file => file.content),
       bundledModule: bundledModule?.content
     }
+  );
+
+  const middlewares = (req) => Middlewares.reduce(
+    (acc, Middleware, index) => {
+      if (!Middleware) return acc
+      Object.assign(Middleware, { ...middlewares })
+      return Middleware({ ...acc })
+    }, req
   );
 
   try {
@@ -108,6 +137,7 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
       DELETE,
       matchedPath,
       dependencies,
+      middlewares,
       config
     };
   } catch (err) {
