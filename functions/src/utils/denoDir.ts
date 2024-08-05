@@ -45,6 +45,4 @@ const reloadCache = async (url: string[] | string) => {
     return res
 }
 
-reloadCache('http://github--vfssantos--jaze.ai:***REMOVED***@localhost:8000/pages/home.jsx?v=1722628778772').then(console.log)
-
 export default getDenoDirectories;
