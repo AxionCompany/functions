@@ -83,7 +83,26 @@ export default (
       try {
         // Get Headers
         const headers = Object.fromEntries(req.headers.entries());
+        const contentType = headers?.["content-type"] || "";
         const __requestId__ = crypto.randomUUID();
+
+        const formData: Record<string, any> = {};
+
+        if (contentType.startsWith("multipart/form-data")) {
+          const form = await req.formData();
+          for (const [key, value] of form.entries()) {
+            if (value instanceof File) {
+              // transoform file to base64
+              const reader = new FileReader();
+              reader.readAsDataURL(value);
+              reader.onloadend = () => {
+                const base64data = reader.result;
+                formData[key] = base64data;
+              };
+
+            }
+          }
+        }
 
         // Get Body
         const body = await req
@@ -199,7 +218,7 @@ export default (
         const responseFn = responseCallback(__requestId__, enqueue);
 
         handler(
-          { url, subdomain, pathname, pathParams, method, queryParams, data, headers, ctx, __requestId__ },
+          { url, subdomain, pathname, pathParams, method, queryParams, data, formData, headers, ctx, __requestId__ },
           responseFn,
         ).then(responseFn.send).catch(responseFn.error);
 

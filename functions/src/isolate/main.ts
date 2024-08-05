@@ -49,6 +49,12 @@ const cleanupIsolate = async (isolateId: string): void => {
     }
 };
 
+const upgradeIsolate = async (isolateId: string): void => {
+    // try to instantiate a new isolate. if it works, set isolateId pointing to the new port and delete/kill the old one. If not, just return
+    const oldPort = getPortFromIsolateId(isolateId);
+}
+
+
 export const cleanupIsolates = (): void => {
     console.log("Cleaning up isolates");
     for (const isolateId of isolates.keys()) {
@@ -57,16 +63,16 @@ export const cleanupIsolates = (): void => {
 }
 
 export default ({ config, modules }: any) => async (
-    { url, pathname, headers, subdomain, method, data, ctx, params, queryParams, __requestId__ }: {
+    { url, pathname, headers, method, data, formData, ctx, params, queryParams, __requestId__ }: {
         url: URL;
         method: string;
         headers: any;
-        subdomain: string;
         pathname: string;
         ctx: any | null;
         params: any | null;
         data: any | null;
         queryParams: any | null;
+        formData : FormData | null;
         __requestId__: string;
     }, response: any) => {
 
@@ -199,6 +205,7 @@ export default ({ config, modules }: any) => async (
                 port,
                 pid: process.pid,
                 process,
+                loadTime: Date.now(),
             });
             await waitForServer(`http://localhost:${port}`);
         } catch (error) {
@@ -224,6 +231,7 @@ export default ({ config, modules }: any) => async (
                     ...urlMetadata.params,
                     ...queryParams,
                     ...data,
+                    ...formData
                 },
                 method,
                 __requestId__: __requestId__,
