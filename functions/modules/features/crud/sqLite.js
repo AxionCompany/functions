@@ -344,7 +344,7 @@ export default ({ config, db: _db, schemas, Validator }) => {
                 sql = _sql;
                 const start = Date.now();
 
-                config.debug && console.log("CRUD Execution Id:", executionId, "| find", "| SQL:", sql, "| Params:", JSON.stringify(validatedParams));
+                config.debug && console.log("CRUD Execution Id:", executionId, "| find", "| SQL:", sql, "| Params:", JSON.stringify(params));
                 // Prepare Statemens
                 const stmt = db.prepare(sql);
                 // Execute SQL Statement

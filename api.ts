@@ -67,7 +67,12 @@ let adapters: any;
           }) || ((a: any) => a);
       }
 
-      const _adapters = await adapters(handlerConfig);
+      let _adapters;
+      try {
+        _adapters = await adapters(handlerConfig);
+      } catch (err) {
+        return new Response(JSON.stringify({ error: { message: err.message, status: (err.status || 500) } }), { status: err.status || 500 });
+      }
       const { loaderConfig, permissions } = _adapters || {};
 
       loaderConfig?.username && (fileLoaderUrl.username = loaderConfig.username);
