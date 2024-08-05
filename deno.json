@@ -9,6 +9,7 @@
         "react": "npm:react",
         "react-dom/server": "npm:react-dom/server",
         "axion-components/":"http://AxionCompany--axions-web--main:{{GIT_API_KEY}}@localhost:9000/src/components/",
+        "axion-modules/":"./functions/modules/",
         "postcss": "npm:postcss",
         "react-icons/hi": "npm:react-icons/hi",
         "react-icons/fa": "npm:react-icons/fa"
