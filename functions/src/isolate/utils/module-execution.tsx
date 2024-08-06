@@ -63,7 +63,7 @@ export default async (config: any) => {
       return chunk;
 
     } catch (err) {
-      console.log(err);
+      // console.log(err);
       throw err;
     }
   };
