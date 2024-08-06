@@ -72,7 +72,7 @@ export default ({ config, modules }: any) => async (
         params: any | null;
         data: any | null;
         queryParams: any | null;
-        formData : FormData | null;
+        formData: FormData | null;
         __requestId__: string;
     }, response: any) => {
 
@@ -81,9 +81,6 @@ export default ({ config, modules }: any) => async (
     const importUrl = !queryParams?.customBaseUrl ? new URL(modules.path.join(config.loaderUrl, config.functionsDir)) : new URL(config.loaderUrl);
     importUrl.pathname = modules.path.join(importUrl.pathname, pathname);
     importUrl.search = url.search;
-
-
-    const importSearchParams = new URL(importUrl).searchParams.toString();
 
     let urlMetadata;
     let isJSX = false;
@@ -113,9 +110,7 @@ export default ({ config, modules }: any) => async (
     if (!urlMetadata || queryParams.bundle || hasMatchParams) {
         urlMetadata = await fetch(importUrl.href, {
             redirect: "follow",
-            headers: {
-                "content-type": "application/json",
-            },
+            headers: { "content-type": "application/json" },
             method: "POST",
             body: JSON.stringify({ denoConfig: config?.denoConfig })
         });
@@ -165,8 +160,7 @@ export default ({ config, modules }: any) => async (
             console.log("Spawning isolate", isolateId);
             const port = await getAvailablePort(3500, 4000);
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null;
-            // config.debug && 
-            console.log('Running with Permissions', permissions)
+            config.debug && console.log('Running with Permissions', permissions)
             const command = new Deno.Command(Deno.execPath(), {
                 args: [
                     'run',
@@ -239,10 +233,11 @@ export default ({ config, modules }: any) => async (
             }),
         });
 
-        response.headers(Object.fromEntries(moduleResponse.headers.entries()));
-        response.status(moduleResponse.status);
-        response.statusText(moduleResponse.statusText);
-
+        response.options({
+            status: moduleResponse.status,
+            statusText: moduleResponse.statusText,
+            headers: Object.fromEntries(moduleResponse.headers.entries())
+        })
         if (!moduleResponse.ok) {
             const errorResponse = await moduleResponse.text();
             try {

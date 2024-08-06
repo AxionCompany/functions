@@ -1,7 +1,7 @@
 
 import { toSqlQuery, toSqlWrite } from "./sqlUtils.js";
 import { Validator as SchemaValidator } from "../../connectors/validator.ts";
-import Database from 'npm:libsql';
+import Database from 'npm:libsql/promise'; // Using the promise api. 
 let hasConnected = false;
 let db;
 
@@ -116,6 +116,7 @@ export default ({ config, db: _db, schemas, Validator }) => {
             // Add more type mappings 
         })?.filter(Boolean)?.join(", ");
         await db.exec(`CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`);
+
     };
 
     const buildJsonObjectQuery = (schema, alias, isArray = false) => {
@@ -209,10 +210,10 @@ export default ({ config, db: _db, schemas, Validator }) => {
 
                 config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| SQL:', insertSql, '| Params:', JSON.stringify(validatedParams));
                 const start = Date.now();
-                const response = db.transaction(() => {
+                const response = await db.transaction(async () => {
                     // Prepare Statemens
-                    const queryStmt = db.prepare(querySql);
-                    const insertStmt = db.prepare(insertSql);
+                    const queryStmt = await db.prepare(querySql);
+                    const insertStmt = await db.prepare(insertSql);
                     // Execute Statements
                     insertStmt.run(serializeParams(params));
                     const insertedRow = queryStmt.get()
@@ -269,10 +270,10 @@ export default ({ config, db: _db, schemas, Validator }) => {
 
                 const start = Date.now();
                 config.debug && console.log('CRUD Execution Id:', executionId, '| createMany', '| SQL:', insertSql, '| Params:', JSON.stringify(validatedParams));
-                const result = db.transaction(() => {
+                const result = await  db.transaction(async () => {
                     // Prepare Statemens
-                    const insertStmt = db.prepare(insertSql);
-                    const queryStmt = db.prepare(querySql);
+                    const insertStmt = await db.prepare(insertSql);
+                    const queryStmt = await db.prepare(querySql);
                     // Execute Statements
                     const inserted = [];
                     for (const row of validatedParams) {
@@ -346,7 +347,7 @@ export default ({ config, db: _db, schemas, Validator }) => {
 
                 config.debug && console.log("CRUD Execution Id:", executionId, "| find", "| SQL:", sql, "| Params:", JSON.stringify(params));
                 // Prepare Statemens
-                const stmt = db.prepare(sql);
+                const stmt = await db.prepare(sql);
                 // Execute SQL Statement
                 const responses = stmt.all(serializeParams(params));
                 // Close the statement
@@ -393,7 +394,7 @@ export default ({ config, db: _db, schemas, Validator }) => {
                 const start = Date.now();
                 config.debug && console.log("CRUD Execution Id:", executionId, "| findOne", "| SQL:", sql, "| Params:", JSON.stringify(validatedParams));
                 // Prepare Statemens
-                const stmt = db.prepare(sql);
+                const stmt = await db.prepare(sql);
                 // Execute SQL Statement
                 const response = stmt.get(serializeParams(params)) || null;
                 // Close the statement
@@ -457,10 +458,10 @@ export default ({ config, db: _db, schemas, Validator }) => {
                 querySql = sql;
 
 
-                const response = db.transaction(() => {
+                const response = await  db.transaction(async () => {
                     // Prepare Statemens
-                    const queryStmt = db.prepare(querySql);
-                    const updateStmt = db.prepare(updateSql);
+                    const queryStmt = await db.prepare(querySql);
+                    const updateStmt = await db.prepare(updateSql);
                     // Execute Statements
                     updateStmt.run(serializeParams(sqlParams));
                     const updatedRow = queryStmt.get(serializeParams(validatedQueryParams));
@@ -517,10 +518,10 @@ export default ({ config, db: _db, schemas, Validator }) => {
                 const start = Date.now();
                 config.debug && console.log("CRUD Execution Id:", executionId, "| updateMany", "| SQL:", updateSql, "| Params:", JSON.stringify(sqlParams));
                 // Execute SQL Statement
-                const respose = db.transaction(() => {
+                const respose = await  db.transaction(async () => {
                     // Prepare Statemens
-                    const updateStmt = db.prepare(updateSql);
-                    const queryStmt = db.prepare(querySql);
+                    const updateStmt = await db.prepare(updateSql);
+                    const queryStmt = await db.prepare(querySql);
                     // Execute Statements
                     updateStmt.run(serializeParams({ ...sqlParams, ...(config.addTimestamps ? { updatedAt: new Date().toISOString() } : {}) }));
                     // Validate the response
@@ -559,7 +560,7 @@ export default ({ config, db: _db, schemas, Validator }) => {
                 config.debug && console.log('CRUD Execution Id:', executionId, '| delete', '| SQL:', deleteSql, '| Params:', JSON.stringify(validatedQueryParams));
 
                 // Prepare Statemens
-                const deleteStmt = db.prepare(deleteSql);
+                const deleteStmt = await db.prepare(deleteSql);
                 // Execute SQL Statement
                 deleteStmt.run(serializeParams(validatedQueryParams));
                 // Validate the response
@@ -587,8 +588,8 @@ export default ({ config, db: _db, schemas, Validator }) => {
                 const deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
                 const start = Date.now();
                 config.debug && console.log('CRUD Execution Id:', executionId, '| deleteMany', '| SQL:', deleteSql, '| Params:', JSON.stringify(sqlParams));
-                const response = db.transaction(() => {
-                    const deleteStmt = db.prepare(deleteSql);
+                const response = await  db.transaction(async () => {
+                    const deleteStmt = await db.prepare(deleteSql);
                     deleteStmt.run(serializeParams(sqlParams));
                     const validatedResponse = Validator(schema, { success: true }, {
                         path: `delete_output:${key}`,
@@ -601,7 +602,7 @@ export default ({ config, db: _db, schemas, Validator }) => {
                 return response;
             },
             customQuery: async (queryStatement) => {
-                const stmt = db.prepare(queryStatement);
+                const stmt = await db.prepare(queryStatement);
                 const response = stmt.all();
                 config.finalizePreparedStatements && stmt.finalize();
                 // Add validation if needed
