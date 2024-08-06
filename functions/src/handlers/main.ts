@@ -10,7 +10,7 @@ interface DataChunk {
 }
 
 export default (
-  { handlers, middlewares, pipes, serializers }: any,
+  { handlers }: any,
 ) => {
 
   function createStreamBuffer(highWaterMark: number = 1, { processData, sendOptions }: any) {
@@ -38,6 +38,7 @@ export default (
 
     function enqueue(data: DataChunk) {
 
+
       data = processData(data);
 
       const encodedChunk = new TextEncoder().encode(data.chunk);
@@ -54,6 +55,7 @@ export default (
       }
 
       if (!headersSent && data.options) {
+
         headersSent = true;
         sendOptions(data.options);
       }
@@ -92,17 +94,23 @@ export default (
           const form = await req.formData();
           for (const [key, value] of form.entries()) {
             if (value instanceof File) {
-              // transoform file to base64
+              // transform file to base64
               const reader = new FileReader();
               reader.readAsDataURL(value);
               reader.onloadend = () => {
                 const base64data = reader.result;
-                formData[key] = base64data;
+                if (!formData[key]) {
+                  formData[key] = base64data;
+                } else if (Array.isArray(formData[key])) {
+                  formData[key].push(base64data);
+                } else {
+                  formData[key] = [formData[key], base64data];
+                }
               };
-
             }
           }
         }
+
 
         // Get Body
         const body = await req
@@ -160,22 +168,6 @@ export default (
         if (body) {
           data = typeof body === "string" ? { data: body } : { ...body };
         }
-        let ctx: any = {};
-
-        // Adding Middlewares
-        for (const key in middlewares) {
-          const middleware = middlewares[key];
-          const addedContext = await middleware(req);
-          ctx = { ...ctx, ...addedContext };
-        }
-
-        // Adding Pipes
-        for (const key in pipes) {
-          const pipe = pipes[key];
-          const pipeData = await pipe(data, ctx);
-          data = { ...data, ...pipeData };
-        }
-
 
         let sendOptions: any
 
@@ -197,10 +189,6 @@ export default (
 
           options = options || {};
 
-          for (const key in serializers) {
-            const serializer = serializers[key];
-            chunk = serializer(url, data, ctx, chunk);
-          }
           if (chunk && typeof chunk === "object") {
             chunk = JSON.stringify(chunk);
 
@@ -218,7 +206,7 @@ export default (
         const responseFn = responseCallback(__requestId__, enqueue);
 
         handler(
-          { url, subdomain, pathname, pathParams, method, queryParams, data, formData, headers, ctx, __requestId__ },
+          { url, subdomain, pathname, pathParams, method, queryParams, data, formData, headers, __requestId__ },
           responseFn,
         ).then(responseFn.send).catch(responseFn.error);
 
