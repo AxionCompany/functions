@@ -1,7 +1,8 @@
 
 import { toSqlQuery, toSqlWrite } from "./sqlUtils.js";
 import { Validator as SchemaValidator } from "../../connectors/validator.ts";
-import Database from 'npm:libsql/promise'; // Using the promise api. 
+// import Database from 'npm:libsql';
+import Database from 'npm:libsql@0.4.0-pre.10/promise'; // Using the promise api. 
 let hasConnected = false;
 let db;
 
@@ -82,10 +83,9 @@ export default (args) => {
     const schemas = args.schemas;
     const Validator = args.Validator || SchemaValidator(schemas)
     const path = config.dbPath || './data/my.db';
-    let db;
     if (!db) {
         const start = Date.now();
-        db = db || new Database(path, config.dbOptions);
+        db = new Database(path, config.dbOptions);
         console.log('Database connection time:', Date.now() - start, 'ms');
     } else {
         console.log('Database already connected');
@@ -616,7 +616,6 @@ export default (args) => {
     hasConnected = true;
     const start = Date.now();
     db.exec(commands.join(";")).then(res => console.log('Table creation time:', Date.now() - start, 'ms'));
-
 
     return models;
 };
