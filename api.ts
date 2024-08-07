@@ -18,22 +18,23 @@ self?.postMessage && self?.addEventListener("unhandledrejection", async event =>
 });
 
 import server from "./functions/src/servers/main.ts";
-import Isolate, { cleanupIsolates } from "./functions/src/isolate/main.ts";
-import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
+import Proxy from "./functions/src/proxy/main.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
 import replaceTemplate from "./functions/src/utils/template.ts";
 import axionDenoConfig from "./deno.json" with { type: "json" };
-const env = await getEnv();
 
+const env = await getEnv();
 const axionConfigs = new Map<string, string>();
 const denoConfigs = new Map<string, any>();
+
 let adapters: any;
+let shouldUpgradeAfter: number = 0;
 
 (async () => {
 
   server({
     requestHandler: async (req: Request) => {
-    
+
       env.DEBUG === 'true' && console.log('Received request in API from', req.url);
 
       const fileLoaderUrl = new URL(env.FILE_LOADER_URL || "http://localhost:9000");
@@ -41,13 +42,13 @@ let adapters: any;
       let functionsDir = env.FUNCTIONS_DIR || ".";
       functionsDir.endsWith('/') && (functionsDir = functionsDir.slice(0, -1));
 
-      const handlerConfig = {
-        middlewares: { "bearerAuth": BearerAuth },
-        modules: {},
-        handlers: {},
-        env,
+      let _adapters = {
         url: req.url,
-        headers: req.headers
+        headers: req.headers,
+        loaderConfig: {},
+        permissions: {},
+        shouldUpgradeAfter,
+        env
       };
 
       if (!adapters) {
@@ -62,14 +63,15 @@ let adapters: any;
           }) || ((a: any) => a);
       }
 
-      let _adapters;
+
       try {
-        _adapters = await adapters(handlerConfig);
+        _adapters = await adapters(_adapters);
       } catch (err) {
         JSON.stringify({ error: { message: err.message, status: (err.status || 500) } }), { status: err.status || 500 }
         return new Response(JSON.stringify({ error: { message: err.message, status: (err.status || 500) } }), { status: err.status || 500, headers: { 'Content-Type': 'application/json' } });
       }
-      const { loaderConfig, permissions } = _adapters || {};
+      const { loaderConfig, permissions, shouldUpgradeAfter: _shouldUpgradeAfter } = _adapters || {};
+      shouldUpgradeAfter = _shouldUpgradeAfter || shouldUpgradeAfter;
 
       loaderConfig?.username && (fileLoaderUrl.username = loaderConfig.username);
       loaderConfig?.password && (fileLoaderUrl.password = loaderConfig.password);
@@ -109,11 +111,12 @@ let adapters: any;
       denoConfig.imports = { ...axionDenoConfig.imports, ...denoConfig.imports };
       denoConfig.scopes = { ...axionDenoConfig.scopes, ...denoConfig.scopes };
 
-      return Isolate({
+      return Proxy({
         config: {
           loaderUrl: fileLoaderUrl.href,
           dirEntrypoint: env.DIR_ENTRYPOINT || "index",
-          functionsDir: functionsDir,
+          shouldUpgradeAfter,
+          functionsDir,
           ...axionConfig,
           denoConfig,
           permissions,
@@ -139,7 +142,8 @@ async function watchFiles(env: any) {
       const dir = Deno.cwd();
       const files = event.paths.map(path => path.split(dir).join(''));
       // clean up isolates
-      await cleanupIsolates();
+      // await cleanupIsolates();
+      shouldUpgradeAfter = new Date().getTime();
       event.paths.forEach(path => {
         self?.postMessage && self?.postMessage({ message: `Files modified: ${files}` });
       })
