@@ -77,8 +77,12 @@ function convertToPositionalParams(sql, params) {
 }
 
 
-export default ({ config, db: _db, schemas, Validator }) => {
+export default (args) => {
+    const config = args.config || {};
+    const schemas = args.schemas;
+    const Validator = args.Validator || SchemaValidator(schemas)
     const path = config.dbPath || './data/my.db';
+    let db;
     if (!db) {
         const start = Date.now();
         db = _db || new Database(path, config.dbOptions);
@@ -87,7 +91,6 @@ export default ({ config, db: _db, schemas, Validator }) => {
         console.log('Database already connected');
     }
 
-    Validator = Validator || SchemaValidator(schemas);
     const models = {};
     const serializeParams = config?.serializer && serializers[config.serializer]?.serialize || ((d) => d);
     const deserializeParams = config?.serializer && serializers[config?.serializer]?.deserialize || ((d) => d)
