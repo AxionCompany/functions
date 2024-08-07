@@ -12,11 +12,11 @@ const tryParseJSON = (str: any) => {
 };
 
 export default async (config: any) => {
-  let { metaUrl, loader, functionsDir, dependencies: remoteDependencies, currentUrl, importUrl, env, isJSX } = config || {};
+  let { loader, functionsDir, dependencies: remoteDependencies, url, importUrl, env, isJSX } = config || {};
   if (!loader) loader = moduleLoader;
   // load the module
   const { mod: defaultModule, GET, POST, PUT, DELETE, middlewares, dependencies: localDependencies, ...moduleExports } = await loader(
-    { importUrl, currentUrl, env, dependencies: remoteDependencies, isJSX },
+    { importUrl, url, env, dependencies: remoteDependencies, isJSX },
   );
 
   const execute = async (
@@ -29,10 +29,10 @@ export default async (config: any) => {
       const dependencies = { ...localDependencies, ...remoteDependencies };
       // run middlewares
       Object.assign(middlewares, dependencies)
-      data = await middlewares({ ...data, url: data?.currentUrl });
+      data = await middlewares(data);
 
       // get the data
-      const { env, method, params: requestParams, headers: requestHeaders, __requestId__, currentUrl } = data;
+      const { method, data:bodyData, formData, queryParams, headers: requestHeaders, __requestId__ } = data;
 
       // get the config
       moduleExports.config = moduleExports.config || {};
@@ -51,10 +51,10 @@ export default async (config: any) => {
       }
 
       // merge path params
-      const params = { headers: requestHeaders, env, ...requestParams, __requestId__ };
+      const params = { headers: requestHeaders, env, ...bodyData, ...formData, ...queryParams, __requestId__ };
 
       // execute the module
-      const workerRes = await moduleInstance({ mod, params, dependencies, url: currentUrl, metaUrl, isJSX, importUrl, functionsDir }, response);
+      const workerRes = await moduleInstance({ mod, params, dependencies, url, isJSX, importUrl, functionsDir }, response);
 
       // try parsing the response as JSON
       const chunk = tryParseJSON(workerRes);
@@ -63,7 +63,7 @@ export default async (config: any) => {
       return chunk;
 
     } catch (err) {
-      // console.log(err);
+
       throw err;
     }
   };
@@ -71,8 +71,8 @@ export default async (config: any) => {
 };
 
 const moduleInstance: any = async (
-  { mod, params, dependencies, url, importUrl, metaUrl, isJSX, functionsDir }
-    : { mod: Function, params: any, dependencies: any, url: string, importUrl: string, metaUrl: string, isJSX: boolean; functionsDir: string },
+  { mod, params, dependencies, url, importUrl, isJSX, functionsDir }
+    : { mod: Function, params: any, dependencies: any, url: string, importUrl: string, isJSX: boolean; functionsDir: string },
   response: any,
 ) => {
 
@@ -138,7 +138,6 @@ const moduleInstance: any = async (
       // build scripts
       const { headScripts, bodyScripts } = dependencies.htmlScripts({
         url,
-        metaUrl,
         props: _pageParams,
         layoutUrls: dependencies.layoutUrls.map((url: string) => url.replace(`${functionsDir}/`, '')),
         environment: (dependencies?.env?.ENV || 'production'),

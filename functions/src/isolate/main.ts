@@ -1,7 +1,6 @@
 const isolates: Map<string, any> = new Map();
 const urlMetadatas: Map<string, any> = new Map();
 
-
 const getAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
     for (let port = startPort; port <= endPort; port++) {
         try {
@@ -54,7 +53,6 @@ const upgradeIsolate = async (isolateId: string): void => {
     const oldPort = getPortFromIsolateId(isolateId);
 }
 
-
 export const cleanupIsolates = (): void => {
     console.log("Cleaning up isolates");
     for (const isolateId of isolates.keys()) {
@@ -62,24 +60,14 @@ export const cleanupIsolates = (): void => {
     }
 }
 
-export default ({ config, modules }: any) => async (
-    { url, pathname, headers, method, data, formData, ctx, params, queryParams, __requestId__ }: {
-        url: URL;
-        method: string;
-        headers: any;
-        pathname: string;
-        ctx: any | null;
-        params: any | null;
-        data: any | null;
-        queryParams: any | null;
-        formData: FormData | null;
-        __requestId__: string;
-    }, response: any) => {
+export default ({ config, modules }: any) => async (req: Request) => {
 
     const { permissions } = config;
+    const url = new URL(req.url);
+    const queryParams = Object.fromEntries(url.searchParams.entries());
 
-    const importUrl = !queryParams?.customBaseUrl ? new URL(modules.path.join(config.loaderUrl, config.functionsDir)) : new URL(config.loaderUrl);
-    importUrl.pathname = modules.path.join(importUrl.pathname, pathname);
+    const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir))
+    importUrl.pathname = modules.path.join(importUrl.pathname, url.pathname);
     importUrl.search = url.search;
 
     let urlMetadata;
@@ -106,7 +94,6 @@ export default ({ config, modules }: any) => async (
         }
     }
 
-
     if (!urlMetadata || queryParams.bundle || hasMatchParams) {
         urlMetadata = await fetch(importUrl.href, {
             redirect: "follow",
@@ -117,11 +104,11 @@ export default ({ config, modules }: any) => async (
 
 
         if (!urlMetadata.ok) {
-            response.status(urlMetadata.status)
-            response.statusText(urlMetadata.statusText)
-            return { error: urlMetadata.statusText }
+            return new Response(JSON.stringify({ error: { message: urlMetadata.statusText } }), { status: urlMetadata.status, headers: { 'Content-Type': 'application/json' } });
         }
+
         urlMetadata = await urlMetadata.text();
+
         try {
             urlMetadata = JSON.parse(urlMetadata);
         } catch (err) {
@@ -129,12 +116,7 @@ export default ({ config, modules }: any) => async (
         }
 
         if (queryParams.bundle) {
-            response.headers({ "content-type": "text/javascript" });
-            if (!urlMetadata?.content) {
-                response.status(404)
-                response.statusText("Module not found")
-            }
-            return urlMetadata?.content;
+            return new Response(urlMetadata?.content, { status: urlMetadata?.status, headers: { 'Content-Type': 'text/javascript' } });
         }
 
         const matchExt = modules.path.extname(urlMetadata?.matchPath);
@@ -150,10 +132,8 @@ export default ({ config, modules }: any) => async (
         urlMetadatas.set(isolateId, urlMetadata);
     }
 
-
     const ext = modules.path.extname(urlMetadata?.path);
     isJSX = ext === ".jsx" || ext === ".tsx";
-
 
     if (!isolates.get(isolateId)) {
         try {
@@ -181,11 +161,9 @@ export default ({ config, modules }: any) => async (
                     new URL(`./adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href,
                     `${port}`,
                     JSON.stringify({
-                        __requestId__: __requestId__,
                         importUrl: isolateId,
-                        currentUrl: url.href,
+                        url: url.href,
                         isJSX,
-                        headers,
                         env: { ...urlMetadata.variables },
                         ...config,
                     }),
@@ -211,75 +189,20 @@ export default ({ config, modules }: any) => async (
     try {
         const port = getPortFromIsolateId(isolateId);
 
-        const moduleResponse = await fetch(`http://localhost:${port}`, {
-            method: "POST",
-            headers: {
-                "content-type": "application/json",
-            },
-            body: JSON.stringify({
-                headers,
-                env: { ...urlMetadata.variables },
-                params: {
-                    ...params,
-                    ...ctx,
-                    ...urlMetadata.params,
-                    ...queryParams,
-                    ...data,
-                    ...formData
-                },
-                method,
-                __requestId__: __requestId__,
-                currentUrl: url.href,
-            }),
+        const moduleResponse = await fetch(new URL(
+            `${url.pathname}?${new URLSearchParams({ ...queryParams, ...urlMetadata.params })}`,
+            `http://localhost:${port}`
+        ), {
+            method: req.method,
+            headers: req.headers,
+            body: req.body
         });
-
-        response.options({
-            status: moduleResponse.status,
-            statusText: moduleResponse.statusText,
-            headers: Object.fromEntries(moduleResponse.headers.entries())
-        })
-        if (!moduleResponse.ok) {
-            const errorResponse = await moduleResponse.text();
-            try {
-                const errorMessage = JSON.parse(errorResponse);
-                return errorMessage;
-            } catch (_) {
-                return errorResponse;
-            }
-        }
-
-        let resolver: any;
-
-        const resolved = new Promise((resolve, reject) => {
-            resolver = { resolve, reject };
-        });
-
-        // create a reader to read the stream
-        const reader = moduleResponse?.body?.getReader();
-
-        reader?.read()?.then(function processText({ done, value }): any {
-            // value for fetch streams is a Uint8Array
-            const chunk = new TextDecoder('utf-8').decode(value, { stream: true });
-
-            // stream the chunk to the response
-            response.stream(chunk);
-
-            // if it's done, then stop reading
-            if (done) {
-                return resolver.resolve(chunk);
-            }
-
-            // Read some more, and call this function again
-            return reader.read().then(processText);
-        });
-        await resolved;
-
-        return;
+        return moduleResponse;
 
     } catch (error) {
         console.error("Error communicating with isolate server", error);
         cleanupIsolate(isolateId);
-        throw error;
+        return new Response(JSON.stringify(error), { status: 500, statusText: 'Bad Request', headers: { 'Content-Type': 'application/json' } });
     }
 
 };

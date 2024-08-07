@@ -115,8 +115,7 @@ export default ({ config, db: _db, schemas, Validator }) => {
             if (type === "any" || typeof type === 'object') return `${key} TEXT${isUnique ? ' UNIQUE' : ''}${isNullable ? '' : ' NOT NULL'}`;
             // Add more type mappings 
         })?.filter(Boolean)?.join(", ");
-        await db.exec(`CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`);
-
+        db.exec(`CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`);
     };
 
     const buildJsonObjectQuery = (schema, alias, isArray = false) => {
