@@ -85,7 +85,7 @@ export default (args) => {
     let db;
     if (!db) {
         const start = Date.now();
-        db = _db || new Database(path, config.dbOptions);
+        db = db || new Database(path, config.dbOptions);
         console.log('Database connection time:', Date.now() - start, 'ms');
     } else {
         console.log('Database already connected');
