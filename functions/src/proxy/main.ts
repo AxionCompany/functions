@@ -109,8 +109,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
         if (!isolateMetadataRes.ok) {
             return new Response(
-                JSON.stringify({ error: { message: isolateMetadata.statusText } }),
-                { status: isolateMetadata.status, headers: { 'Content-Type': 'application/json' } }
+                JSON.stringify({ error: { message: isolateMetadataRes.statusText } }),
+                { status: isolateMetadataRes.status, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
