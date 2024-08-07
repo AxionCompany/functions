@@ -2,7 +2,7 @@
 
 import server from "../../servers/main.ts";
 import RequestHandler from "../../handlers/main.ts";
-import ModuleExecution from "../utils/module-execution.tsx";
+import ModuleExecution from "../main.ts";
 
 const [portString, configString, envString]: string[] = Deno.args || [];
 const port = parseInt(portString) || 3000;
