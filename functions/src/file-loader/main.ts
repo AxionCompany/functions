@@ -30,7 +30,7 @@ export default ({ config, modules }: any) => {
       path: pathname
     }) || {};
 
-    if (!path && !customBaseUrl) {
+    if (!content) {
       res.status(404);
       res.statusText(`No path found for ${pathname}`)
       return;

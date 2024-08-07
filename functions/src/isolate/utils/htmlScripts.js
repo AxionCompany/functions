@@ -1,7 +1,6 @@
 const createScripts = ({
   url,
   environment,
-  metaUrl,
   props,
   layoutUrls,
   shared
@@ -54,11 +53,7 @@ const createScripts = ({
           \`\${new URL(path,window.baseUrl).href}?bundle=true&shared=${shared?.length ? shared.join(',') : ''}\`
         )
       }
-      window.metaImport = async (path) => {
-        return await import(
-          \`\${new URL(path,window.baseUrl).href}?bundle=true&customBaseUrl=${metaUrl}\`
-        )
-      }`
+     `
     },
 
   ]
@@ -74,7 +69,6 @@ const createScripts = ({
              // Hydrate the App
              hydrateRoot(document.body.querySelector('main'), App);
            }
-           window.importAxion = (path) => metaImport(path);
            const layouts = await Promise.all([
             ${layoutUrls.map((path) => `"${path}"`).join(",")}
            ].map(async (path) => await dynamicImport(path)));

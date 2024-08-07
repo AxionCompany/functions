@@ -18,15 +18,8 @@ for (const key in env) {
 }
 
 const isServer = true;
-const metaUrl = import.meta.url.split('src')?.[0];
-const importAxion: any = (path: string, config: any = {}) => {
-    config?.debug && console.log('Importing Axion Module from:', new URL(path, metaUrl).href);
-    return import(new URL(path, metaUrl).href);
-};
 
 globalThis.React = React;
-globalThis.metaUrl = metaUrl;
-globalThis.importAxion = importAxion;
 globalThis.isServer = isServer;
 
 
@@ -40,7 +33,6 @@ const indexHtml = `
 
 const moduleExecutor = await ModuleExecution({
     ...config,
-    metaUrl,
     dependencies: {
         ReactDOMServer,
         React,
@@ -52,24 +44,16 @@ const moduleExecutor = await ModuleExecution({
 });
 
 const handlerConfig = {
-    middlewares: {},
-    pipes: {}, // default to no pipes
     handlers: {
-        "/(.*)+": async ({ data }: any, response: any) => {
-
-            if (!data) return
-
+        "/(.*)+": async (data: any, response: any) => {
             try {
-
                 const chunk = await moduleExecutor(data, response);
                 return chunk;
             } catch (err) {
                 return response.error(err);
             }
         }
-    },
-    serializers: {},
-    dependencies: {},
+    }
 };
 
 
