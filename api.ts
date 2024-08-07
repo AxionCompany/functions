@@ -61,7 +61,6 @@ let shouldUpgradeAfter: number = 0;
       }
 
 
-
       try {
         _adapters = await adapters(_adapters);
       } catch (err) {
@@ -70,6 +69,7 @@ let shouldUpgradeAfter: number = 0;
       }
       const { loaderConfig, permissions, shouldUpgradeAfter: _shouldUpgradeAfter } = _adapters || {};
       shouldUpgradeAfter = _shouldUpgradeAfter || shouldUpgradeAfter;
+      console.log('PERMISSIONS', permissions);
 
       loaderConfig?.username && (fileLoaderUrl.username = loaderConfig.username);
       loaderConfig?.password && (fileLoaderUrl.password = loaderConfig.password);
