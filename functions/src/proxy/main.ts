@@ -132,7 +132,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
                 { status: isolateMetadata?.status, headers: { 'Content-Type': 'text/javascript' } }
             );
         }
-        
+
         // matchPath is the path to match in the URL
         const matchExt = modules.path.extname(_isolateMetadata?.matchPath);
         let match = matchExt ? _isolateMetadata?.matchPath?.replace(matchExt, '') : _isolateMetadata?.matchPath;
@@ -166,8 +166,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
             console.log("Spawning isolate id", isolateId);
             const port = await getAvailablePort(3500, 4000);
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null;
-            // config.debug && 
-            console.log('Running with Permissions', permissions)
+            config.debug && console.log('Running with Permissions', permissions)
             const reload = [];
 
             if (shouldUpgrade) {
