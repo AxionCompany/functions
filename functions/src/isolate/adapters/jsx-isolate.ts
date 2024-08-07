@@ -1,6 +1,6 @@
 import server from "../../servers/main.ts";
 import RequestHandler from "../../handlers/main.ts";
-import ModuleExecution from "../utils/module-execution.tsx";
+import ModuleExecution from "../main.ts";
 import processCss from "../utils/processCss.ts";
 import htmlScripts from '../utils/htmlScripts.js';
 import ReactDOMServer from "react-dom/server";

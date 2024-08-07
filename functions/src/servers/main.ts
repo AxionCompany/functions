@@ -6,6 +6,7 @@ export default (
     async (req: Request) => {
       // Handle OPTIONS request
       if (req.method === "OPTIONS") {
+        // to do: improve this
         return new Response(null, {
           headers: {
             "Access-Control-Allow-Origin": "*",
