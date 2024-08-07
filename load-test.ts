@@ -1,9 +1,9 @@
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Configuration
-const endpoint = (i) => `http://localhost:9002/examples/bench`;
-const concurrentRequests = 30;
-const totalRequests = 300;
+const endpoint = (i) => `http://localhost:9002/examples/api/tasks`;
+const concurrentRequests = 50;
+const totalRequests = 50;
 let requestCount = 0;
 
 // Function to send a single request

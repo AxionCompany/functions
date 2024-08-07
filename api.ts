@@ -18,7 +18,6 @@ self?.postMessage && self?.addEventListener("unhandledrejection", async event =>
 });
 
 import server from "./functions/src/servers/main.ts";
-import RequestHandler from "./functions/src/handlers/main.ts";
 import Isolate, { cleanupIsolates } from "./functions/src/isolate/main.ts";
 import BearerAuth from "./functions/modules/middlewares/bearerAuth.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
@@ -34,6 +33,7 @@ let adapters: any;
 
   server({
     requestHandler: async (req: Request) => {
+    
       env.DEBUG === 'true' && console.log('Received request in API from', req.url);
 
       const fileLoaderUrl = new URL(env.FILE_LOADER_URL || "http://localhost:9000");
@@ -42,14 +42,9 @@ let adapters: any;
       functionsDir.endsWith('/') && (functionsDir = functionsDir.slice(0, -1));
 
       const handlerConfig = {
-        middlewares: {
-          "bearerAuth": BearerAuth,
-        },
-        pipes: {}, // default to no pipes
+        middlewares: { "bearerAuth": BearerAuth },
         modules: {},
         handlers: {},
-        serializers: {},
-        dependencies: {},
         env,
         url: req.url,
         headers: req.headers
@@ -71,7 +66,6 @@ let adapters: any;
       try {
         _adapters = await adapters(handlerConfig);
       } catch (err) {
-        console.log('adapter err', err);
         JSON.stringify({ error: { message: err.message, status: (err.status || 500) } }), { status: err.status || 500 }
         return new Response(JSON.stringify({ error: { message: err.message, status: (err.status || 500) } }), { status: err.status || 500, headers: { 'Content-Type': 'application/json' } });
       }
@@ -115,27 +109,20 @@ let adapters: any;
       denoConfig.imports = { ...axionDenoConfig.imports, ...denoConfig.imports };
       denoConfig.scopes = { ...axionDenoConfig.scopes, ...denoConfig.scopes };
 
-      return RequestHandler({
-        ..._adapters,
-        handlers: {
-          ..._adapters.handlers,
-          "/(.*)+": Isolate({
-            config: {
-              loaderUrl: fileLoaderUrl.href,
-              dirEntrypoint: env.DIR_ENTRYPOINT || "index",
-              functionsDir: functionsDir,
-              ...axionConfig,
-              denoConfig,
-              permissions,
-            },
-            modules: {
-              path: { SEPARATOR, basename, extname, join, dirname },
-              template: replaceTemplate
-            },
-          }),
+      return Isolate({
+        config: {
+          loaderUrl: fileLoaderUrl.href,
+          dirEntrypoint: env.DIR_ENTRYPOINT || "index",
+          functionsDir: functionsDir,
+          ...axionConfig,
+          denoConfig,
+          permissions,
         },
-
-      })(req)
+        modules: {
+          path: { SEPARATOR, basename, extname, join, dirname },
+          template: replaceTemplate
+        },
+      })(req);
     },
     config: {
       PORT: env.PORT || 9002,

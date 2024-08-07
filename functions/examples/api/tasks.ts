@@ -18,5 +18,6 @@ export const POST = ({ name }) => {
 export const DELETE = (params) => {
     const { id } = params;
     tasks = tasks.filter(task => task.id !== id);
+    console.log('TASKS', tasks);
     return { success: true };
 };

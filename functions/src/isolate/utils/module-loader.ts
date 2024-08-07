@@ -1,6 +1,7 @@
 import getAllFiles from "./getAllFiles.ts";
 
-export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) => {
+export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
+  console.log('URL', url)
 
   const importPromises = [];
 
@@ -85,7 +86,7 @@ export default async ({ currentUrl, env, importUrl, dependencies, isJSX }: any) 
     },
     // Initial dependencies
     {
-      url: currentUrl,
+      url,
       env, ...dependencies, LayoutModules,
       indexHtml: indexHtmlFiles?.slice(-1)?.[0]?.content,
       layoutUrls: bundledLayouts?.map(file => file.path),
