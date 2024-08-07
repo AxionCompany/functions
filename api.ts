@@ -42,12 +42,9 @@ let shouldUpgradeAfter: number = 0;
       let functionsDir = env.FUNCTIONS_DIR || ".";
       functionsDir.endsWith('/') && (functionsDir = functionsDir.slice(0, -1));
 
-      let _adapters = {
+      let _adapters: any = {
         url: req.url,
         headers: req.headers,
-        loaderConfig: {},
-        permissions: {},
-        shouldUpgradeAfter,
         env
       };
 
@@ -62,6 +59,7 @@ let shouldUpgradeAfter: number = 0;
             )
           }) || ((a: any) => a);
       }
+
 
 
       try {
