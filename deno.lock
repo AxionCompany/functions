@@ -8,6 +8,7 @@
       "npm:jsonata": "npm:jsonata@2.0.5",
       "npm:jsonwebtoken": "npm:jsonwebtoken@9.0.2",
       "npm:libsql": "npm:libsql@0.4.0",
+      "npm:libsql@0.4.0-pre.10": "npm:libsql@0.4.0-pre.10",
       "npm:linkedom": "npm:linkedom@0.18.4",
       "npm:lodash.debounce": "npm:lodash.debounce@4.0.8",
       "npm:mongodb@6.7.0": "npm:mongodb@6.7.0",
@@ -356,12 +357,20 @@
         "integrity": "sha512-XpdSvOnNicz7RXLus6nGWvEKYJpN0ApbY6C9pqIdjCdhe3FjSCHMCtuTdsJDbC39YRafF4/bClAd3UAIUopkbA==",
         "dependencies": {}
       },
+      "@libsql/darwin-arm64@0.4.0-pre.10": {
+        "integrity": "sha512-UgfcbVsZdpPohhTaN+szvqOmPOb/7YYkKxEBpGnLAsAA6UeexBFaGyyLGNAVcAnP63l10e2R1Q0/JcJG78FMiA==",
+        "dependencies": {}
+      },
       "@libsql/darwin-x64@0.3.19": {
         "integrity": "sha512-q9O55B646zU+644SMmOQL3FIfpmEvdWpRpzubwFc2trsa+zoBlSkHuzU9v/C+UNoPHQVRMP7KQctJ455I/h/xw==",
         "dependencies": {}
       },
       "@libsql/darwin-x64@0.4.0": {
         "integrity": "sha512-jBY1jPhBFPgE4WBpeJstGoNOKxmAM5OJR9RUQBVYh19VGdXz3FJrAUvXAjCytKGtoWRwDRjyjrQJb+WB7Np7/A==",
+        "dependencies": {}
+      },
+      "@libsql/darwin-x64@0.4.0-pre.10": {
+        "integrity": "sha512-FfREqmqLXr1DLfHS/J69TIJeFOvz/TFEfdcmG0wmYw0OWZqBfz40z+Ol1Bgi+V1WWXNbwmr3B/3z4xkQ2NqxSw==",
         "dependencies": {}
       },
       "@libsql/linux-arm64-gnu@0.3.19": {
@@ -372,12 +381,20 @@
         "integrity": "sha512-6qWBYMSskCOTp+NkZKUQ35QmvkPWFiZAFlu5xdkfXXHi7qWuGWnvjPNZWvswiONxZuMC/04pmvb9KV6u4JmmSg==",
         "dependencies": {}
       },
+      "@libsql/linux-arm64-gnu@0.4.0-pre.10": {
+        "integrity": "sha512-amz2WdtT9CCgL4nTXcnwrRw+SLiXGVOA669aFYcWPGimObDyFaHgjE+4Megd4HjmTn3nAFYg5f05W6HZ9sqIRQ==",
+        "dependencies": {}
+      },
       "@libsql/linux-arm64-musl@0.3.19": {
         "integrity": "sha512-VEZtxghyK6zwGzU9PHohvNxthruSxBEnRrX7BSL5jQ62tN4n2JNepJ6SdzXp70pdzTfwroOj/eMwiPt94gkVRg==",
         "dependencies": {}
       },
       "@libsql/linux-arm64-musl@0.4.0": {
         "integrity": "sha512-6jqlatdhXprmdt8AK+IBBgqFBDaODmRcfHSIwg8sk0DhLzmF2nCeKdgfW6VdSELQcM7kwOkjX9AYn+CHBD+mqg==",
+        "dependencies": {}
+      },
+      "@libsql/linux-arm64-musl@0.4.0-pre.10": {
+        "integrity": "sha512-ltsJ2pvXe3vSDVbDF/oDTLvwPqXuyyXQlFkecsG+P9EMPl2j3zljLUXekHI0Vqw7iEa0je7fK2P8uZz9B4KhIQ==",
         "dependencies": {}
       },
       "@libsql/linux-x64-gnu@0.3.19": {
@@ -388,6 +405,10 @@
         "integrity": "sha512-pf7jko2DcXSTe6Fh1kaSh11KgKOBcVlzGhQfvKAO46SvneVcBG+IaR33Pxy3+SM/dfCeenJYsjlreFe0g/b4hQ==",
         "dependencies": {}
       },
+      "@libsql/linux-x64-gnu@0.4.0-pre.10": {
+        "integrity": "sha512-2gAYyfSwEq5p+dd7ctutLQlV6TcJJ9ahplxD6uN1codMUszgzgnGKGeY6uqdLckDX6yrc52Qmh2DxPRgdeT8cQ==",
+        "dependencies": {}
+      },
       "@libsql/linux-x64-musl@0.3.19": {
         "integrity": "sha512-BLsXyJaL8gZD8+3W2LU08lDEd9MIgGds0yPy5iNPp8tfhXx3pV/Fge2GErN0FC+nzt4DYQtjL+A9GUMglQefXQ==",
         "dependencies": {}
@@ -396,12 +417,20 @@
         "integrity": "sha512-Zs96O1lt2hbRZgTYCZiAbY5ExkRzK/WU6bFs2lw/m0uyFsbPxJFaqwW5LFiUkpn9DZiuWS+JS29by/RuVR8eZw==",
         "dependencies": {}
       },
+      "@libsql/linux-x64-musl@0.4.0-pre.10": {
+        "integrity": "sha512-OmO8Y2htGD4V4jAsYxKjfWdY/nmYwi6W08kqIpP2w05wO5J6+bpAtrVXscTYgYP/TK+oOlNvA84JqVgIjhBRAg==",
+        "dependencies": {}
+      },
       "@libsql/win32-x64-msvc@0.3.19": {
         "integrity": "sha512-ay1X9AobE4BpzG0XPw1gplyLZPGHIgJOovvW23gUrukRegiUP62uzhpRbKNogLlUOynyXeq//prHgPXiebUfWg==",
         "dependencies": {}
       },
       "@libsql/win32-x64-msvc@0.4.0": {
         "integrity": "sha512-BYEb6YJCNFZLKX3d49gwwmFIuBzZ2chHx84cQe/lzaGqLaovLeUDeuNRlgf+cptW0qMtSHIYDhcBl4QAStbJ2g==",
+        "dependencies": {}
+      },
+      "@libsql/win32-x64-msvc@0.4.0-pre.10": {
+        "integrity": "sha512-XEVLtk+qLDxma1rJgu70qLRBa/hh2ETQQlcfdiv/IfCdn8UxjaldtZ9cZ0G40eiYCxAgxdLA3Ipi8nI8ok1iwA==",
         "dependencies": {}
       },
       "@mongodb-js/saslprep@1.1.8": {
@@ -1099,6 +1128,21 @@
           "@libsql/linux-x64-gnu": "@libsql/linux-x64-gnu@0.4.0",
           "@libsql/linux-x64-musl": "@libsql/linux-x64-musl@0.4.0",
           "@libsql/win32-x64-msvc": "@libsql/win32-x64-msvc@0.4.0",
+          "@neon-rs/load": "@neon-rs/load@0.0.4",
+          "detect-libc": "detect-libc@2.0.2",
+          "libsql": "libsql@0.3.19"
+        }
+      },
+      "libsql@0.4.0-pre.10": {
+        "integrity": "sha512-oyBx2D5TVxxapimKKTkaFI+M05sIUBUQib5Rb5ctkfs6TcwM84FkHO3mooV29wO7uSbEAmblYOB57WSauMsCCw==",
+        "dependencies": {
+          "@libsql/darwin-arm64": "@libsql/darwin-arm64@0.4.0-pre.10",
+          "@libsql/darwin-x64": "@libsql/darwin-x64@0.4.0-pre.10",
+          "@libsql/linux-arm64-gnu": "@libsql/linux-arm64-gnu@0.4.0-pre.10",
+          "@libsql/linux-arm64-musl": "@libsql/linux-arm64-musl@0.4.0-pre.10",
+          "@libsql/linux-x64-gnu": "@libsql/linux-x64-gnu@0.4.0-pre.10",
+          "@libsql/linux-x64-musl": "@libsql/linux-x64-musl@0.4.0-pre.10",
+          "@libsql/win32-x64-msvc": "@libsql/win32-x64-msvc@0.4.0-pre.10",
           "@neon-rs/load": "@neon-rs/load@0.0.4",
           "detect-libc": "detect-libc@2.0.2",
           "libsql": "libsql@0.3.19"
