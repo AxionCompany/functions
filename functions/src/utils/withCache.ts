@@ -19,7 +19,7 @@ const Cache = async (projectId: string, prefix = '') => {
     if (connections.has(projectId)) {
         kv = connections.get(projectId);
     } else {
-        await createDirIfNotExists(`./${prefix || '.'}/cache`);
+        await createDirIfNotExists(['.', prefix, 'cache'].filter(Boolean).join('/'));
         kv = await Deno.openKv(`./${prefix || '.'}/cache/cache.db`);
         connections.set(projectId, kv);
     }
