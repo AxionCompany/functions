@@ -1,5 +1,7 @@
 /// <reference lib="deno.unstable" />
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
+import { ensureDir } from "https://deno.land/std@0.224.0/fs/ensure_dir.ts";
+
 
 self?.postMessage && self?.addEventListener("unhandledrejection", async event => {
   // Prevent this being reported (Firefox doesn't currently respect this)
@@ -16,8 +18,7 @@ self?.postMessage && self?.addEventListener("unhandledrejection", async event =>
   });
 
 });
-
-import server from "./functions/src/servers/main.ts";
+import server from "./functions/src/server/main.ts";
 import Proxy from "./functions/src/proxy/main.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
 import replaceTemplate from "./functions/src/utils/template.ts";
@@ -34,7 +35,6 @@ let shouldUpgradeAfter: number = 0;
 
   server({
     requestHandler: async (req: Request) => {
-
       env.DEBUG === 'true' && console.log('Received request in API from', req.url);
 
       const fileLoaderUrl = new URL(env.FILE_LOADER_URL || "http://localhost:9000");
@@ -60,7 +60,6 @@ let shouldUpgradeAfter: number = 0;
           }) || ((a: any) => a);
       }
 
-
       try {
         _adapters = await adapters(_adapters);
       } catch (err) {
@@ -70,8 +69,8 @@ let shouldUpgradeAfter: number = 0;
       const { loaderConfig, permissions, shouldUpgradeAfter: _shouldUpgradeAfter } = _adapters || {};
       shouldUpgradeAfter = _shouldUpgradeAfter || shouldUpgradeAfter;
 
-      loaderConfig?.username && (fileLoaderUrl.username = loaderConfig.username);
-      loaderConfig?.password && (fileLoaderUrl.password = loaderConfig.password);
+      fileLoaderUrl.username = (loaderConfig?.username || 'local');
+      loaderConfig?.password && (fileLoaderUrl.password = loaderConfig?.password);
 
       let axionConfig: any = axionConfigs.get(new URL(req.url).origin);
 
@@ -120,7 +119,8 @@ let shouldUpgradeAfter: number = 0;
         },
         modules: {
           path: { SEPARATOR, basename, extname, join, dirname },
-          template: replaceTemplate
+          template: replaceTemplate,
+          fs: { ensureDir }
         },
       })(req);
     },

@@ -1,7 +1,4 @@
 import moduleLoader from "./utils/moduleLoader.ts";
-import { createHash } from "../../modules/connectors/security.js";
-import { get, set } from "https://deno.land/x/kv_toolbox/blob.ts";
-
 
 const tryParseJSON = (str: any) => {
   try {
@@ -134,10 +131,18 @@ const moduleInstance: any = async (
 
       const compiledHtml = [dependencies.bundledLayouts.join('\n'), dependencies.bundledModule].join('\n');
       // compile css script
-      // build css with page visible elements, only
-      const css = await (buildStyles(dependencies))(html, { importUrl });
-      // async build css with all elements and dependent components
-      const completeCss = (buildStyles(dependencies))(compiledHtml, { importUrl });
+      let css = '';
+      let completeCss;
+      if (dependencies.postCssConfig) {
+        // build css with page visible elements, only
+        css = await dependencies.processCss(dependencies.postCssConfig, html, importUrl);
+        // async build css with all elements and dependent components
+        completeCss = dependencies.withCache(
+          dependencies.processCss,
+          { expireIn: 1000 * 60 },
+          dependencies.postCssConfig, compiledHtml, importUrl
+        )
+      }
       // add css to head
       const style = document.createElement('style');
       style.textContent = css;
@@ -167,19 +172,23 @@ const moduleInstance: any = async (
       // render the html template
       workerRes = document.toString();
       // stream up to the main element for readly availability of SSR content 
-      const endIndex = workerRes.indexOf('</body>');
-      if (endIndex > -1) {
-        const endChunk = workerRes.slice(0, endIndex);
-        response.stream(endChunk + '\n')
-        // then, stream script for updating the style tag
-        await completeCss.then((css: string) =>
-          css && response.stream(`
-          <script>
-          const style = document.querySelector('style');
-          style.textContent += ${JSON.stringify(css)};
-          </script>
-          `))
-        workerRes = workerRes.slice(endIndex);
+      if (completeCss) {
+        const endIndex = workerRes.indexOf('</body>');
+        if (endIndex > -1) {
+          const endChunk = workerRes.slice(0, endIndex);
+          response.stream(endChunk + '\n')
+          // then, stream script for updating the style tag
+          await completeCss.then((css: string) =>
+            css && response.stream(`
+            <script>
+            const style = document.querySelector('style');
+            style.textContent += ${JSON.stringify(css)};
+            </script>
+            `))
+          workerRes = workerRes.slice(endIndex);
+          response.stream(workerRes + '\n')
+        }
+      } else {
         response.stream(workerRes + '\n')
       }
       // the end
@@ -197,33 +206,4 @@ const moduleInstance: any = async (
   } catch (err) {
     throw err;
   }
-}
-
-const createDirIfNotExists = async (path: string) => {
-  try {
-    await Deno.mkdir(path, { recursive: true });
-  } catch (_) { }
-}
-
-
-await createDirIfNotExists('./cache');
-const kv = await Deno.openKv('./cache/db');
-
-const buildStyles = (dependencies: any) => async (html: string, { importUrl }: { importUrl: string }) => {
-  if (dependencies.postCssConfig) {
-    try {
-
-      const hash = await createHash(html);
-      const cachedData: any = await get(kv, ['cache', 'styles', hash])
-      if (cachedData?.value) {
-        const cachedStyle = new TextDecoder('utf-8').decode(cachedData.value);
-        return cachedStyle
-      } else {
-        const style = await dependencies.processCss(dependencies.postCssConfig, html, importUrl)
-        set(kv, ['cache', 'styles', hash], new TextEncoder().encode(style), { expireIn: 1000 * 60 });
-        return style;
-      }
-    } catch (e) { console.log('ERROR', e) }
-  }
-  return ''
 }

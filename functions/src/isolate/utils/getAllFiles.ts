@@ -1,6 +1,6 @@
 import getFile from './getFile.ts';
 
-const getAllFiles = async ({ url, name, extensions, returnProp , ...rest}: any) => {
+const getAllFiles = async ({ url, name, extensions, returnProp, ...rest }: any) => {
 
     const urlData = new URL(url);
     const possibleFileUrls: string[] = []
@@ -8,7 +8,7 @@ const getAllFiles = async ({ url, name, extensions, returnProp , ...rest}: any) 
         .map((_, i, arr) => {
             const urlParts = arr.slice(0, i + 1)
             urlParts.push(name);
-            return new URL(urlParts.join('/') + `${urlData.search ?? ''}`, urlData.origin).href
+            return new URL(`${urlParts.join('/')}?${urlData.search ?? ''}`, url).href
         })
         .forEach((url) => possibleFileUrls.push(url));
 
