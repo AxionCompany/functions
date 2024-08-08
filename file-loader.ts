@@ -140,7 +140,7 @@ server({
             path: {
               SEPARATOR, basename, extname, join, dirname
             },
-            withCache: await Cache(username)
+            withCache: await Cache(username, 'data/local')
           }
         }),
         serializers: {}
