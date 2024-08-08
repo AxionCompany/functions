@@ -12,15 +12,15 @@ const createDirIfNotExists = async (path: string) => {
     } catch (e) { console.log('Error on createDirIfNotExists', e) }
 }
 
-const Cache = async (projectId: string) => {
+const Cache = async (projectId: string, prefix = '') => {
 
     let kv;
     // check if connection already exists
     if (connections.has(projectId)) {
         kv = connections.get(projectId);
     } else {
-        await createDirIfNotExists(`./cache`);
-        kv = await Deno.openKv(`./cache/cache.db`);
+        await createDirIfNotExists(`./${prefix || '.'}/cache`);
+        kv = await Deno.openKv(`./${prefix || '.'}/cache/cache.db`);
         connections.set(projectId, kv);
     }
 

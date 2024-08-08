@@ -59,8 +59,6 @@ export default ({ config, modules }: any) => {
       }
     }
 
-    console.log('Loading URL', url.href, JSON.stringify(redirect, matchPath, path))
-
     redirect = redirect && !shouldBundle;
     if (redirect) {
       // logic for redirecting to the new path, so the loader will get the correct file extension from the path in URL.
