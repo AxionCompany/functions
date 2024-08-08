@@ -1,4 +1,4 @@
-
+import runOptions from "./utils/runOptions.ts";
 const isolatesMetadata = new Map<string, any>();
 
 const getAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
@@ -46,11 +46,6 @@ const cleanupIsolate = async (isolateId: string): void => {
     }
 };
 
-const upgradeIsolate = async (isolateId: string): void => {
-    // try to instantiate a new isolate. if it works, set isolateId pointing to the new port and delete/kill the old one. If not, just return
-    const oldPort = getPortFromIsolateId(isolateId);
-}
-
 export const cleanupIsolates = (): void => {
     console.log("Cleaning up isolates");
     for (const isolateId of isolatesMetadata.keys()) {
@@ -58,9 +53,9 @@ export const cleanupIsolates = (): void => {
     }
 }
 
+
 export default ({ config, modules }: any) => async (req: Request) => {
 
-    const { permissions } = config;
     const url = new URL(req.url);
     const queryParams = Object.fromEntries(url.searchParams.entries());
 
@@ -166,43 +161,37 @@ export default ({ config, modules }: any) => async (req: Request) => {
             console.log("Spawning isolate id", isolateId);
             const port = await getAvailablePort(3500, 4000);
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null;
-            config.debug && console.log('Running with Permissions', permissions)
             const reload = [];
-
             if (shouldUpgrade) {
                 reload.push(...[importUrl.origin, url.origin, metaUrl])
                 console.log("Upgrading isolate with ID:", isolateId, 'reloading:', reload.filter(Boolean).join(','));
             }
+            const projectId = new URL(isolateId).username;
+            config.projectId = projectId;
+
+            await modules.fs.ensureDir(`./data/${projectId}`);
 
             const command = new Deno.Command(Deno.execPath(), {
+                env: {
+                    DENO_DIR: `./cache/.deno`,
+                },
+                cwd: `./data/${projectId}`,
                 args: [
                     'run',
-                    reload.length ? `--reload=${reload.filter(Boolean).join(',')}` : '',
-                    '--deny-run',
-                    `--allow-env${permissions?.['allow-env'] === true ? '' : '=' + ['DENO_AUTH_TOKENS', ...(permissions?.['allow-env'] || [])].join(',') || ''}`,
-                    `--allow-sys${permissions?.['allow-sys'] === true ? '' : '=' + ['cpus', 'osRelease', ...(permissions?.['allow-sys'] || [])].join(',') || ''}`,
-                    `--allow-write${permissions?.['allow-write'] === true ? '' : '=' + ['./cache/', ...(permissions?.['allow-write'] || [])].join(',') || ''}`,
-                    '--allow-read',
-                    '--allow-net',
-                    '--allow-ffi',
-                    '--unstable-sloppy-imports',
-                    '--unstable-kv',
-                    '--unstable',
-                    '--no-lock',
-                    '--no-prompt',
-                    '--importmap=' + `data:application/json,${modules.template(JSON.stringify({ imports: config?.denoConfig?.imports, scope: config?.denoConfig?.scope }), isolateMetadata.variables)}`,
-                    new URL(`../isolate/adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href,
-                    `${port}`,
+                    ...runOptions({ ...config.permissions, reload }, { config, modules, variables: isolateMetadata.variables }),
+                    new URL(`../isolate/adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, // path to isolate.ts
+                    `${port}`, // port
                     JSON.stringify({
+                        projectId,
                         importUrl: isolateId,
                         url: url.href,
                         isJSX,
                         env: { ...isolateMetadata.variables },
                         ...config,
-                    }),
+                    }), // isolate metadata
                     JSON.stringify({
                         DENO_AUTH_TOKENS: isolateMetadata.variables.DENO_AUTH_TOKENS,
-                    })
+                    }) //
                 ].filter(Boolean),
             });
             const process = command.spawn();

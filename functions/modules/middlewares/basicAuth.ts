@@ -19,9 +19,6 @@ export default ({ validateAuth }: any) => {
     throw new Response(error || "401 Unauthorized", {
       status: 401,
       statusText: "Unauthorized",
-      headers: {
-        // "www-authenticate": `Basic realm="${realm}"`,
-      },
     });
   };
 };

@@ -24,17 +24,19 @@ export default ({ config, modules }: any) => {
     );
 
     const startTime = Date.now();
-    let { content, redirect, params, path, variables, matchPath } = await modules.withCache(
-      fileLoader,
-      { cachettl: config.cachettl, useCache: config.useCache, keys: ['file-loader', url.href] }, {
-      path: pathname
-    }) || {};
+    let fileData;
+    try {
+      fileData = await fileLoader({ path: pathname })
+    } catch (_) {}
+
+    let { content, redirect, params, path, variables, matchPath } = fileData || {};
 
     if (!content) {
       res.status(404);
       res.statusText(`No path found for ${pathname}`)
       return;
     }
+
     config.debug && console.log(`Loaded file ${url.href} in ${Date.now() - startTime}ms`)
 
     if (shouldBundle) {
@@ -44,17 +46,20 @@ export default ({ config, modules }: any) => {
       }
       const bundleUrl = url
       bundleUrl.search = '';
-      const bundleContent = await modules.withCache(
-        bundler,
-        { cachettl: config.cachettl, useCache: false, keys: ['bundler', bundleUrl.href] },
+
+      const bundleContent = await bundler(
         bundleUrl,
         { shared: shared?.split(','), ...variables, ...data, ...params, environment: config.environment }
-      ).then(res => res).catch(console.log);
+      ).catch((err: any) => {
+        console.log(`Error trying to bundle ${bundleUrl.href}: ${err.toString()}`);
+      });
 
       if (bundleContent) {
         return { content: bundleContent, params, path, matchPath };;
       }
     }
+
+    console.log('Loading URL', url.href, JSON.stringify(redirect, matchPath, path))
 
     redirect = redirect && !shouldBundle;
     if (redirect) {
@@ -71,12 +76,12 @@ export default ({ config, modules }: any) => {
       return { content, redirect, params, path, variables, matchPath };
     }
 
+
     if (['js', 'jsx', 'ts', 'tsx'].includes(matchPath?.split('.').pop())) {
       if (params) { // add export for params in content
         content += `\n\nexport const _pathParams = ${JSON.stringify(params)};`;
       }
       content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\', '/')}"`;
-
       // transform the content
       if (['js', 'ts'].includes(pathname.split('.').pop())) {
         content = transformer({

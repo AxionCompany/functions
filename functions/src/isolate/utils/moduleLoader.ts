@@ -1,7 +1,9 @@
 import getAllFiles from "./getAllFiles.ts";
 
 export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
-  console.log('URL', url)
+  // Load target module
+  importUrl = new URL(importUrl);
+  // importUrl.searchParams.append('v', new Date().getTime().toString());
 
   const importPromises = [];
 
@@ -22,6 +24,8 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
 
   const bundleUrl = new URL(importUrl);
   bundleUrl.searchParams.append('bundle', true);
+
+  console.log('bundleUrl', bundleUrl.href);
 
 
   if (isJSX) {
@@ -105,6 +109,9 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
 
   try {
     // Load target module
+    // importUrl = new URL(importUrl);
+    // importUrl.searchParams.append('v', new Date().getTime().toString());
+    // console.log('ESMOD IMPORT URL', importUrl);
     const ESModule = await import(importUrl).then(mod => mod).catch(err => {
       throw {
         message: `Error Importing Module \`${importUrl}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, ''),

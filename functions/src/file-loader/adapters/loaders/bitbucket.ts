@@ -1,6 +1,8 @@
-import { withCache } from "../../main.ts";
 
-export default ({ config }: any) => {
+
+export default ({ config, modules }: any) => {
+
+    const withCache = modules.withCache;
 
     const BITBUCKET_API_URL = "https://api.bitbucket.org/2.0";
 

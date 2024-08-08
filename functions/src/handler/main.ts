@@ -1,5 +1,5 @@
-import responseCallback from "../utils/responseCallback.ts";
-import { getSubdomain } from "../utils/urlFunctions.ts";
+import responseCallback from "./utils/responseCallback.ts";
+import { getSubdomain } from "./utils/urlFunctions.ts";
 
 interface DataChunk {
   options?: { [key: string]: string };

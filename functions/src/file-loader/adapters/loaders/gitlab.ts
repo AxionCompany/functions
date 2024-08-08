@@ -1,6 +1,7 @@
-import { withCache } from "../../main.ts";
 
-export default ({ config }: any) => {
+export default ({ config, modules }: any) => {
+
+    const withCache = modules.withCache;
 
     const GITLAB_API_URL = "https://gitlab.com/api/v4";
 

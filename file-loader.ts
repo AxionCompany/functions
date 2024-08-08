@@ -1,10 +1,10 @@
 /// <reference lib="deno.unstable" />
-import RequestHandler from "./functions/src/handlers/main.ts";
+import RequestHandler from "./functions/src/handler/main.ts";
 import FileLoader from "./functions/src/file-loader/main.ts";
-import server from "./functions/src/servers/main.ts";
+import server from "./functions/src/server/main.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
-import withCache from "./functions/src/utils/withCache.ts";
+import Cache from "./functions/src/utils/withCache.ts";
 import denoConfig from "./deno.json" with { type: "json" };
 
 self?.addEventListener("unhandledrejection", event => {
@@ -28,16 +28,20 @@ server({
 
     let useCache;
     const authorizationEncoded = req.headers.get('authorization')?.slice(6);
-    const [username, password] = authorizationEncoded ? atob(authorizationEncoded).split(':') : [];
+    let [username, password] = authorizationEncoded ? atob(authorizationEncoded).split(':') : [];
     debug && console.log('Received request in File Loader from', req.url, username, password);
 
     try {
       useCache = JSON.parse(env.USE_CACHE || 'true');
-    } catch (err) {
+    } catch (_) {
       useCache = true;
     }
 
+
     const [provider, org, repo, branch, environment] = username?.split('--') || [];
+    if (!provider) {
+      username = 'local';
+    }
 
     const fileLoaderWithAxionConfig = async ({ config, modules }) => async (params, res) => {
 
@@ -86,13 +90,12 @@ server({
           pathname: '/deno.json',
           url: denoConfigUrl,
         }, responseMock);
-
         _denoConfig = JSON.parse(_denoConfig || '{}')
         const nodeConfig = await fileLoader({
           queryParams: {},
           headers: { 'content-type': 'text/plain' },
           pathname: '/package.json',
-          url: denoConfigUrl,
+          url: new URL('/package.json', denoConfigUrl),
         }, responseMock);
         const nodeConfigJson = JSON.parse(nodeConfig || '{}');
         _denoConfig.imports = _denoConfig?.imports || {};
@@ -105,6 +108,7 @@ server({
         });
         denoConfigs.set(denoConfigUrl.origin, { ...denoConfig, ..._denoConfig });
       }
+
 
       return FileLoader({
         config: { ...config, ...axionConfig },
@@ -136,7 +140,7 @@ server({
             path: {
               SEPARATOR, basename, extname, join, dirname
             },
-            withCache
+            withCache: await Cache(username)
           }
         }),
         serializers: {}
