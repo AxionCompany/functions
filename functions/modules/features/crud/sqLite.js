@@ -570,12 +570,11 @@ export default (args) => {
                 // Query SQL Statement
                 const whereClauses = toSqlQuery(validatedQuery, { table: key });
                 const _deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
-                const start = Date.now();
-                config.debug && console.log('CRUD Execution Id:', executionId, '| delete', '| SQL:', deleteSql, '| Params:', JSON.stringify(validatedQueryParams));
-
                 const { sql: deleteSql, params: sqlParams } = convertToPositionalParams(_deleteSql, validatedQueryParams);
-
+                
+                config.debug && console.log('CRUD Execution Id:', executionId, '| delete', '| SQL:', deleteSql, '| Params:', JSON.stringify(validatedQueryParams));
                 // Prepare Statemens
+                const start = Date.now();
                 const deleteStmt = await db.prepare(deleteSql);
                 // Execute SQL Statement
                 deleteStmt.run(serializeParams(sqlParams));
