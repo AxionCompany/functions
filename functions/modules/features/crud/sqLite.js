@@ -438,7 +438,6 @@ export default (args) => {
 
                 const _sqlParams = { ..._validatedQueryParams, ...validatedDataParams };
 
-
                 // Query SQL Statement
                 const whereClauses = toSqlQuery(validatedQuery, { table: key })
                 let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
@@ -453,13 +452,13 @@ export default (args) => {
                 const _updateSql = `UPDATE ${key} ${setClauses} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
 
                 config.addTimestamps && (_sqlParams.updatedAt = new Date().toISOString());
-                const start = Date.now();
-                config.debug && console.log('CRUD Execution Id:', executionId, '| update', '| SQL:', _updateSql, '| Params:', JSON.stringify(_sqlParams));
 
                 const { sql: updateSql, params: sqlParams } = convertToPositionalParams(_updateSql, _sqlParams);
                 const { sql, params: validatedQueryParams } = convertToPositionalParams(querySql, _validatedQueryParams);
                 querySql = sql;
 
+                const start = Date.now();
+                config.debug && console.log('CRUD Execution Id:', executionId, '| update', '| SQL:', _updateSql, '| Params:', JSON.stringify(_sqlParams));
 
                 const response = await db.transaction(async () => {
                     // Prepare Statemens
@@ -490,7 +489,7 @@ export default (args) => {
                     query: true,
                     path: `updateMany_inputQuery:${key}`,
                 });
-                const validatedQueryParams = Validator(schema, query, {
+                const _validatedQueryParams = Validator(schema, query, {
                     query: true,
                     removeOperators: true,
                 });
@@ -507,17 +506,29 @@ export default (args) => {
                     validatedDataParams.updatedAt = new Date().toISOString();
                 }
 
-                const sqlParams = { ...validatedQueryParams, ...validatedDataParams };
+                const _sqlParams = { ...validatedQueryParams, ...validatedDataParams };
 
                 // Query SQL Statement
-                const whereClauses = toSqlQuery(validatedQuery, { table: key });
+                // Where clause
+                // Query SQL Statement
+                const whereClauses = toSqlQuery(validatedQuery, { table: key })
+                let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
+                    if (typeof value === 'object' || value === 'any') {
+                        return `json_extract(${key}.${field}, '$') as ${field}`;
+                    }
+                    return `${key}.${field}`;
+                }).join(", ")}`;
+                querySql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ''}`;
+                // const whereClauses = toSqlQuery(validatedQuery, { table: key });
                 const setClauses = toSqlWrite(validatedData);
-                const updateSql = `UPDATE ${key} SET ${setClauses} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
-                const querySql = `SELECT * FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
-
-
+                const _updateSql = `UPDATE ${key} ${setClauses} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
 
                 config.addTimestamps && (sqlParams.updatedAt = new Date().toISOString());
+
+                const { sql: updateSql, params: sqlParams } = convertToPositionalParams(_updateSql, _sqlParams);
+                const { sql, params: validatedQueryParams } = convertToPositionalParams(querySql, _validatedQueryParams);
+                querySql = sql;
+
                 const start = Date.now();
                 config.debug && console.log("CRUD Execution Id:", executionId, "| updateMany", "| SQL:", updateSql, "| Params:", JSON.stringify(sqlParams));
                 // Execute SQL Statement
@@ -558,14 +569,16 @@ export default (args) => {
 
                 // Query SQL Statement
                 const whereClauses = toSqlQuery(validatedQuery, { table: key });
-                const deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
+                const _deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
                 const start = Date.now();
                 config.debug && console.log('CRUD Execution Id:', executionId, '| delete', '| SQL:', deleteSql, '| Params:', JSON.stringify(validatedQueryParams));
+
+                const { sql: deleteSql, params: sqlParams } = convertToPositionalParams(_deleteSql, validatedQueryParams);
 
                 // Prepare Statemens
                 const deleteStmt = await db.prepare(deleteSql);
                 // Execute SQL Statement
-                deleteStmt.run(serializeParams(validatedQueryParams));
+                deleteStmt.run(serializeParams(sqlParams));
                 // Validate the response
                 const validatedResponse = Validator(schema, { success: true }, {
                     path: `delete_output:${key}`,
@@ -580,17 +593,25 @@ export default (args) => {
             },
             deleteMany: async (query, options) => {
                 const executionId = crypto.randomUUID();
+
                 const validatedQuery = Validator(schema, query, {
                     query: true,
-                    path: `delete_input:${key}`,
+                    path: `deleteMany_input:${key}`,
+                });
+                const validatedQueryParams = Validator(schema, query, {
+                    query: true,
+                    path: `deleteMany_inputParams:${key}`,
+                    removeOperators: true,
                 });
 
                 const whereClauses = toSqlQuery(validatedQuery, { table: key });
-                const sqlParams = { ...validatedQuery };
 
-                const deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
+                const _deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
                 const start = Date.now();
+                const { sql: deleteSql, params: sqlParams } = convertToPositionalParams(_deleteSql, validatedQueryParams);
+
                 config.debug && console.log('CRUD Execution Id:', executionId, '| deleteMany', '| SQL:', deleteSql, '| Params:', JSON.stringify(sqlParams));
+
                 const response = await db.transaction(async () => {
                     const deleteStmt = await db.prepare(deleteSql);
                     deleteStmt.run(serializeParams(sqlParams));
