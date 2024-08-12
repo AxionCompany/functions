@@ -218,6 +218,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
             `http://localhost:${port}`
         ), {
             method: req.method,
+            redirect: "manual",
             headers: req.headers,
             body: req.body
         });
