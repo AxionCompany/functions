@@ -10,8 +10,6 @@ const port = parseInt(portString) || 3000;
 const config = JSON.parse(configString);
 const env = JSON.parse(envString);
 
-console.log('PATH', Deno.cwd())
-
 const withCache = await Cache(config.projectId);
 
 for (const key in env) {
@@ -27,6 +25,10 @@ const handlerConfig = {
     middlewares: {},
     handlers: {
         "/(.*)+": async function executor(data: any, response: any) {
+            const pathname = new URL(data.url).pathname;
+            if (pathname === "/__healthcheck__") {
+                return "ok";
+            }
             try {
                 const chunk = await moduleExecutor(data, response);
                 return chunk;

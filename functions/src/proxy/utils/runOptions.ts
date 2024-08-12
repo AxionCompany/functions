@@ -21,7 +21,7 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
     const permissions = Object
         .entries(permissionsObj)
         .map(([key, value]) => {
-            return typeof value === 'boolean'
+            return typeof value === 'boolean' && (value === true)
                 ? `--${key}`
                 : Array.isArray(value)
                     ? `--${key}=${value.join(",")}`
