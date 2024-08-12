@@ -50,7 +50,7 @@ const TasksPage = () => {
 
     return (
         <div className="container mx-auto p-6">
-            <h1 className="text-4xl font-bold mb-8 text-center">Task Management</h1>
+            <h1 className="text-4xl font-bold mb-8 text-center">Tasks Management</h1>
             <form onSubmit={addTask} className="mb-8 flex justify-center items-center space-x-4">
                 <input
                     type="text"
