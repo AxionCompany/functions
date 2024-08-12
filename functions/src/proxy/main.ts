@@ -213,8 +213,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
     try {
         const port = getPortFromIsolateId(isolateId);
 
-        console.log('PRE-REQUEST', req.url)
-
         const moduleResponse = await fetch(new URL(
             `${url.pathname}?${new URLSearchParams({ ...queryParams, ...isolateMetadata.params })}`,
             `http://localhost:${port}`
