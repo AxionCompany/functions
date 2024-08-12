@@ -2,7 +2,6 @@ import getAllFiles from './getAllFiles.ts';
 import postcss from "postcss";
 
 const processCss = async (config: any, html: string, importUrl: string) => {
-    console.log('POSTCSS CONFIG', config)
     if (typeof config === 'function') {
         config = await config(html);
     } else if (typeof config !== 'object') {

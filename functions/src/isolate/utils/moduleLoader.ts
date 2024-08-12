@@ -25,8 +25,6 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
   const bundleUrl = new URL(importUrl);
   bundleUrl.searchParams.append('bundle', true);
 
-  console.log('bundleUrl', bundleUrl.href);
-
 
   if (isJSX) {
     // Get module bundle 
