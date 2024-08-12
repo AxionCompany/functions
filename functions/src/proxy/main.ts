@@ -159,7 +159,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
         }
 
         isolateMetadata.status = 'loading';
-        
+
         isolatesMetadata.set(isolateId, isolateMetadata)
     }
 
@@ -175,7 +175,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null;
             const reload = [];
             if (shouldUpgrade) {
-                reload.push(...[importUrl.origin, url.origin, metaUrl])
+                reload.push(...[isolateId, metaUrl, url.origin])
                 console.log("Upgrading isolate with ID:", isolateId, 'reloading:', reload.filter(Boolean).join(','));
             }
             const projectId = new URL(isolateId).username;
@@ -185,12 +185,12 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
             const command = new Deno.Command(Deno.execPath(), {
                 env: {
-                    DENO_DIR: `./cache/.deno`,
+                    DENO_DIR: config.cacheDir || `./cache/.deno`,
                 },
                 cwd: `./data/${projectId}`,
                 args: [
                     'run',
-                    ...runOptions({ ...config.permissions, reload }, { config, modules, variables: isolateMetadata.variables }),
+                    ...runOptions({ reload, ...config.permissions }, { config, modules, variables: isolateMetadata.variables }),
                     new URL(`../isolate/adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, // path to isolate.ts
                     `${port}`, // port
                     JSON.stringify({

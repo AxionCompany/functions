@@ -14,8 +14,8 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
         "unstable": true,
         "no-lock": true,
         "no-prompt": true,
+        ...customPermissions,
         "import-map": `data:application/json,${modules.template(JSON.stringify({ imports: config?.denoConfig?.imports, scope: config?.denoConfig?.scope }), variables)}`,
-        ...customPermissions
     };
 
     const permissions = Object
