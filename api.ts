@@ -1,7 +1,6 @@
 /// <reference lib="deno.unstable" />
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 import { ensureDir } from "https://deno.land/std@0.224.0/fs/ensure_dir.ts";
-import getDenoDirectories from "./functions/src/utils/denoDir.ts";
 
 self?.postMessage && self?.addEventListener("unhandledrejection", async event => {
   // Prevent this being reported (Firefox doesn't currently respect this)
@@ -138,7 +137,8 @@ async function watchFiles(env: any) {
     if (event.kind === "modify" && event.paths.some(path => /\.(html|js|jsx|tsx|ts)$/.test(path))) {
       const dir = Deno.cwd();
       const files = event.paths.map(path => path.split(dir).join(''));
-      if (files.some(file => file.includes(env.CACHE_DIR || `./cache/.deno`))) {
+
+      if (files.some(file => file.includes(env.CACHE_DIR || `/cache/.deno`))) {
         continue;
       }
 
