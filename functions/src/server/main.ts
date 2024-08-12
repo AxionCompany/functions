@@ -7,16 +7,19 @@ export default (
       // Handle OPTIONS request
       if (req.method === "OPTIONS") {
         // to do: improve this
-        return new Response(null, {
+        return new Response("OK", {
           headers: {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers":
               "authorization, x-client-info, apikey, content-type",
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
           },
+          "status": 200,
+          "statusText": "OK",
         });
       }
-      return await requestHandler(req);
+      const response = await requestHandler(req);
+      return response
     },
   );
   return server.finished;

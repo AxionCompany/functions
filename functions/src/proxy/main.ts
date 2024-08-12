@@ -1,6 +1,7 @@
 import runOptions from "./utils/runOptions.ts";
 const isolatesMetadata = new Map<string, any>();
 
+
 const getAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
     for (let port = startPort; port <= endPort; port++) {
         try {
@@ -60,7 +61,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
     const queryParams = Object.fromEntries(url.searchParams.entries());
 
     const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir))
-    importUrl.pathname = modules.path.join(importUrl.pathname, url.pathname);
+    importUrl.pathname = modules.path.join(importUrl.pathname, url.pathname).split('/').filter(Boolean).join('/');
     importUrl.search = url.search;
 
     let isolateMetadata;
@@ -91,6 +92,14 @@ export default ({ config, modules }: any) => async (req: Request) => {
         }
     }
 
+    if (isolateMetadata?.status === 'loading') {
+        const status = isolatesMetadata.get(isolateId)?.status;
+        while (status === 'loading') {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        isolateMetadata = isolatesMetadata.get(isolateId);
+    };
+
 
     if (!isolateMetadata || queryParams.bundle || !isExactMatch) {
 
@@ -105,7 +114,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
         if (!isolateMetadataRes.ok) {
             return new Response(
                 JSON.stringify({ error: { message: isolateMetadataRes.statusText } }),
-                { status: isolateMetadataRes.status, headers: { 'Content-Type': 'application/json' } }
+                { status: isolateMetadataRes.status || 500, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
@@ -124,7 +133,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
         if (queryParams.bundle) {
             return new Response(
                 _isolateMetadata?.content,
-                { status: isolateMetadata?.status, headers: { 'Content-Type': 'text/javascript' } }
+                { status: 200, headers: { 'Content-Type': 'text/javascript' } }
             );
         }
 
@@ -140,14 +149,17 @@ export default ({ config, modules }: any) => async (req: Request) => {
         isolateId = new URL(importUrl.href)
         isolateId.pathname = match;
         isolateId = isolateId.href;
+
         // isolateMetadata is the metadata for the isolate
         if (!isolatesMetadata.get(isolateId)) {
             isolateMetadata = _isolateMetadata;
             isolateMetadata.paths = [importUrl.href];
         } else {
-            isolateMetadata.paths = [...isolateMetadata.paths, importUrl.href];
+            isolateMetadata.paths = [...isolatesMetadata.get(isolateId)?.paths, importUrl.href];
         }
 
+        isolateMetadata.status = 'loading';
+        
         isolatesMetadata.set(isolateId, isolateMetadata)
     }
 
@@ -202,11 +214,12 @@ export default ({ config, modules }: any) => async (req: Request) => {
                 port,
                 pid: process.pid,
                 process,
+                status: 'up',
                 loadedAt: Date.now(),
             });
         } catch (error) {
             console.error(`Failed to spawn isolate: ${isolateId}`, error);
-            throw error;
+            return new Response(JSON.stringify({ error: { message: 'Bad Request. Failed to initialize Isolate' } }), { status: 500, headers: { 'Content-Type': 'application/json' } });
         }
     }
 
