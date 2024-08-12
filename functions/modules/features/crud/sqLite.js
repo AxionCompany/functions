@@ -13,7 +13,11 @@ const serializers = {
         serialize: (value) => {
             return value
                 ? Object.entries(value).reduce((acc, [key, value]) => {
-                    acc[key] = typeof value === 'object' ? JSON.stringify(value) : value;
+                    acc[key] = ['number', 'string'].indexOf(typeof value) === -1
+                        ? JSON.stringify(value)
+                        : typeof value === 'string'
+                            ? `'${value}'`
+                            : value;
                     return acc;
                 }, {})
                 : null
@@ -34,7 +38,11 @@ const serializers = {
     stringifyArrays: {
         serialize: (value) => {
             return value
-                ? value.map((i) => typeof i === 'object' ? JSON.stringify(i) : i)
+                ? value.map((i) => ['number', 'string'].indexOf(typeof i) === -1
+                    ? JSON.stringify(i)
+                    : typeof i === 'string' && i.indexOf(' ') >= 0
+                        ? `${i}`
+                        : i)
                 : null
         },
         deserialize: (value) => {
@@ -211,7 +219,7 @@ export default (args) => {
                 const _insertSql = `INSERT INTO ${key} ${toSqlWrite('insert', validatedData)}`;
                 const { sql: insertSql, params } = convertToPositionalParams(_insertSql, validatedParams);
 
-                config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| SQL:', insertSql, '| Params:', JSON.stringify(validatedParams));
+                config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| SQL:', insertSql, '| Params:', JSON.stringify(params));
                 const start = Date.now();
                 const response = await db.transaction(async () => {
                     // Prepare Statemens
@@ -237,26 +245,21 @@ export default (args) => {
             },
             createMany: async (data, options) => {
                 const executionId = crypto.randomUUID();
-                // Validate data
+
                 const validatedData = Validator([schema], data, {
-                    path: `createMany_input_sql:${key}`,
+                    path: `create_input:${key}`,
                 });
                 const validatedParams = Validator([schema], data, {
-                    path: `createMany_input_params:${key}`,
+                    path: `create_input:${key}`,
                     removeOperators: true,
                 });
 
                 if (config.addTimestamps) {
-                    validatedData.forEach((row) => {
-                        row.createdAt = new Date().toISOString();
-                        row.updatedAt = new Date().toISOString();
-                    });
-                    validatedParams.forEach((row) => {
-                        row.createdAt = new Date().toISOString();
-                        row.updatedAt = new Date().toISOString();
-                    });
-                }
-
+                    validatedData.forEach(d => d.createdAt = new Date().toISOString());
+                    validatedData.forEach(d => d.updatedAt = new Date().toISOString());
+                    validatedParams.forEach(d => d.createdAt = new Date().toISOString());
+                    validatedParams.forEach(d => d.updatedAt = new Date().toISOString());
+                };
 
                 // Query SQL Statement
                 let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
@@ -265,37 +268,40 @@ export default (args) => {
                     }
                     return `${key}.${field}`;
                 }).join(", ")}`;
-                querySql += ` FROM ${key} WHERE _id = last_insert_rowid()`;
 
+                querySql += ` FROM ${key} WHERE _id = last_insert_rowid()`;
                 // Inster SQL Statement
                 const _insertSql = `INSERT INTO ${key} ${toSqlWrite('insert', validatedData[0])}`;
-                const { sql: insertSql } = convertToPositionalParams(_insertSql, validatedParams[0]);
+                const arrayParams = validatedParams.map((params) => convertToPositionalParams(_insertSql, params));
 
                 const start = Date.now();
-                config.debug && console.log('CRUD Execution Id:', executionId, '| createMany', '| SQL:', insertSql, '| Params:', JSON.stringify(validatedParams));
-                const result = await db.transaction(async () => {
-                    // Prepare Statemens
-                    const insertStmt = await db.prepare(insertSql);
-                    const queryStmt = await db.prepare(querySql);
-                    // Execute Statements
-                    const inserted = [];
-                    for (const row of validatedParams) {
-                        const { params } = convertToPositionalParams(_insertSql, row);
-                        insertStmt.run(serializeParams(params));
-                        const insertedRow = queryStmt.get();
-                        inserted.push(deserializeParams(insertedRow));
-                    }
-                    // Validate the response
-                    const validatedResponse = Validator([schema], inserted, {
-                        path: `createMany_output:${key}`,
-                    });
-                    // Close the Transactions
-                    return validatedResponse;
-                })();
-                config.debug && console.log('CRUD Execution Id:', executionId, '| createMany', '| Response:', JSON.stringify(result), '| Duration:', Date.now() - start, 'ms');
-                config.finalizePreparedStatements && insertStmt.finalize();
+                const results = [];
+                for (const { sql, params } of arrayParams) {
+                    const response = await db.transaction(async () => {
+                        config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| SQL:', sql, '| Params:', JSON.stringify(params));
+                        // Prepare Statemens
+                        const queryStmt = await db.prepare(querySql);
+                        const insertStmt = await db.prepare(sql);
+                        // Execute Statements
+                        await insertStmt.run(serializeParams(params));
+                        const insertedRow = await queryStmt.get()
+
+                        // Validate the response
+                        const validatedResponse = Validator(schema, deserializeParams(insertedRow), {
+                            path: `create_output:${key}`,
+                        });
+                        return validatedResponse;
+                    })();
+                    results.push(response);
+                }
+                // Close the Transactions
+
+                config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| Response:', JSON.stringify(results), '| Duration:', Date.now() - start, 'ms');
+
                 config.finalizePreparedStatements && queryStmt.finalize();
-                return result;
+                config.finalizePreparedStatements && insertStmt.finalize();
+
+                return results;
             },
             find: async (query, options) => {
                 const executionId = crypto.randomUUID();
@@ -571,7 +577,7 @@ export default (args) => {
                 const whereClauses = toSqlQuery(validatedQuery, { table: key });
                 const _deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
                 const { sql: deleteSql, params: sqlParams } = convertToPositionalParams(_deleteSql, validatedQueryParams);
-                
+
                 config.debug && console.log('CRUD Execution Id:', executionId, '| delete', '| SQL:', deleteSql, '| Params:', JSON.stringify(validatedQueryParams));
                 // Prepare Statemens
                 const start = Date.now();
