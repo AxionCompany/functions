@@ -139,7 +139,7 @@ const moduleInstance: any = async (
         // async build css with all elements and dependent components
         completeCss = dependencies.withCache(
           dependencies.processCss,
-          { expireIn: 1000 * 60 },
+          { keys: ['css', url], expireIn: 1000 * 60 },
           dependencies.postCssConfig, compiledHtml, importUrl
         )
       }

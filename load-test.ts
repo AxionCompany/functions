@@ -1,7 +1,7 @@
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Configuration
-const endpoint = (i) => `https://test.jaze.ai/backend/hello`;
+const endpoint = (i) => `http://localhost:9002/examples/api/tasks`;
 const concurrentRequests = 100;
 const totalRequests = 100;
 let requestCount = 0;
