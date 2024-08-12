@@ -49,6 +49,10 @@ const moduleExecutor = await ModuleExecution({
 const handlerConfig = {
     handlers: {
         "/(.*)+": async (data: any, response: any) => {
+            const pathname = new URL(data.url).pathname;
+            if (pathname === "/__healthcheck__") {
+                return "ok";
+            }
             try {
                 const chunk = await moduleExecutor(data, response);
                 return chunk;
