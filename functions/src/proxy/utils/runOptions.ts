@@ -31,6 +31,7 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
         })
         .filter(Boolean)
 
+        console.log('PERMISSIONS', permissions)
     return permissions;
 }
 
