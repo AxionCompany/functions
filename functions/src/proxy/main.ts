@@ -110,6 +110,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
             body: JSON.stringify({ denoConfig: config?.denoConfig })
         });
 
+        
+
 
         if (!isolateMetadataRes.ok) {
             return new Response(
@@ -158,8 +160,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
             isolateMetadata.paths = [...isolatesMetadata.get(isolateId)?.paths, importUrl.href];
         }
 
-        isolateMetadata.status = 'loading';
-
         isolatesMetadata.set(isolateId, isolateMetadata)
     }
 
@@ -167,8 +167,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
     isJSX = ext === ".jsx" || ext === ".tsx";
 
     const shouldUpgrade = !isolateMetadata?.loadedAt || (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
-
     if (!isolateMetadata?.port || shouldUpgrade) {
+        isolatesMetadata.set(isolateId, {...isolateMetadata, status:'loading'});
         try {
             console.log("Spawning isolate id", isolateId);
             const port = await getAvailablePort(3500, 4000);
