@@ -127,7 +127,7 @@ export default (args) => {
             if (type === "any" || typeof type === 'object') return `${key} TEXT${isUnique ? ' UNIQUE' : ''}${isNullable ? '' : ' NOT NULL'}`;
             // Add more type mappings 
         })?.filter(Boolean)?.join(", ");
-        // db.exec(`CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`);
+
         return `CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`;
     };
 
