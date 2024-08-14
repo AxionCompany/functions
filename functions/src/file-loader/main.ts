@@ -76,18 +76,18 @@ export default ({ config, modules }: any) => {
 
 
     if (['js', 'jsx', 'ts', 'tsx'].includes(matchPath?.split('.').pop())) {
-      if (params) { // add export for params in content
-        content += `\n\nexport const _pathParams = ${JSON.stringify(params)};`;
-      }
-      content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\', '/')}"`;
+      // if (params) { // add export for params in content
+        // content += `\n\nexport const _pathParams = ${JSON.stringify(params)};`;
+      // }
+      // content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\', '/')}"`;
       // transform the content
-      if (['js', 'ts'].includes(pathname.split('.').pop())) {
-        content = transformer({
-          __requestId__, code: content, url,
+      // if (['js', 'ts'].includes(pathname.split('.').pop())) {
+        // content = transformer({
+          // __requestId__, code: content, url,
           // beforeRun: withModules((options, ...args) => console.log('Executing Function:', options.name, '| URL:', options.url, '| Request ID:', options.__requestId__, '| Execution ID:', options.executionId, '| Input:', JSON.stringify(args))),
           // afterRun: withModules((options, result) => console.log('Function Executed:', options.name, '| URL:', options.url, '| Request ID:', options.__requestId__, '| Execution ID:', options.executionId, '| Duration:', options.duration, '| Output:', typeof result !== 'string' ? JSON.stringify(result) : result))
-        });
-      }
+        // });
+      // }
 
       // ISSUE: Some projects may have .js or .ts files that actually contain .jsx or .tsx code.
       // CURRENT SOLUTION: Set a fixed content type for stating that the file is .tsx type (should work for parsing .js, .ts, .jsx, .tsx files as well). 

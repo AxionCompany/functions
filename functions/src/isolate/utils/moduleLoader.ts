@@ -98,10 +98,12 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
   );
 
   const middlewares = (req) => Middlewares.reduce(
-    (acc, Middleware, index) => {
+    async (acc, Middleware, index) => {
       if (!Middleware) return acc
       Object.assign(Middleware, { ...middlewares })
-      return Middleware({ ...acc })
+      const MiddlewareExec = await Middleware({ ...acc });
+      Object.assign(middlewares, { ...Middleware })
+      return MiddlewareExec
     }, req
   );
 
