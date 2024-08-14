@@ -29,11 +29,15 @@ export default async (config: any) => {
       data.params = getParams(data);
 
       // merge dependencies
-      const dependencies = { ...localDependencies, ...remoteDependencies };
+      let dependencies = { ...localDependencies, ...remoteDependencies };
 
       // run middlewares
+      // pass dependencies to middlewares
       Object.assign(middlewares, dependencies)
+      // execute middleware
       data = await middlewares(data);
+      // get middleware-defined dependencies;
+      dependencies = { ...dependencies, ...middlewares };
 
       // get the data
       const { method, params, headers: requestHeaders, __requestId__ } = data;
