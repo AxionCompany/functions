@@ -90,7 +90,7 @@ export default (
 
         const formData: Record<string, any> = {};
 
-        if (contentType.includes("multipart/form-data")) 
+        if (contentType.includes("multipart/form-data")) {
 
           const form = await req.formData();
           for (const [key, value] of form.entries()) {
@@ -115,6 +115,7 @@ export default (
             }
           }
         }
+
 
         // Get Body
         const body = await req
