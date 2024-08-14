@@ -79,7 +79,7 @@ export default (
     return { enqueue, getStream };
   }
 
-  return (req: Request) => {
+  return async (req: Request) => {
 
     const handleRequest = async (req: Request) => {
       try {
@@ -90,27 +90,31 @@ export default (
 
         const formData: Record<string, any> = {};
 
+
         if (contentType.startsWith("multipart/form-data")) {
           const form = await req.formData();
           for (const [key, value] of form.entries()) {
             if (value instanceof File) {
               // transform file to base64
               const reader = new FileReader();
+              const base64dataPromise = new Promise<string | ArrayBuffer | null>((resolve) => {
+                reader.onloadend = () => {
+                  const base64data = reader.result;
+                  resolve(base64data);
+                };
+              });
               reader.readAsDataURL(value);
-              reader.onloadend = () => {
-                const base64data = reader.result;
-                if (!formData[key]) {
-                  formData[key] = base64data;
-                } else if (Array.isArray(formData[key])) {
-                  formData[key].push(base64data);
-                } else {
-                  formData[key] = [formData[key], base64data];
-                }
-              };
+              const base64data = await base64dataPromise;
+              if (!formData[key]) {
+                formData[key] = base64data;
+              } else if (Array.isArray(formData[key])) {
+                formData[key].push(base64data);
+              } else {
+                formData[key] = [formData[key], base64data];
+              }
             }
           }
         }
-
 
         // Get Body
         const body = await req
@@ -240,7 +244,7 @@ export default (
     };
 
 
-    return handleRequest(req);
+    return await handleRequest(req);
   }
 }
 
