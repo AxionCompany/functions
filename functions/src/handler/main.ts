@@ -85,13 +85,15 @@ export default (
       try {
         // Get Headers
         const headers = Object.fromEntries(req.headers.entries());
-        const contentType = headers?.["content-type"] || "";
+        const contentType = headers?.["content-type"] || headers?.["Content-Type"] || "";
         const __requestId__ = crypto.randomUUID();
 
         const formData: Record<string, any> = {};
 
+        console.log(contentType.startsWith("multipart/form-data"), contentType.includes("multipart/form-data"), headers);
 
-        if (contentType.startsWith("multipart/form-data")) {
+        if (contentType.includes("multipart/form-data")) {
+
           const form = await req.formData();
           for (const [key, value] of form.entries()) {
             if (value instanceof File) {
