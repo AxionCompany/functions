@@ -96,16 +96,17 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
       bundledModule: bundledModule?.content
     }
   );
-
-  const middlewares = (req) => Middlewares.reduce(
-    async (acc, Middleware, index) => {
-      if (!Middleware) return acc
-      Object.assign(Middleware, { ...middlewares })
-      const MiddlewareExec = await Middleware({ ...acc });
-      Object.assign(middlewares, { ...Middleware })
-      return MiddlewareExec
-    }, req
-  );
+  const middlewares = async (req) => {
+    for (const Middleware of Middlewares) {
+      if (Middleware) {
+        Object.assign(Middleware, { ...middlewares });
+        const MiddlewareExec = await Middleware({ ...req });
+        Object.assign(middlewares, { ...Middleware });
+        req = MiddlewareExec;
+      }
+    }
+    return req;
+  };
 
   try {
     // Load target module
