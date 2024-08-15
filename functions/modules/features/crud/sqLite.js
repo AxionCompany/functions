@@ -3,8 +3,11 @@ import { toSqlQuery, toSqlWrite } from "./sqlUtils.js";
 import { Validator as SchemaValidator } from "../../connectors/validator.ts";
 // import Database from 'npm:libsql';
 import Database from 'npm:libsql@0.4.0-pre.10/promise'; // Using the promise api. 
-let hasConnected = false;
-let db;
+
+// let hasConnected = false;
+// let db;
+
+const connectedDbs = new Map();
 
 // To use with Sqlite3 lib: serializers are not necessary; Should set config.finalizePreparedStatements to true so there's no leak;
 // To use with better-sqlite-3, use the stringifyObjects serializer. Should set config.finalizePreparedStatements to false as there's no need for it;
@@ -22,14 +25,17 @@ const serializers = {
                 }, {})
                 : null
         },
-        deserialize: (value) => {
+        deserialize: (value, schema) => {
             return value
                 ? Object.entries(value).reduce((acc, [key, value]) => {
-                    try {
+                    const currentSchema = schema[key];
+
+                    if (schema[key] === 'any' || typeof schema[key] === 'object' || (typeof currentSchema === 'string' && currentSchema?.includes("->"))) {
                         acc[key] = JSON.parse(value);
-                    } catch (_) {
+                    } else {
                         acc[key] = value;
                     }
+
                     return acc;
                 }, {})
                 : null
@@ -45,15 +51,17 @@ const serializers = {
                         : i)
                 : null
         },
-        deserialize: (value) => {
+        deserialize: (value, schema) => {
             return value
                 ? Object.entries(value).reduce((acc, [key, value]) => {
-                    try {
+                    const currentSchema = schema[key];
+                    if (schema[key] === 'any' || typeof schema[key] === 'object' || (typeof currentSchema === 'string' && currentSchema?.includes("->"))) {
                         acc[key] = JSON.parse(value);
-                    } catch (_) {
+                    } else {
                         acc[key] = value;
                     }
-                    return acc;
+                    return acc
+
                 }, {})
                 : null
         }
@@ -87,15 +95,19 @@ function convertToPositionalParams(sql, params) {
 
 
 export default (args) => {
+    let db;
     const config = args.config || {};
     const schemas = args.schemas;
     const Validator = args.Validator || SchemaValidator(schemas)
     const path = config.dbPath || './data/my.db';
-    if (!db) {
+    // ensure the directory exists (config.dbPath)
+    if (!connectedDbs.has(path)) {
         const start = Date.now();
         db = new Database(path, config.dbOptions);
         console.log('Database connection time:', Date.now() - start, 'ms');
+        connectedDbs.set(path, { db });
     } else {
+        db = connectedDbs.get(path).db;
         console.log('Database already connected');
     }
 
@@ -127,6 +139,8 @@ export default (args) => {
             if (type === "any" || typeof type === 'object') return `${key} TEXT${isUnique ? ' UNIQUE' : ''}${isNullable ? '' : ' NOT NULL'}`;
             // Add more type mappings 
         })?.filter(Boolean)?.join(", ");
+
+        console.log(`CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`);
 
         return `CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`;
     };
@@ -183,7 +197,7 @@ export default (args) => {
         const schema = schemas[key];
         config.addTimestamps && (schema.createdAt = "string");
         config.addTimestamps && (schema.updatedAt = "string");
-        if (!hasConnected) {
+        if (!connectedDbs.get(path).status) {
             commands.push(createTable(schema, key));  // Ensure table creation
         }
 
@@ -229,7 +243,7 @@ export default (args) => {
                     await insertStmt.run(serializeParams(params));
                     const insertedRow = await queryStmt.get()
                     // Validate the response
-                    const validatedResponse = Validator(schema, deserializeParams(insertedRow), {
+                    const validatedResponse = Validator(schema, deserializeParams(insertedRow, schema), {
                         path: `create_output:${key}`,
                     });
                     // Close the Transactions
@@ -287,7 +301,7 @@ export default (args) => {
                         const insertedRow = await queryStmt.get()
 
                         // Validate the response
-                        const validatedResponse = Validator(schema, deserializeParams(insertedRow), {
+                        const validatedResponse = Validator(schema, deserializeParams(insertedRow, schema), {
                             path: `create_output:${key}`,
                         });
                         return validatedResponse;
@@ -362,7 +376,7 @@ export default (args) => {
                 // Close the statement
                 config.finalizePreparedStatements && stmt.finalize();
                 // Validate the response
-                const validatedResponse = Validator([schema], responses?.map(deserializeParams), {
+                const validatedResponse = Validator([schema], responses?.map((i) => deserializeParams(i, schema)), {
                     path: `find_output:${key}`,
                 });
                 config.debug && console.log("CRUD Execution Id:", executionId, "| find", "| Response:", JSON.stringify(validatedResponse), "| Duration:", Date.now() - start, "ms");
@@ -409,7 +423,7 @@ export default (args) => {
                 // Close the statement
                 config.finalizePreparedStatements && stmt.finalize();
                 // Validate the response
-                const validatedResponse = Validator(schema, deserializeParams(response), {
+                const validatedResponse = Validator(schema, deserializeParams(response, schema), {
                     path: `findOne_output:${key}`,
                 });
                 config.debug && console.log("CRUD Execution Id:", executionId, "| findOne", "| Response:", JSON.stringify(validatedResponse), "| Duration:", Date.now() - start, "ms");
@@ -474,7 +488,7 @@ export default (args) => {
                     await updateStmt.run(serializeParams(sqlParams));
                     const updatedRow = await queryStmt.get(serializeParams(validatedQueryParams));
                     // Validate the response
-                    const validatedResponse = Validator(schema, deserializeParams(updatedRow), {
+                    const validatedResponse = Validator(schema, deserializeParams(updatedRow, schema), {
                         path: `update_output:${key}`,
                     });
                     // Close the Transactions
@@ -546,7 +560,7 @@ export default (args) => {
                     await updateStmt.run(serializeParams({ ...sqlParams, ...(config.addTimestamps ? { updatedAt: new Date().toISOString() } : {}) }));
                     // Validate the response
                     const updatedRows = await queryStmt.all(serializeParams(validatedQuery));
-                    const validatedResponse = Validator([schema], updatedRows?.map(deserializeParams), {
+                    const validatedResponse = Validator([schema], updatedRows?.map((i) => deserializeParams(i, schema)), {
                         path: `updateMany_output:${key}`,
                     });
                     // Close the Transactions
@@ -639,9 +653,11 @@ export default (args) => {
             },
         };
     }
-    hasConnected = true;
     const start = Date.now();
+
     db.exec(commands.join(";")).then(res => console.log('Table creation time:', Date.now() - start, 'ms'));
+
+    connectedDbs.get(path).status = 'connected';
 
     return models;
 };
