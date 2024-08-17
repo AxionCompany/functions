@@ -1,6 +1,10 @@
-  
+
+import { Validator as SchemaValidator } from "../../connectors/validator.ts";
+
 export default ({ config, db, schemas, Validator }) => {
   const models = {};
+
+  Validator = Validator || SchemaValidator(schemas)
 
   const populate = (schema, populateKeys,) => {
     // add lookup pipeline for populate options

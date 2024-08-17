@@ -12,7 +12,7 @@ export default async (config: any) => {
   let { loader, functionsDir, dependencies: remoteDependencies, url, importUrl, env, isJSX } = config || {};
   if (!loader) loader = moduleLoader;
   // load the module
-  const { mod: defaultModule, GET, POST, PUT, DELETE, middlewares, dependencies: localDependencies, ...moduleExports } = await loader(
+  const { mod: defaultModule, GET, POST, PUT, DELETE, middlewares, beforeRun, afterRun, dependencies: localDependencies, ...moduleExports } = await loader(
     { importUrl, url, env, dependencies: remoteDependencies, isJSX },
   );
 
@@ -38,6 +38,10 @@ export default async (config: any) => {
       data = await middlewares(data);
       // get middleware-defined dependencies;
       dependencies = { ...dependencies, ...middlewares };
+
+      // pass dependencies to beforeRun and afterRun hooks, and set them as globalThis
+      beforeRun && Object.assign(beforeRun, dependencies) && (globalThis._beforeRun = beforeRun);
+      afterRun && Object.assign(afterRun, dependencies) && (globalThis._afterRun = afterRun);
 
       // get the data
       const { method, params, headers: requestHeaders, __requestId__ } = data;
