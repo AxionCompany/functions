@@ -235,6 +235,9 @@ export default (args) => {
 
                 config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| SQL:', insertSql, '| Params:', JSON.stringify(params));
                 const start = Date.now();
+
+                console.log('DB STATUS', db)
+
                 const response = await db.transaction(async () => {
                     // Prepare Statemens
                     const queryStmt = await db.prepare(querySql);
@@ -478,7 +481,7 @@ export default (args) => {
                 querySql = sql;
 
                 const start = Date.now();
-                config.debug && console.log('CRUD Execution Id:', executionId, '| update', '| SQL:', _updateSql, '| Params:', JSON.stringify(_sqlParams));
+                config.debug && console.log('CRUD Execution Id:', executionId, '| update', '| SQL:', updateSql, '| Params:', JSON.stringify(sqlParams));
 
                 const response = await db.transaction(async () => {
                     // Prepare Statemens

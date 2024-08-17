@@ -1,4 +1,4 @@
-function toSqlQuery(query, config ) {
+function toSqlQuery(query, config) {
     config.dialect = config.dialect || 'sqlite';
 
     const sqlConditions = [];
@@ -153,7 +153,9 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
 
             const updateConditions = Object.entries(data).map(([field, value]) => {
                 if (typeof value === 'undefined') return
-                if (typeof value === 'object' && !Array.isArray(value)) {
+                if (Array.isArray(value)) {
+                    return `${jsonInsert(field)}`;
+                } else if (typeof value === 'object') {
                     if (value.$set) {
                         return `${jsonSet(field)}`;
                     } else if (value.$insert) {
@@ -164,12 +166,9 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
                         return `${arrayInsert(field)}`;
                     }
                 }
-                else if (Array.isArray(value)) {
-                    return `${jsonInsert(field)}`;
-                }
-                else {
-                    return `${field} = $${field}`;
-                }
+
+                return `${field} = $${field}`;
+
             }).filter(Boolean).join(', ');
             sqlQuery = `SET ${updateConditions}`;
             break;

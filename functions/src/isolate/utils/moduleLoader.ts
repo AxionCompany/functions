@@ -3,7 +3,6 @@ import getAllFiles from "./getAllFiles.ts";
 export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
   // Load target module
   importUrl = new URL(importUrl);
-  // importUrl.searchParams.append('v', new Date().getTime().toString());
 
   const importPromises = [];
 
@@ -21,6 +20,12 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
     extensions: ['js', 'ts']
   }));
 
+  // Get intereptor modules
+  importPromises.push(getAllFiles({
+    url: importUrl,
+    name: 'interceptor',
+    extensions: ['js', 'ts']
+  }));
 
   const bundleUrl = new URL(importUrl);
   bundleUrl.searchParams.append('bundle', true);
@@ -36,7 +41,7 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
   }
 
   // Await all import promises
-  const [sharedModulesData, middlewaresData, bundledModule, indexHtmlFiles, bundledLayouts] = await Promise.all(importPromises);
+  const [sharedModulesData, middlewaresData, interceptorData, bundledModule, indexHtmlFiles, bundledLayouts] = await Promise.all(importPromises);
 
   const loadPromises = [];
 
@@ -64,6 +69,22 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
     })
   ));
 
+  // Get interceptor URL
+  const interceptorUrl = interceptorData.slice(-1)?.[0]?.matchPath
+  // Load interceptor modules
+  if (!interceptorUrl) {
+    loadPromises.push(Promise.resolve({}));
+  } else {
+    loadPromises.push(
+      import(new URL(`/${interceptorUrl}`, importUrl).href)
+        .then((mod) => mod)
+        .catch(err => {
+          console.log(`Error Importing Interceptor Module \`${interceptorUrl}\`: ${err.toString()}`);
+          throw { message: `Error Importing Interceptor Module \`${interceptorUrl}\`: ${err.toString()}`, status: 401 };
+        }));
+  }
+
+
   if (isJSX) {
     // Load layout modules
     loadPromises.push(Promise.all(
@@ -78,7 +99,7 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
     ));
   }
 
-  const [SharedModules, Middlewares, LayoutModules] = await Promise.all(loadPromises);
+  const [SharedModules, Middlewares, InterceptorModule, LayoutModules] = await Promise.all(loadPromises);
 
   // Instantiate shared modules
   dependencies = SharedModules.reduce(
@@ -108,11 +129,11 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
     return req;
   };
 
+  const { beforeRun, afterRun } = InterceptorModule || {};
+
   try {
+
     // Load target module
-    // importUrl = new URL(importUrl);
-    // importUrl.searchParams.append('v', new Date().getTime().toString());
-    // console.log('ESMOD IMPORT URL', importUrl);
     const ESModule = await import(importUrl).then(mod => mod).catch(err => {
       throw {
         message: `Error Importing Module \`${importUrl}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, ''),
@@ -147,6 +168,8 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
       matchedPath,
       dependencies,
       middlewares,
+      beforeRun,
+      afterRun,
       config
     };
   } catch (err) {

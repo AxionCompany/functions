@@ -1,7 +1,7 @@
 import { parse } from "npm:@typescript-eslint/typescript-estree";
 
 
-export default (config, modules) => ({ __requestId__, code, url, beforeRun, afterRun }) => {
+export default ({ code, url }) => {
 
 
     // Parse code to AST
@@ -9,41 +9,74 @@ export default (config, modules) => ({ __requestId__, code, url, beforeRun, afte
 
     // HOF for wrapping as a string
     const withWrapperCode = `
-const withWrapper = (name,fn) => {
+const withWrapper = (name, fn) => {
   if (typeof fn !== 'function') {
     return fn;
   }
   const mod = (...args) => {
+    const willUseHook = (globalThis._beforeRun || globalThis._afterRun) && mod.__requestId__;
+    Object.assign(fn, mod);
+
     const executionId = crypto.randomUUID();
-    Object.assign(fn, mod)
-    _beforeRun && _beforeRun({url:"${url.href}",name, requestId:mod.__requestId__, executionId, mod:fn, ...mod}, ...args);
+    willUseHook && globalThis._beforeRun && globalThis._beforeRun({
+      url: "${url.href}",
+      name,
+      requestId: mod.__requestId__,
+      executionId,
+      properties: { ...mod },
+      input: args
+    });
     const startTime = Date.now();
     let result = fn(...args);
-    if (_afterRun){
-        if (result?.then) {
-          result = result.then((resolved) => {
-            const duration = Date.now() - startTime;
-            _afterRun({url:"${url.href}",name, duration, requestId:mod.__requestId__, executionId, mod:fn, ...mod}, resolved);
-            return resolved;
-          });
-        } else {
+    if (result?.then) {
+      result = result
+        .then((resolved) => {
           const duration = Date.now() - startTime;
-          _afterRun({url:"${url.href}",name, duration, requestId:mod.__requestId__, executionId, mod:fn, ...mod},result);
-        }
+          willUseHook && globalThis._afterRun && globalThis._afterRun({
+            url: "${url.href}",
+            name,
+            requestId: mod.__requestId__,
+            executionId,
+            duration,
+            status: 'completed',
+            properties: { ...mod },
+            output: resolved
+          });
+          Object.assign(mod, fn);
+          return resolved;
+        }).catch((error) => {
+          const duration = Date.now() - startTime;
+          willUseHook && globalThis._afterRun && globalThis._afterRun({
+            url: "${url.href}",
+            name,
+            requestId: mod.__requestId__,
+            executionId,
+            duration,
+            status: 'failed',
+            properties: { ...mod },
+            output: error,
+            error: true
+          });
+          Object.assign(mod, fn);
+          throw error;
+        });
+    } else {
+      Object.assign(mod, fn);
+      const duration = Date.now() - startTime;
+      willUseHook && globalThis._afterRun && globalThis._afterRun({
+        url: "${url.href}",
+        name,
+        requestId: mod.__requestId__,
+        executionId,
+        duration,
+        status: 'completed',
+        properties: { ...mod },
+        output: result
+      });
     }
     return result
   }
   return mod
-};
-
-const withRequestId = (fn, requestId) => {
-  if (typeof fn !== 'function') {
-    return fn;
-  }
-  return (...args) => {
-    Object.assign(fn, { requestId });
-    return fn.apply(this, args);
-  };
 };
 `;
 
@@ -52,6 +85,7 @@ const withRequestId = (fn, requestId) => {
 
     // Helper function to get code slice
     const getCodeSlice = (node) => code.slice(node.range[0], node.range[1]);
+    let i = 0;
 
     // Traverse AST to collect export declarations
     ast.body.forEach((node) => {
@@ -76,16 +110,30 @@ const withRequestId = (fn, requestId) => {
                 }
             } else if (node.specifiers) {
                 node.specifiers.forEach((specifier) => {
+                    // Generate an import statement for the original module
+                    let importStatement;
+                    let localName = specifier.local.name;
+                    if (node.source) {
+                        if ('default' === localName) {
+                            localName = `_${localName}_${i}`;
+                            i++;
+                        }
+                        const importedModulePath = node.source.value;
+                        // Generate an import statement for the original module
+                        importStatement = `import ${localName} from '${importedModulePath}';`;
+                    }
                     if (specifier.exported.name !== specifier.local.name) {
                         exportsList.push({
                             key: specifier.exported.name,
-                            value: `withWrapper("${specifier.exported.name}",${specifier.local.name})`,
+                            value: `withWrapper("${specifier.exported.name}",${localName})`,
+                            importStatement
                         });
                     } else {
                         exportsList.push({
                             key: `___${specifier.exported.name}___`,
-                            value: `withWrapper("${specifier.exported.name}",${specifier.local.name})`,
-                            as: specifier.exported.name
+                            value: `withWrapper("${specifier.exported.name}",${localName})`,
+                            as: specifier.exported.name,
+                            importStatement
                         });
                     }
                 });
@@ -109,13 +157,12 @@ const withRequestId = (fn, requestId) => {
             return '';
         }
         return getCodeSlice(node);
-    };      
+    };
 
     const transformedCode = [
-        `const _beforeRun = ${beforeRun}`,
-        `const _afterRun = ${afterRun}`,
-        withWrapperCode,
         ...ast?.body?.map(removeExportDeclarations),
+        ...exportsList.map(e => e.importStatement).filter(Boolean),
+        withWrapperCode,
         declarationStatements,
         newExportStatement,
     ]?.filter(Boolean)?.join('\n');
