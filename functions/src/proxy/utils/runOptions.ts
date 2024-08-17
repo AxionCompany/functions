@@ -3,19 +3,19 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
 
     const permissionsObj = {
         "deny-run": true,
-        "allow-env": ["DENO_DIR", "DENO_AUTH_TOKENS"],
-        "allow-sys": ["cpus", "osRelease"],
+        // "allow-env": false, //["DENO_DIR", "DENO_AUTH_TOKENS"],
+        // "allow-sys": false,// ["cpus", "osRelease"],
         "allow-write": [`.`],
         "allow-read": [`.`],
-        "allow-net": true,
         "allow-ffi": true,
+        "allow-net": true,
         "unstable-sloppy-imports": true,
         "unstable-kv": true,
         "unstable": true,
         "no-lock": true,
         "no-prompt": true,
-        ...customPermissions,
         "import-map": `data:application/json,${modules.template(JSON.stringify({ imports: config?.denoConfig?.imports, scope: config?.denoConfig?.scope }), variables)}`,
+        ...customPermissions,
     };
 
     const permissions = Object
