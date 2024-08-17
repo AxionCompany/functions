@@ -1,12 +1,11 @@
 
 import FileLoader from "./adapters/loaders/main.ts";
 import bundler from './adapters/bundler/esbuild.js';
-import Transformer from "./adapters/transformers/higherOrderFunction.js";
+import transformer from "./adapters/transformers/higherOrderFunction.js";
 
 export default ({ config, modules }: any) => {
 
   const fileLoader = FileLoader({ config, modules });
-  const transformer = Transformer({ config, modules });
 
   return async ({ pathname, url, headers, queryParams, data, __requestId__ }: any, res: any) => {
 
@@ -27,7 +26,7 @@ export default ({ config, modules }: any) => {
     let fileData;
     try {
       fileData = await fileLoader({ path: pathname })
-    } catch (_) {}
+    } catch (_) { }
 
     let { content, redirect, params, path, variables, matchPath } = fileData || {};
 
@@ -77,17 +76,13 @@ export default ({ config, modules }: any) => {
 
     if (['js', 'jsx', 'ts', 'tsx'].includes(matchPath?.split('.').pop())) {
       // if (params) { // add export for params in content
-        // content += `\n\nexport const _pathParams = ${JSON.stringify(params)};`;
+      // content += `\n\nexport const _pathParams = ${JSON.stringify(params)};`;
       // }
       // content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\', '/')}"`;
       // transform the content
-      // if (['js', 'ts'].includes(pathname.split('.').pop())) {
-        // content = transformer({
-          // __requestId__, code: content, url,
-          // beforeRun: withModules((options, ...args) => console.log('Executing Function:', options.name, '| URL:', options.url, '| Request ID:', options.__requestId__, '| Execution ID:', options.executionId, '| Input:', JSON.stringify(args))),
-          // afterRun: withModules((options, result) => console.log('Function Executed:', options.name, '| URL:', options.url, '| Request ID:', options.__requestId__, '| Execution ID:', options.executionId, '| Duration:', options.duration, '| Output:', typeof result !== 'string' ? JSON.stringify(result) : result))
-        // });
-      // }
+      if (['js', 'ts'].includes(pathname.split('.').pop())) {
+        content = transformer({ code: content, url });
+      }
 
       // ISSUE: Some projects may have .js or .ts files that actually contain .jsx or .tsx code.
       // CURRENT SOLUTION: Set a fixed content type for stating that the file is .tsx type (should work for parsing .js, .ts, .jsx, .tsx files as well). 
@@ -99,21 +94,3 @@ export default ({ config, modules }: any) => {
     return content;
   };
 }
-
-const withModules = hook => {
-  return `
-(...args) => {
-  const __hook__ = ${hook.toString()}; 
-  const [options] = args;
-  const { mod: fn, config } = options;
-
-  if (
-    !String(fn).includes('React') ||  // does not deal with React
-    !config?.isFactory
-  ) {
-    return __hook__(...args);
-  };
-  return args;
-}`;
-}
-
