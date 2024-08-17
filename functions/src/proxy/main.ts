@@ -175,14 +175,14 @@ export default ({ config, modules }: any) => async (req: Request) => {
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null;
             const reload = [];
             if (shouldUpgrade) {
-                reload.push(...[isolateId, metaUrl, url.origin])
+                reload.push(...[new URL(isolateId).origin, metaUrl, url.origin])
                 console.log("Upgrading isolate with ID:", isolateId, 'reloading:', reload.filter(Boolean).join(','));
             }
             const projectId = new URL(isolateId).username;
             config.projectId = projectId;
 
             await modules.fs.ensureDir(`./data/${projectId}`);
-
+            console.log('ISOLATE STARTUP OPTIONS', runOptions({ reload, ...config.permissions }, { config, modules, variables: isolateMetadata.variables }))
             const command = new Deno.Command(Deno.execPath(), {
                 env: {
                     DENO_DIR: config.cacheDir || `./cache/.deno`,
