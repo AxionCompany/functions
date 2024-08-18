@@ -5,16 +5,11 @@ import RequestHandler from "../../handler/main.ts";
 import ModuleExecution from "../main.ts";
 import Cache from "../../utils/withCache.ts";
 
-const [portString, configString, envString]: string[] = Deno.args || [];
+const [portString, configString]: string[] = Deno.args || [];
 const port = parseInt(portString) || 3000;
 const config = JSON.parse(configString);
-const env = JSON.parse(envString);
 
 const withCache = await Cache(config.projectId);
-
-for (const key in env) {
-    Deno.env.set(key, env[key]);
-}
 
 const isServer = true;
 globalThis.isServer = isServer;

@@ -423,6 +423,7 @@ export default (args) => {
                 const stmt = await db.prepare(sql);
                 // Execute SQL Statement
                 const response = await stmt.get(serializeParams(params)) || null;
+                console.log('AQUI', response);
                 // Close the statement
                 config.finalizePreparedStatements && stmt.finalize();
                 // Validate the response
