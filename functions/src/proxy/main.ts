@@ -57,10 +57,13 @@ const cleanupIsolate = async (isolateId: string): void => {
     console.log("Cleaning up isolate with ID:", isolateId);
     if (isolatesMetadata.get(isolateId)) {
         // kill process, delete isolate and its references
-        console.log("SIGKILL issued. Terminating isolate with ID:", isolateId);
-        Deno.kill(isolatesMetadata.get(isolateId)?.pid, 'SIGKILL');
-        isolatesMetadata.set(isolateId, { ...isolatesMetadata.get(isolateId), status: 'down' });
-
+        try{
+            console.log("SIGKILL issued. Terminating isolate with ID:", isolateId);
+            isolatesMetadata.set(isolateId, { ...isolatesMetadata.get(isolateId), status: 'down' });
+            Deno.kill(isolatesMetadata.get(isolateId)?.pid, 'SIGKILL');
+        } catch(err){
+            console.error("Error terminating isolate", err);
+        }
     }
 };
 
@@ -226,7 +229,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
             });
             const process = command.spawn();
             await waitForServer(`http://localhost:${port}/__healthcheck__`);
-            isolateMetadata.status && isolateMetadata.status !== 'down' && cleanupIsolate(isolateId);
+            const updatedIsolate = isolatesMetadata.get(isolateId)
+            updatedIsolate?.status && updatedIsolate.status !== 'down' && cleanupIsolate(isolateId);
             isolatesMetadata.set(isolateId, {
                 ...isolateMetadata,
                 port,
