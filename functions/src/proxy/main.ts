@@ -112,6 +112,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
         }
     }
 
+    clearTimeout(isolatesMetadata.get(isolateId)?.timer);
+
     if (isolateMetadata?.status === 'loading') {
         const status = isolatesMetadata.get(isolateId)?.status;
         while (status === 'loading') {
