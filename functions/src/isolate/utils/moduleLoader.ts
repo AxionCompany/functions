@@ -42,7 +42,6 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
 
   // Await all import promises
   const [sharedModulesData, middlewaresData, interceptorData, bundledModule, indexHtmlFiles, bundledLayouts] = await Promise.all(importPromises);
-
   const loadPromises = [];
 
   // Load shared modules
