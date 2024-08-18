@@ -1,6 +1,22 @@
 import runOptions from "./utils/runOptions.ts";
 const isolatesMetadata = new Map<string, any>();
 
+// Function to kill the isolate
+const killIsolate = (isolateId: string) => {
+    cleanupIsolate(isolateId);
+};
+
+// Function to reset the timer
+const resetIsolateTimer = (isolateId: string) => {
+
+    isolatesMetadata.set(isolateId, {
+        ...isolatesMetadata.get(isolateId),
+        timer: setTimeout(() => {
+            console.log(`Isolate idle for 5 seconds. Terminating isolate with ID:`, isolateId);
+            killIsolate(isolateId);
+        }, 5000)
+    })
+};
 
 const getAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
     for (let port = startPort; port <= endPort; port++) {
@@ -42,7 +58,7 @@ const cleanupIsolate = async (isolateId: string): void => {
         // kill process, delete isolate and its references
         console.log("SIGKILL issued. Terminating isolate with ID:", isolateId);
         Deno.kill(isolatesMetadata.get(isolateId)?.pid, 'SIGKILL');
-        isolatesMetadata.delete(isolateId);
+        isolatesMetadata.set(isolateId, { ...isolatesMetadata.get(isolateId), status: 'down' });
 
     }
 };
@@ -110,9 +126,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
             body: JSON.stringify({ denoConfig: config?.denoConfig })
         });
 
-        
-
-
         if (!isolateMetadataRes.ok) {
             return new Response(
                 JSON.stringify({ error: { message: isolateMetadataRes.statusText } }),
@@ -167,26 +180,31 @@ export default ({ config, modules }: any) => async (req: Request) => {
     isJSX = ext === ".jsx" || ext === ".tsx";
 
     const shouldUpgrade = !isolateMetadata?.loadedAt || (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
-    if (!isolateMetadata?.port || shouldUpgrade) {
-        isolatesMetadata.set(isolateId, {...isolateMetadata, status:'loading'});
+    if ((['up', 'loading'].indexOf(isolateMetadata?.status) === -1) || shouldUpgrade) {
+        isolatesMetadata.set(isolateId, { ...isolateMetadata, status: 'loading' });
         try {
-            console.log("Spawning isolate id", isolateId);
-            const port = await getAvailablePort(3500, 4000);
+
+            const { origin: reloadUrlOrigin, username: reloadUrlUsername } = new URL(isolateId);
+            const reloadUrl = new URL(reloadUrlOrigin);
+            reloadUrl.username = reloadUrlUsername;
+
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null;
-            const reload = [];
+            let reload;
+
             if (shouldUpgrade) {
-                reload.push(...[new URL(isolateId).origin, metaUrl, url.origin])
-                console.log("Upgrading isolate with ID:", isolateId, 'reloading:', reload.filter(Boolean).join(','));
+                reload = [new URL(isolateId).origin, metaUrl, url.origin, reloadUrl.href]
+                console.log("Upgrading isolate id", isolateId);
+            } else {
+                console.log("Spawning isolate id", isolateId);
             }
+
+            const port = await getAvailablePort(3500, 4000);
             const projectId = new URL(isolateId).username;
             config.projectId = projectId;
 
             await modules.fs.ensureDir(`./data/${projectId}`);
-            console.log('ISOLATE STARTUP OPTIONS', runOptions({ reload, ...config.permissions }, { config, modules, variables: isolateMetadata.variables }))
             const command = new Deno.Command(Deno.execPath(), {
-                env: {
-                    DENO_DIR: config.cacheDir || `./cache/.deno`,
-                },
+                env: { DENO_DIR: config.cacheDir || `./cache/.deno`, },
                 cwd: `./data/${projectId}`,
                 args: [
                     'run',
@@ -201,14 +219,11 @@ export default ({ config, modules }: any) => async (req: Request) => {
                         env: { ...isolateMetadata.variables },
                         ...config,
                     }), // isolate metadata
-                    JSON.stringify({
-                        DENO_AUTH_TOKENS: isolateMetadata.variables.DENO_AUTH_TOKENS,
-                    }) //
                 ].filter(Boolean),
             });
             const process = command.spawn();
             await waitForServer(`http://localhost:${port}/__healthcheck__`);
-            isolateMetadata?.port && cleanupIsolate(isolateId);
+            isolateMetadata.status && isolateMetadata.status !== 'down' && cleanupIsolate(isolateId);
             isolatesMetadata.set(isolateId, {
                 ...isolateMetadata,
                 port,
@@ -225,6 +240,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
     try {
         const port = getPortFromIsolateId(isolateId);
+        clearTimeout(isolatesMetadata.get(isolateId)?.timer);
 
         const moduleResponse = await fetch(new URL(
             `${url.pathname}?${new URLSearchParams({ ...queryParams, ...isolateMetadata.params })}`,
@@ -236,7 +252,25 @@ export default ({ config, modules }: any) => async (req: Request) => {
             body: req.body
         });
 
-        return moduleResponse;
+        // Using pipeThrough to process the stream and kill the isolate after the last chunk is sent
+        const transformStream = new TransformStream({
+            start() { },
+            transform(chunk, controller) {
+                controller.enqueue(chunk);
+            },
+            flush(controller) {
+                controller.terminate();
+                resetIsolateTimer(isolateId);  // Reset timer after the last chunk is processed
+            }
+        });
+
+        const responseStream = moduleResponse.body?.pipeThrough(transformStream);
+
+        return new Response(responseStream, {
+            headers: moduleResponse.headers,
+            status: moduleResponse.status,
+            statusText: moduleResponse.statusText,
+        });
 
     } catch (error) {
         console.error("Error communicating with isolate server", error);

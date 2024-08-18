@@ -8,14 +8,10 @@ import React from "react";
 import { DOMParser } from "npm:linkedom";
 import Cache from "../../utils/withCache.ts";
 
-const [portString, configString, envString]: string[] = Deno.args || [];
+const [portString, configString]: string[] = Deno.args || [];
 const port = parseInt(portString) || 3000;
 const config = JSON.parse(configString);
-const env = JSON.parse(envString);
 
-for (const key in env) {
-    Deno.env.set(key, env[key]);
-}
 
 const withCache = await Cache(config.projectId);
 
