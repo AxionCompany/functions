@@ -8,6 +8,7 @@ const killIsolate = (isolateId: string) => {
 
 // Function to reset the timer
 const resetIsolateTimer = (isolateId: string) => {
+    clearTimeout(isolatesMetadata.get(isolateId)?.timer);
 
     isolatesMetadata.set(isolateId, {
         ...isolatesMetadata.get(isolateId),
@@ -176,6 +177,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
         isolatesMetadata.set(isolateId, isolateMetadata)
     }
 
+    clearTimeout(isolatesMetadata.get(isolateId)?.timer);
+
     const ext = modules.path.extname(isolateMetadata?.path);
     isJSX = ext === ".jsx" || ext === ".tsx";
 
@@ -240,7 +243,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
     try {
         const port = getPortFromIsolateId(isolateId);
-        clearTimeout(isolatesMetadata.get(isolateId)?.timer);
 
         const moduleResponse = await fetch(new URL(
             `${url.pathname}?${new URLSearchParams({ ...queryParams, ...isolateMetadata.params })}`,
