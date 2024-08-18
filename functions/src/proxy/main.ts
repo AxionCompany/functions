@@ -18,8 +18,7 @@ const killIsolate = (isolateId: string) => {
 };
 
 // Function to reset the timer
-const resetIsolateTimer = (isolateId: string) => {
-    console.log('clearing timer', getIsolate(isolateId)?.timer);
+const resetIsolateTimer = (isolateId: string, timeout:number) => {
 
     if (getIsolate(isolateId)?.timer) clearTimeout(getIsolate(isolateId)?.timer);
 
@@ -29,7 +28,7 @@ const resetIsolateTimer = (isolateId: string) => {
             clearTimeout(getIsolate(isolateId)?.timer);
             console.log(`Isolate idle for 5 seconds. Terminating isolate with ID:`, isolateId, getIsolate(isolateId)?.timer);
             killIsolate(isolateId);
-        }, 5000)
+        }, timeout || 5*60*1000)
     })
 };
 
@@ -301,11 +300,10 @@ export default ({ config, modules }: any) => async (req: Request) => {
             start() { },
             transform(chunk, controller) {
                 controller.enqueue(chunk);
-                console.log('reestarting timer', getIsolate(isolateId)?.timer)
             },
             flush(controller) {
                 controller.terminate();
-                if (!getIsolate(isolateId)?.timer) resetIsolateTimer(isolateId);  // Reset timer after the last chunk is processed
+                if (!getIsolate(isolateId)?.timer) resetIsolateTimer(isolateId, config.isolateMaxIdleTime);  // Reset timer after the last chunk is processed
             }
         });
 
