@@ -1,5 +1,16 @@
 import runOptions from "./utils/runOptions.ts";
+
 const isolatesMetadata = new Map<string, any>();
+
+const getIsolate = (isolateId: string) => {
+    return isolatesMetadata.get(isolateId);
+}
+const getIsolateKeys = () => {
+    return Array.from(isolatesMetadata.keys());
+}
+const setIsolate = (isolateId: string, isolateMetadata: any) => {
+    return isolatesMetadata.set(isolateId, isolateMetadata);
+}
 
 // Function to kill the isolate
 const killIsolate = (isolateId: string) => {
@@ -8,12 +19,15 @@ const killIsolate = (isolateId: string) => {
 
 // Function to reset the timer
 const resetIsolateTimer = (isolateId: string) => {
-    clearTimeout(isolatesMetadata.get(isolateId)?.timer);
+    console.log('clearing timer', getIsolate(isolateId)?.timer);
+
+    if (getIsolate(isolateId)?.timer) clearTimeout(getIsolate(isolateId)?.timer);
 
     isolatesMetadata.set(isolateId, {
         ...isolatesMetadata.get(isolateId),
         timer: setTimeout(() => {
-            console.log(`Isolate idle for 5 seconds. Terminating isolate with ID:`, isolateId);
+            clearTimeout(getIsolate(isolateId)?.timer);
+            console.log(`Isolate idle for 5 seconds. Terminating isolate with ID:`, isolateId, getIsolate(isolateId)?.timer);
             killIsolate(isolateId);
         }, 5000)
     })
@@ -22,7 +36,7 @@ const resetIsolateTimer = (isolateId: string) => {
 const getAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
     for (let port = startPort; port <= endPort; port++) {
         try {
-            console.log('Checking port:', port);
+            // console.log('Checking port:', port);
             const listener = Deno.listen({ port });
             listener.close();
             return port;
@@ -54,15 +68,16 @@ const getPortFromIsolateId = (isolateId: string): number => {
 }
 
 const cleanupIsolate = async (isolateId: string): void => {
-    console.log("Cleaning up isolate with ID:", isolateId);
-    if (isolatesMetadata.get(isolateId)) {
+    // console.log("Cleaning up isolate with ID:", isolateId);
+    const isolateMetadata = getIsolate(isolateId);
+    if (isolateMetadata && isolateMetadata.status && isolateMetadata.status !== 'down') {
         // kill process, delete isolate and its references
-        try{
-            console.log("SIGKILL issued. Terminating isolate with ID:", isolateId);
+        try {
+            // console.log("SIGKILL issued. Terminating isolate with ID:", isolateId);
             isolatesMetadata.set(isolateId, { ...isolatesMetadata.get(isolateId), status: 'down' });
             Deno.kill(isolatesMetadata.get(isolateId)?.pid, 'SIGKILL');
-        } catch(err){
-            console.error("Error terminating isolate", err);
+        } catch (err) {
+            // console.error("Error terminating isolate", err);
         }
     }
 };
@@ -84,46 +99,81 @@ export default ({ config, modules }: any) => async (req: Request) => {
     importUrl.pathname = modules.path.join(importUrl.pathname, url.pathname).split('/').filter(Boolean).join('/');
     importUrl.search = url.search;
 
-    let isolateMetadata;
-    let isJSX = false;
-    let isolateId;
+    const setIsolateSearchUrl = config.setIsolateSearchUrl ||
+        ((importUrl: URL) => {
+            const pathname = importUrl.pathname;
+            const ext = modules.path.extname(pathname);
+            // remove extension from matchPath
+            let matchPath = ext ? pathname?.replace(ext, '') : pathname
+            const dirEntrypointIndex = matchPath?.lastIndexOf(`/${config?.dirEntrypoint}`)
+            matchPath = dirEntrypointIndex > -1 ? matchPath.slice(0, dirEntrypointIndex) : matchPath;
 
-    // get array of possible urls to match
-    let possibleUrls = Array.from(isolatesMetadata.keys());
+            const isolateSearchUrl = new URL(importUrl.href)
+            isolateSearchUrl.pathname = matchPath;
+            return isolateSearchUrl.href;
+        })
+
+    const setIsolateUrlPattern = config.setIsolateUrlPattern ||
+        ((matchUrl: URL) => {
+            // matchPath is the path to match in the URL
+            const pathname = matchUrl.pathname;
+            const ext = modules.path.extname(pathname);
+            // remove extension from matchPath
+            let matchPath = ext ? pathname?.replace(ext, '') : pathname
+            matchPath = matchPath?.replaceAll(/\[([^\[\]]+)\]/g, ':$1');
+            const dirEntrypointIndex = matchPath?.lastIndexOf(`/${config?.dirEntrypoint}`)
+            matchPath = dirEntrypointIndex > -1 ? matchPath.slice(0, dirEntrypointIndex) : matchPath;
+            // isolateId is the URL to match in the URL
+            const isolateUrlPattern = new URL(matchUrl.href)
+            isolateUrlPattern.pathname = matchPath;
+            return isolateUrlPattern.href;
+        })
+
+    let isolateMetadata: any = {};
+    let isJSX = false;
+    let isolateId: string;
+
     // the more path params the url has, more towards the end of the array it will be
     const matchesParams = (url: string) => url.split('/').filter((part) => part.startsWith(':')).length;
-    possibleUrls = possibleUrls?.sort((a, b) => {
+    // get array of possible urls to match
+    const isolateIdPatterns = getIsolateKeys()?.sort((a, b) => {
         return matchesParams(b) - matchesParams(a);
     })
 
     let isExactMatch;
-    for (const key of possibleUrls) {
-        const { pathname, hostname } = new URL(key);
-        const pattern = new URLPattern({ pathname, hostname })
-        const matched = pattern.exec(importUrl.href);
+
+    for (const key of isolateIdPatterns) {
+        const { pathname, hostname, username } = new URL(key);
+        const pattern = new URLPattern({ username, pathname, hostname })
+        const isolateSearchUrl = setIsolateSearchUrl(importUrl);
+        config.debug && console.log('matching', username, pathname, hostname, 'with', isolateSearchUrl)
+        const matched = pattern.exec(isolateSearchUrl);
         if (matched) {
+            config.debug && console.log('matched', matched)
             const keyPaths = isolatesMetadata.get(key)?.paths;
             const matchParams = matched?.pathname?.groups;
 
             isExactMatch = keyPaths?.some((p: string) => p === importUrl.href)
             isolateId = key;
 
-            isolateMetadata = { ...isolatesMetadata.get(key), params: matchParams };
+            isolateMetadata = { ...getIsolate(key), params: matchParams };
+            break;
         }
     }
 
-    clearTimeout(isolatesMetadata.get(isolateId)?.timer);
-
-    if (isolateMetadata?.status === 'loading') {
-        const status = isolatesMetadata.get(isolateId)?.status;
+    if (isolateId && isolateMetadata?.status === 'loading') {
+        config.debug && console.log('Isolate is loading. Waiting for it to finish', isolateId);
+        const status = getIsolate(isolateId)?.status;
         while (status === 'loading') {
             await new Promise((resolve) => setTimeout(resolve, 100));
         }
-        isolateMetadata = isolatesMetadata.get(isolateId);
+        config.debug && console.log('Isolate has finished loading', isolateId);
+        isolateMetadata = getIsolate(isolateId);
     };
 
 
     if (!isolateMetadata || queryParams.bundle || !isExactMatch) {
+        config.debug && console.log('Isolate not found. Importing metadata', importUrl.href);
 
         const isolateMetadataRes = await fetch(importUrl.href, {
             redirect: "follow",
@@ -133,6 +183,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
         });
 
         if (!isolateMetadataRes.ok) {
+            config.debug && console.log('Error importing metadata', importUrl.href, isolateMetadataRes.statusText)
             return new Response(
                 JSON.stringify({ error: { message: isolateMetadataRes.statusText } }),
                 { status: isolateMetadataRes.status || 500, headers: { 'Content-Type': 'application/json' } }
@@ -144,7 +195,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
         try {
             _isolateMetadata = await isolateMetadataRes.json();
         } catch (err) {
-            console.log('Error importing metadata', importUrl.href, isolateMetadata)
+            config.debug && console.log('Error importing metadata', importUrl.href, isolateMetadata)
             return new Response(
                 JSON.stringify({ error: { message: 'Bad Request' } }),
                 { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -159,37 +210,30 @@ export default ({ config, modules }: any) => async (req: Request) => {
         }
 
         // matchPath is the path to match in the URL
-        const matchExt = modules.path.extname(_isolateMetadata?.matchPath);
-        let match = matchExt ? _isolateMetadata?.matchPath?.replace(matchExt, '') : _isolateMetadata?.matchPath;
-        if (match) match = match?.startsWith('/') ? match : `/${match}`;
-        match = match?.replaceAll(/\[([^\[\]]+)\]/g, ':$1');
-        const dirEntrypointIndex = match?.lastIndexOf(`/${config?.dirEntrypoint}`)
-        match = dirEntrypointIndex > -1 ? match.slice(0, dirEntrypointIndex) : match;
-        _isolateMetadata.matchPath = match;
-        // isolateId is the URL to match in the URL
-        isolateId = new URL(importUrl.href)
-        isolateId.pathname = match;
-        isolateId = isolateId.href;
+        const matchUrl = new URL(importUrl.href);
+        matchUrl.pathname = _isolateMetadata?.matchPath;
+        isolateId = setIsolateUrlPattern(matchUrl);
 
-        // isolateMetadata is the metadata for the isolate
-        if (!isolatesMetadata.get(isolateId)) {
-            isolateMetadata = _isolateMetadata;
-            isolateMetadata.paths = [importUrl.href];
-        } else {
-            isolateMetadata.paths = [...isolatesMetadata.get(isolateId)?.paths, importUrl.href];
-        }
+        // get updated state of isolate metadata
+        isolateMetadata = getIsolate(isolateId) || {};
+        // merge paths
+        const paths = [...(isolateMetadata?.paths || []), _isolateMetadata.path];
+        Object.assign(isolateMetadata, { ..._isolateMetadata, paths });
 
-        isolatesMetadata.set(isolateId, isolateMetadata)
+        // set isolate metadata
+        config.debug && console.log('Setting isolate metadata', isolateId)
+        setIsolate(isolateId, isolateMetadata);
+
     }
 
-    clearTimeout(isolatesMetadata.get(isolateId)?.timer);
+    clearTimeout(getIsolate(isolateId)?.timer);
 
     const ext = modules.path.extname(isolateMetadata?.path);
     isJSX = ext === ".jsx" || ext === ".tsx";
 
     const shouldUpgrade = !isolateMetadata?.loadedAt || (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
     if ((['up', 'loading'].indexOf(isolateMetadata?.status) === -1) || shouldUpgrade) {
-        isolatesMetadata.set(isolateId, { ...isolateMetadata, status: 'loading' });
+        setIsolate(isolateId, { ...isolateMetadata, status: 'loading' });
         try {
 
             const { origin: reloadUrlOrigin, username: reloadUrlUsername } = new URL(isolateId);
@@ -201,9 +245,9 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
             if (shouldUpgrade) {
                 reload = [new URL(isolateId).origin, metaUrl, url.origin, reloadUrl.href]
-                console.log("Upgrading isolate id", isolateId);
+                config.debug && console.log("Upgrading isolate id", isolateId);
             } else {
-                console.log("Spawning isolate id", isolateId);
+                config.debug && console.log("Spawning isolate id", isolateId);
             }
 
             const port = await getAvailablePort(3500, 4000);
@@ -220,9 +264,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
                     new URL(`../isolate/adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, // path to isolate.ts
                     `${port}`, // port
                     JSON.stringify({
+                        isolateId,
                         projectId,
-                        importUrl: isolateId,
-                        url: url.href,
                         isJSX,
                         env: { ...isolateMetadata.variables },
                         ...config,
@@ -231,16 +274,9 @@ export default ({ config, modules }: any) => async (req: Request) => {
             });
             const process = command.spawn();
             await waitForServer(`http://localhost:${port}/__healthcheck__`);
-            const updatedIsolate = isolatesMetadata.get(isolateId)
-            updatedIsolate?.status && updatedIsolate.status !== 'down' && cleanupIsolate(isolateId);
-            isolatesMetadata.set(isolateId, {
-                ...isolateMetadata,
-                port,
-                pid: process.pid,
-                process,
-                status: 'up',
-                loadedAt: Date.now(),
-            });
+            isolateMetadata = getIsolate(isolateId);
+            isolateMetadata?.pid && cleanupIsolate(isolateId);
+            setIsolate(isolateId, { ...isolateMetadata, port, pid: process.pid, process, status: 'up', loadedAt: Date.now() });
         } catch (error) {
             console.error(`Failed to spawn isolate: ${isolateId}`, error);
             return new Response(JSON.stringify({ error: { message: 'Bad Request. Failed to initialize Isolate' } }), { status: 500, headers: { 'Content-Type': 'application/json' } });
@@ -251,7 +287,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
         const port = getPortFromIsolateId(isolateId);
 
         const moduleResponse = await fetch(new URL(
-            `${url.pathname}?${new URLSearchParams({ ...queryParams, ...isolateMetadata.params })}`,
+            `${url.pathname}?${new URLSearchParams({ ...queryParams, ...isolateMetadata.params, "__importUrl__": btoa(importUrl.href) })}`,
             `http://localhost:${port}`
         ), {
             method: req.method,
@@ -265,10 +301,11 @@ export default ({ config, modules }: any) => async (req: Request) => {
             start() { },
             transform(chunk, controller) {
                 controller.enqueue(chunk);
+                console.log('reestarting timer', getIsolate(isolateId)?.timer)
             },
             flush(controller) {
                 controller.terminate();
-                resetIsolateTimer(isolateId);  // Reset timer after the last chunk is processed
+                if (!getIsolate(isolateId)?.timer) resetIsolateTimer(isolateId);  // Reset timer after the last chunk is processed
             }
         });
 

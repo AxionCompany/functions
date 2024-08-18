@@ -65,7 +65,7 @@ let shouldUpgradeAfter: number = 0;
         JSON.stringify({ error: { message: err.message, status: (err.status || 500) } }), { status: err.status || 500 }
         return new Response(JSON.stringify({ error: { message: err.message, status: (err.status || 500) } }), { status: err.status || 500, headers: { 'Content-Type': 'application/json' } });
       }
-      const { loaderConfig, permissions, shouldUpgradeAfter: _shouldUpgradeAfter } = _adapters || {};
+      const { loaderConfig, shouldUpgradeAfter: _shouldUpgradeAfter, ...adaptersData } = _adapters || {};
       shouldUpgradeAfter = _shouldUpgradeAfter || shouldUpgradeAfter;
 
       fileLoaderUrl.username = (loaderConfig?.username || 'local');
@@ -114,7 +114,7 @@ let shouldUpgradeAfter: number = 0;
           functionsDir,
           ...axionConfig,
           denoConfig,
-          permissions,
+          ...adaptersData,
         },
         modules: {
           path: { SEPARATOR, basename, extname, join, dirname },

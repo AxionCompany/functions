@@ -76,9 +76,9 @@ export default ({ config, modules }: any) => {
 
     if (['js', 'jsx', 'ts', 'tsx'].includes(matchPath?.split('.').pop())) {
       // if (params) { // add export for params in content
-      // content += `\n\nexport const _pathParams = ${JSON.stringify(params)};`;
+      //   content += `\n\nexport const _pathParams = ${JSON.stringify(params)};`;
       // }
-      // content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\', '/')}"`;
+      content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\', '/')}"`;
       // transform the content
       if (['js', 'ts'].includes(pathname.split('.').pop())) {
         content = transformer({ code: content, url });
