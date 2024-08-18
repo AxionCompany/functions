@@ -116,7 +116,6 @@ export default (
           }
         }
 
-
         // Get Body
         const body = await req
           ?.text()

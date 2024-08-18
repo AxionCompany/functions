@@ -3,7 +3,7 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
 
     const permissionsObj = {
         "deny-run": true,
-        // "allow-env": false, //["DENO_DIR", "DENO_AUTH_TOKENS"],
+        "allow-env": false, //["DENO_DIR", "DENO_AUTH_TOKENS"],
         // "allow-sys": false,// ["cpus", "osRelease"],
         "allow-write": [`.`],
         "allow-read": [`.`],
@@ -21,6 +21,7 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
     const permissions = Object
         .entries(permissionsObj)
         .map(([key, value]) => {
+            if (typeof value === 'undefined') return null;
             return typeof value === 'boolean' && (value === true)
                 ? `--${key}`
                 : Array.isArray(value)
