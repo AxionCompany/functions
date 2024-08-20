@@ -13,6 +13,7 @@ const withCache = await Cache(config.projectId);
 
 const isServer = true;
 globalThis.isServer = isServer;
+globalThis.isolateType = 'regular';
 
 const moduleExecutors = new Map<string, any>();
 
@@ -31,12 +32,16 @@ const handlerConfig = {
                 let moduleExecutor;
                 const queryParams = Object.fromEntries(new URL(data.url).searchParams.entries());
                 const importUrl = atob(queryParams.__importUrl__);
+                const isJSX = queryParams.__isJSX__ === 'true';
+                if (isJSX) {
+                    throw new Error(`Isolate of type "${globalThis.isolateType}" is not compatible with JSX modules`);
+                  }
                 if (moduleExecutors.has(importUrl)) {
                     console.log('Module already loaded:', importUrl);
                     moduleExecutor = moduleExecutors.get(importUrl);
                 } else {
                     console.log('Loading module:', importUrl);
-                    moduleExecutor = await ModuleExecution({ ...config, importUrl, dependencies: { withCache } });
+                    moduleExecutor = await ModuleExecution({ ...config, isJSX, importUrl, dependencies: { withCache } });
                     moduleExecutors.set(importUrl, moduleExecutor);
                 }
                 const chunk = await moduleExecutor(data, response);

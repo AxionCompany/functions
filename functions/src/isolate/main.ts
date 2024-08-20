@@ -27,6 +27,7 @@ export default async (config: any) => {
       }
 
       data.params = getParams(data);
+      const url = data.url;
 
       // merge dependencies
       let dependencies = { ...localDependencies, ...remoteDependencies };
