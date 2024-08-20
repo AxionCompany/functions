@@ -1,6 +1,19 @@
+const maxIsolates = 2;
+let currentIsolateIndex = 0;
+
+// isolate load balancer with round-robin strategy;
+
 export default (adapters: any) => {
-    const setIsolateSearchUrl = (url: URL) => url.origin + '/.tsx'; // add .tsx to the end of the url to use .TSX isolate renderer
-    const setIsolateUrlPattern = (url: URL) => url.origin + '/.tsx'; // add .tsx to the end of the url to use .TSX isolate renderer
-    return { ...adapters, setIsolateSearchUrl, setIsolateUrlPattern, permissions: { "allow-sys": true } }
+
+    const mapFilePathToIsolateId = null
+    // ({ formattedFileUrl: _filePathUrl }: { formattedFileUrl: string }) => {
+    //     // remove search params from the URL
+    //     currentIsolateIndex++
+    //     const isolateId = String(currentIsolateIndex % maxIsolates)
+    //     return isolateId
+    // };
+    const isolateMaxIdleTime = null;
+    return { ...adapters, mapFilePathToIsolateId, isolateMaxIdleTime, permissions: { "allow-sys": true } }
 }
+
 
