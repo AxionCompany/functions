@@ -107,16 +107,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
         return isolateSearchUrl.href;
     });
 
-    const url = new URL(req.url);
-    const queryParams = Object.fromEntries(url.searchParams.entries());
-
-    const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir))
-    importUrl.pathname = modules.path.join(importUrl.pathname, url.pathname).split('/').filter(Boolean).join('/');
-    importUrl.search = url.search;
-
-    const formattedImportUrl = formatImportUrl(importUrl);
-
-
     const mapFilePathToIsolateId = ((_fileUrl: URL) => {
 
         const customMapperId = config.mapFilePathToIsolateId ||
@@ -151,6 +141,15 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
     })
 
+    const url = new URL(req.url);
+    const queryParams = Object.fromEntries(url.searchParams.entries());
+
+    const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir))
+    importUrl.pathname = modules.path.join(importUrl.pathname, url.pathname).split('/').filter(Boolean).join('/');
+    importUrl.search = url.search;
+
+    const formattedImportUrl = formatImportUrl(importUrl);
+
     let isolateMetadata: any = {};
     let isJSX = false;
     let isolateId: string;
@@ -158,9 +157,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
     // the more path params the url has, more towards the end of the array it will be
     const matchesParams = (url: string) => url.split('/').filter((part) => part.startsWith(':')).length;
     // get array of possible urls to match
-    const sortedFileUrls = getCachedFileUrls()?.sort((a, b) => {
-        return matchesParams(b) - matchesParams(a);
-    })
+    const sortedFileUrls = getCachedFileUrls()?.sort((a, b) => matchesParams(b) - matchesParams(a));
 
     let isExactMatch;
 
@@ -191,7 +188,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
         config.debug && console.log('Isolate has finished loading', isolateId);
         isolateMetadata = getIsolate(isolateId);
     };
-
 
     if (!isolateMetadata || queryParams.bundle || !isExactMatch) {
         config.debug && console.log('Isolate not found. Importing metadata', importUrl.href);
@@ -252,7 +248,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
     const ext = modules.path.extname(isolateMetadata?.path);
     isJSX = ext === '.jsx' || ext === '.tsx';
 
-
     const shouldUpgrade = !isolateMetadata?.loadedAt || (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
     if ((!['up', 'loading'].includes(isolateMetadata?.status)) || shouldUpgrade) {
         setIsolate(isolateId, { ...isolateMetadata, status: 'loading' });
@@ -260,9 +255,12 @@ export default ({ config, modules }: any) => async (req: Request) => {
             console.log("Spawning isolate", isolateId);
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null;
             let reload;
+            const reloadUrl = new URL(formattedImportUrl);
+            reloadUrl.pathname='';
+
 
             if (shouldUpgrade) {
-                reload = [formattedImportUrl, metaUrl, url.origin]
+                reload = [reloadUrl.href, metaUrl, url.origin]
                 config.debug && console.log("Upgrading isolate id", isolateId);
             } else {
                 config.debug && console.log("Spawning isolate id", isolateId);
@@ -286,8 +284,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
                         isolateId,
                         projectId,
                         isJSX,
-                        env: { ...isolateMetadata.variables },
                         ...config,
+                        env: { ...isolateMetadata.variables },
                     }), // isolate metadata
                 ].filter(Boolean),
             });
@@ -347,5 +345,4 @@ export default ({ config, modules }: any) => async (req: Request) => {
         cleanupIsolate(isolateId);
         return new Response(JSON.stringify(error), { status: 500, statusText: 'Bad Request', headers: { 'Content-Type': 'application/json' } });
     }
-
 };
