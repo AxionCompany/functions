@@ -1,10 +1,9 @@
 // permissions object, each key is a permission, and can receive either an array or a boolean
-const runOptions = (customPermissions: object = {}, { config, variables, modules }): string[] => {
+const runOptions = (customPermissions: object = {}, { config, variables, modules }): any => {
 
-    const permissionsObj = {
+    let permissions: any = {
         "deny-run": true,
-        "allow-env": false, //["DENO_DIR", "DENO_AUTH_TOKENS"],
-        // "allow-sys": false,// ["cpus", "osRelease"],
+        "allow-env": false,
         "allow-write": [`.`],
         "allow-read": [`.`],
         "allow-ffi": true,
@@ -18,19 +17,33 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
         ...customPermissions,
     };
 
-    const permissions = Object
-        .entries(permissionsObj)
-        .map(([key, value]) => {
-            if (typeof value === 'undefined') return null;
-            return typeof value === 'boolean' && (value === true)
-                ? `--${key}`
-                : Array.isArray(value)
-                    ? `--${key}=${value.join(",")}`
-                    : typeof value === 'string'
-                        ? `--${key}=${value}`
-                        : ''
-        })
-        .filter(Boolean)
+    if (config.isolateType === 'subprocess') {
+        permissions = Object
+            .entries(permissions)
+            .map(([key, value]) => {
+                if (typeof value === 'undefined') return null;
+                return typeof value === 'boolean' && (value === true)
+                    ? `--${key}`
+                    : Array.isArray(value)
+                        ? `--${key}=${value.join(",")}`
+                        : typeof value === 'string'
+                            ? `--${key}=${value}`
+                            : ''
+            })
+            .filter(Boolean)
+    } else {
+        permissions = Object
+            .entries(permissions)
+            .reduce((acc: any, [key, value]) => {
+                if (typeof value === 'undefined') return;
+                const [concession, type] = key.split('-');
+                if (concession === 'allow') {
+                    acc[type] = value;
+                }
+                // TODO: deny-{...} permission is not yet implemented in Deno webworkers permissions (as of v1.44.5)
+                return acc
+            }, {})
+    }
 
     return permissions;
 }
