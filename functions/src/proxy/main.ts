@@ -1,4 +1,4 @@
-import runOptions from "./utils/runOptions.ts";
+import isolateFactory from "./utils/isolateFactory.ts";
 
 const cachedFileUrls = new Map<string, any>();
 const isolatesMetadata = new Map<string, any>();
@@ -69,17 +69,22 @@ const getPortFromIsolateId = (isolateId: string): number => {
     return parseInt(isolatesMetadata.get(isolateId).port);
 }
 
-const cleanupIsolate = async (isolateId: string): void => {
-    // console.log("Cleaning up isolate with ID:", isolateId);
+const cleanupIsolate = async (isolateId: string): Promise<void> => {
     const isolateMetadata = getIsolate(isolateId);
-    if (isolateMetadata && isolateMetadata.status && isolateMetadata.status !== 'down') {
-        // kill process, delete isolate and its references
+    if (isolateMetadata?.status !== 'down') {
         try {
-            // console.log("SIGKILL issued. Terminating isolate with ID:", isolateId);
-            isolatesMetadata.set(isolateId, { ...isolatesMetadata.get(isolateId), status: 'down' });
-            Deno.kill(isolatesMetadata.get(isolateId)?.pid, 'SIGKILL');
+            if (isolateMetadata?.worker) {
+                console.log('terminating worker', isolateId);
+                isolateMetadata.worker.terminate();
+                delete isolateMetadata.worker;
+            } else if (isolateMetadata?.pid) {
+                console.log('terminating subprocess', isolateId);
+                Deno.kill(isolateMetadata.pid, 'SIGKILL');
+                delete isolateMetadata.pid;
+            }
+            isolatesMetadata.set(isolateId, { ...isolateMetadata, status: 'down' });
         } catch (err) {
-            // console.error("Error terminating isolate", err);
+            console.error("Error terminating isolate", err);
         }
     }
 };
@@ -92,6 +97,8 @@ export const cleanupIsolates = (): void => {
 }
 
 export default ({ config, modules }: any) => async (req: Request) => {
+
+    if (!config?.isolateType) config.isolateType = 'subprocess';
 
     const formatImportUrl = config.formatImportUrl || ((importUrl: URL) => {
         const pathname = importUrl.pathname;
@@ -222,7 +229,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
         if (queryParams.bundle) {
             return new Response(
                 _isolateMetadata?.content,
-                { status: 200, headers: { 'Content-Type': 'text/javascript' } }
+                { status: 200, headers: { 'Content-Type': 'text/javascript', 'Access-Control-Allow-Origin': '*' } }
             );
         }
 
@@ -256,7 +263,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null;
             let reload;
             const reloadUrl = new URL(formattedImportUrl);
-            reloadUrl.pathname='';
+            reloadUrl.pathname = '';
 
 
             if (shouldUpgrade) {
@@ -272,28 +279,32 @@ export default ({ config, modules }: any) => async (req: Request) => {
             config.projectId = projectId;
             await modules.fs.ensureDir(`./data/${projectId}`);
 
-            const command = new Deno.Command(Deno.execPath(), {
-                env: { DENO_DIR: config.cacheDir || `./cache/.deno`, },
-                cwd: `./data/${projectId}`,
-                args: [
-                    'run',
-                    ...runOptions({ reload, ...config.permissions }, { config, modules, variables: isolateMetadata.variables }),
-                    new URL(`../isolate/adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, // path to isolate.ts
-                    `${port}`, // port
-                    JSON.stringify({
-                        isolateId,
-                        projectId,
-                        isJSX,
-                        ...config,
-                        env: { ...isolateMetadata.variables },
-                    }), // isolate metadata
-                ].filter(Boolean),
-            });
-            const process = command.spawn();
+            const isolateInstance = await isolateFactory({
+                isolateType: config.isolateType,
+                isolateId,
+                projectId,
+                modules,
+                port,
+                isJSX,
+                denoConfig: config.denoConfig,
+                type: config.isolateType,
+                reload,
+                permissions: config.permissions,
+                env: isolateMetadata.variables
+            })
+
             await waitForServer(`http://localhost:${port}/__healthcheck__`);
+
             isolateMetadata = getIsolate(isolateId);
-            isolateMetadata?.pid && cleanupIsolate(isolateId);
-            setIsolate(isolateId, { ...isolateMetadata, port, pid: process.pid, process, status: 'up', loadedAt: Date.now() });
+
+            if (config.isolateType === 'subprocess') {
+                isolateMetadata?.pid && cleanupIsolate(isolateId);
+                setIsolate(isolateId, { ...isolateMetadata, port, pid: isolateInstance.pid, instance: isolateInstance, status: 'up', loadedAt: Date.now() });
+            } else {
+                isolateMetadata?.worker && cleanupIsolate(isolateId);
+                setIsolate(isolateId, { ...isolateMetadata, port, worker: isolateInstance, status: 'up', loadedAt: Date.now() });
+            }
+
         } catch (error) {
             console.error(`Failed to spawn isolate: ${isolateId}`, error);
             return new Response(JSON.stringify({ error: { message: 'Bad Request. Failed to initialize Isolate' } }), { status: 500, headers: { 'Content-Type': 'application/json' } });
@@ -308,7 +319,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
                 ...queryParams,
                 ...isolateMetadata.params,
                 "__importUrl__": btoa(importUrl.href),
-                "__isJSX__": isJSX
+                "__isJSX__": isJSX,
+                "__proxyUrl__": btoa(url.href),
             })}`,
             `http://localhost:${port}`
         ), {
@@ -346,3 +358,5 @@ export default ({ config, modules }: any) => async (req: Request) => {
         return new Response(JSON.stringify(error), { status: 500, statusText: 'Bad Request', headers: { 'Content-Type': 'application/json' } });
     }
 };
+
+

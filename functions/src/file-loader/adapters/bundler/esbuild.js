@@ -11,8 +11,7 @@ export default async (path, { ...options } = {}) => {
     const importMapURL = `data:application/json,${importMap}`;
 
     // Define Deno Loader Plugins;
-    let [denoResolver, denoLoader] = denoPlugins({ importMapURL });
-
+    const [denoResolver, denoLoader] = denoPlugins({ importMapURL });
     const config = {
         plugins: [
             denoResolver,
@@ -27,10 +26,17 @@ export default async (path, { ...options } = {}) => {
         minifySyntax: true,
         jsx: "transform",
         platform: "browser",
-        external: ['react', 'react-dom', ...(options.shared || [])],
     };
 
+    if (options?.shared?.some(s => s === 'none')) {
+        config.external = [];
+    } else {
+        config.external = ['react', 'react-dom', ...(options.shared || [])]
+    }
+
+
     config.entryPoints = [path.href];
+
 
     let ctx = await context(config);
     const result = await ctx.rebuild();
