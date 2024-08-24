@@ -12,8 +12,8 @@ export default (adapters: any) => {
     //     const isolateId = String(currentIsolateIndex % maxIsolates)
     //     return isolateId
     // };
-    const isolateMaxIdleTime = null;
-    return { ...adapters, mapFilePathToIsolateId, isolateMaxIdleTime, permissions: { "allow-sys": true } }
+    const isolateMaxIdleTime = 5000;
+    return { ...adapters, isolateType:'worker', mapFilePathToIsolateId, isolateMaxIdleTime, permissions: { "allow-sys": true } }
 }
 
 
