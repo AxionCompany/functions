@@ -155,6 +155,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
     importUrl.pathname = modules.path.join(importUrl.pathname, url.pathname).split('/').filter(Boolean).join('/');
     importUrl.search = url.search;
 
+
     const formattedImportUrl = formatImportUrl(importUrl);
 
     let isolateMetadata: any = {};
@@ -199,7 +200,14 @@ export default ({ config, modules }: any) => async (req: Request) => {
     if (!isolateMetadata || queryParams.bundle || !isExactMatch) {
         config.debug && console.log('Isolate not found. Importing metadata', importUrl.href);
 
-        const isolateMetadataRes = await fetch(importUrl.href, {
+        const _url = importUrl;
+        if (!(isolateMetadata?.loadedAt) || (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter)) {
+            const appendVersion = String(new Date().getTime());
+            const searchParams = new URLSearchParams({ ...queryParams, appendVersion }).toString();;
+            _url.search = searchParams;
+        }
+
+        const isolateMetadataRes = await fetch(_url.href, {
             redirect: "follow",
             headers: { "content-type": "application/json" },
             method: "POST",
