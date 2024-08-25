@@ -98,7 +98,7 @@ export const cleanupIsolates = (): void => {
 
 export default ({ config, modules }: any) => async (req: Request) => {
 
-    if (!config?.isolateType) config.isolateType = 'subprocess';
+    if (!config?.isolateType) config.isolateType = 'worker';
 
     const formatImportUrl = config.formatImportUrl || ((importUrl: URL) => {
         const pathname = importUrl.pathname;
@@ -117,7 +117,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
     const mapFilePathToIsolateId = ((_fileUrl: URL) => {
 
         const customMapperId = config.mapFilePathToIsolateId ||
-            (({ formattedFileUrl }: { fileUrl: string, formattedFileUrl: string }) => `1`)
+            (({ formattedFileUrl }: { fileUrl: string, formattedFileUrl: string }) => formattedFileUrl)
 
         // Format File Path
         const filePathUrl = new URL(_fileUrl)
