@@ -2,6 +2,8 @@ import { get, set, } from "https://deno.land/x/kv_toolbox/blob.ts";
 
 const connections = new Map<string, any>();
 
+let warningIssued = false
+
 const createDirIfNotExists = async (path: string) => {
 
     try {
@@ -21,7 +23,10 @@ const Cache = async (projectId: string, prefix = '') => {
         kv = connections.get(projectId);
     } else {
         if (!(typeof Deno.openKv === 'function')) {
-            console.warn('Deno Kv not available in namespace... Bypassing cache usage. If you want to enable cache, run with --unstable-kv in Deno versions prior to 2.0.')
+            if (!warningIssued) {
+                console.warn('Deno Kv not available in namespace... Bypassing cache usage. If you want to enable cache, run with --unstable-kv in Deno versions prior to 2.0.')
+                warningIssued = true;
+            }
             return (cb: Function, config: any, ...params: any[]) => cb(...params);
         }
         await createDirIfNotExists(['.', prefix, 'cache'].filter(Boolean).join('/'));
