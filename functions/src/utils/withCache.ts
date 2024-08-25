@@ -53,6 +53,10 @@ const Cache = async (projectId: string, prefix = '') => {
 
     return async (cb: Function, config: { useCache: boolean | undefined, keys: string[], cachettl: number | undefined }, ...params: any[]) => {
 
+        if (!(typeof Deno.openKv ==='function')){
+            console.warn('Deno Kv not available in namespace... Bypassing cache usage. If you want to enable cache, run with --unstable-kv in Deno versions prior to 2.0.')
+            return await cb(...params)
+        }
         config.useCache = config.useCache !== false;
         config.cachettl = config.cachettl || 1000 * 60 * 10; // 10 minutes
 

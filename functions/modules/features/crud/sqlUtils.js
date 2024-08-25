@@ -123,7 +123,14 @@ function toSqlQuery(query, config) {
 function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
     const dialectConfigs = {
         sqlite: {
-            jsonSet: (field) => `json_set(COALESCE(${field}, '{}'), '$', json($${field}))`,
+            jsonSet: (field, value) => {
+                const isNested = typeof value === 'object';
+                return `${field} = json_set(COALESCE(${field},'{}'), ${isNested
+                    ? Object.keys(value).map((key) => `${Array.isArray(value) ? `'$[${key}]'` : `'$.${key}'`}, ($${field}_${key.replaceAll('.', '_')})`).join(', ')
+                    : `'$', json($${field})`
+                    })`;
+            },
+          
             jsonInsert: (field) => `${field} = json($${field})`,
             jsonRemove: (field) => `json_remove(${field}, '$')`,
             arrayInsert: (field) => {
@@ -164,12 +171,16 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
                         return `${jsonRemove(field)}`;
                     } else if (value.$push) {
                         return `${arrayInsert(field)}`;
+                    } else {
+                        return `${jsonSet(field, value)}`;
                     }
                 }
 
                 return `${field} = $${field}`;
 
             }).filter(Boolean).join(', ');
+
+
             sqlQuery = `SET ${updateConditions}`;
             break;
         }

@@ -69,7 +69,33 @@ const serializers = {
 
 }
 
+const formattedNestedData = (data) => Object.entries(data)
+    .reduce((acc, [field, value]) => {
+        if (field.includes('.')) {
+            const [newField, ...fields] = field.split('.');
+            field = newField;
+            if (!acc[field]) {
+                acc[field] = { [fields.join('.')]: value }
+            } else {
+                acc[field][fields.join('.')] = value;
+            }
+        }
+        else {
+            acc[field] = value;
+        }
+        return acc;
+    }, {})
+
 function convertToPositionalParams(sql, params) {
+    params = Object.entries(params).reduce((acc, [key, value]) => {
+        if (key.includes('.')) {
+            key = key.replaceAll('.', '_');
+        }
+        acc[key] = value;
+        return acc;
+    }, {});
+
+
     const paramNames = Object.keys(params);
     const positionalParams = [];
     const paramMap = {};
@@ -438,20 +464,24 @@ export default (args) => {
                 // Validate query
                 const validatedQuery = Validator(schema, query, {
                     query: true,
+                    useDotNotation: true,
                     path: `update_inputQuery:${key}`,
                 });
                 const _validatedQueryParams = Validator(schema, query, {
-                    query: true,
                     path: `update_inputParams:${key}`,
                     removeOperators: true,
                 });
                 // Validate data
-                const validatedData = Validator(schema, data, {
+                const validatedData = formattedNestedData(Validator(schema, data, {
                     path: `update_inputData:${key}`,
-                });
+                    query: true,
+                    useDotNotation: true,
+                }));
                 const validatedDataParams = Validator(schema, data, {
                     path: `update_inputDataParams:${key}`,
                     removeOperators: true,
+                    query: true,
+                    useDotNotation: true,
                 });
 
                 if (config.addTimestamps) {
@@ -460,6 +490,7 @@ export default (args) => {
                 }
 
                 const _sqlParams = { ..._validatedQueryParams, ...validatedDataParams };
+
 
                 // Query SQL Statement
                 const whereClauses = toSqlQuery(validatedQuery, { table: key })
@@ -475,9 +506,9 @@ export default (args) => {
                 const _updateSql = `UPDATE ${key} ${setClauses} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
 
                 config.addTimestamps && (_sqlParams.updatedAt = new Date().toISOString());
-
                 const { sql: updateSql, params: sqlParams } = convertToPositionalParams(_updateSql, _sqlParams);
                 const { sql, params: validatedQueryParams } = convertToPositionalParams(querySql, _validatedQueryParams);
+                console.log('SQL PARAMS', _sqlParams, _updateSql, querySql, _validatedQueryParams)
                 querySql = sql;
 
                 const start = Date.now();

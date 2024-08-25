@@ -1,6 +1,50 @@
 # Axion Functions
 
 Axion Functions is a full-stack development framework designed to simplify the process of developing applications. It leverages JavaScript (JS) and ES Modules, supporting both backend modules and front-end React components, with automatic routing and rendering. Axion Functions runs on the Deno runtime, eliminating the need for npm package management (but still compatible with it).
+# Quickstart
+
+Get started with Axion Functions in a few simple steps:
+
+1. **Install Deno**: Download from [deno.land](https://deno.land/)
+
+2. **Create project structure**:
+   ```
+   my-project/
+   ├── api/
+   │   └── hello.ts
+   ├── pages/
+   │   └── home.jsx
+   ```
+
+3. **Create a backend module** (`api/hello.ts`):
+   ```typescript
+   export default (props) => {
+     return `Hello, ${props.name || 'World'}!`;
+   };
+   ```
+
+4. **Create a frontend component** (`pages/home.jsx`):
+   ```jsx
+   import React from 'npm:react'; // in Deno, you can use npm: specifiers to import modules without need to `npm install`.
+
+   const HomePage = (props) => {
+     return <div>Welcome to Axion Functions!</div>;
+   };
+
+   export default HomePage;
+   ```
+
+5. **Start the application**:
+   ```sh
+   deno run -A https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts
+   ```
+
+7. **Test your application**:
+   - Backend: `curl http://localhost:9002/api/hello?name=Axion`
+   - Frontend: Open `http://localhost:9002/pages/home` in your browser
+
+You now have a basic Axion Functions application up and running!
+
 
 ## Our Commitment
 
@@ -41,19 +85,19 @@ Axion Functions runs on the Deno runtime. Ensure you have Deno installed on your
 
 ## Starting the Application Server
 
-To start the application, create a `deno.json` file with the following content:
+The recommended way of starting the application is bt creating a `deno.json` file with the following content:
 
 ```json
 {
     "tasks": {
-        "start": "PORT=8000 deno run -A -r --unstable --no-lock https://raw.githubusercontent.com/AxionCompany/functions/develop/main.ts",
-        "dev": "WATCH=true deno run -A --reload=http://localhost:8001,https://raw.githubusercontent.com/AxionCompany/functions/ --unstable --no-lock https://raw.githubusercontent.com/AxionCompany/functions/develop/main.ts"
-    }
+        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --reload=http://localhost --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts",
+        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=http://localhost,https://raw.githubusercontent.com/AxionCompany/functions/release -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts"
+    },
 }
 ```
 This configuration defines two tasks:
 - start: Runs the application on port 8000.
-- dev: Runs the application in development mode with hot-reloading enabled.
+- dev: Runs the application in development mode with reload-on-save.
 
 ### Add Configuration File
 ```json
@@ -84,8 +128,8 @@ If you prefer to use npm, you can create a package.json file with the following 
 ```json
 {
     "scripts": {
-        "start": "PORT=8000 deno run -A -r --unstable --no-lock https://raw.githubusercontent.com/AxionCompany/functions/develop/main.ts",
-        "dev": "WATCH=true deno run -A --reload=http://localhost:8001,https://raw.githubusercontent.com/AxionCompany/functions/ --unstable --no-lock https://raw.githubusercontent.com/AxionCompany/functions/develop/main.ts"
+        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --reload=http://localhost --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts",
+        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=http://localhost,https://raw.githubusercontent.com/AxionCompany/functions/release -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts"
     }
 }
 ```
@@ -108,37 +152,52 @@ Both methods will pull Axion Functions' code from GitHub and execute it on your 
 ## Usage
 
 1. **Creating Backend Modules**: Use `.ts` or `.js` extensions.
-    ```javascript
-    // backend/hello.ts
-    export default (props) => {
-        return `Hello, ${props.name || 'World'}!`;
-    };
 
-    export const GET = (props) => {
-        return `Hello, ${props.name || 'World'} via GET!`;
-    };
+Any exported function will be automatically executed for the corresponding http method. If the function is not explicitly defined, the default export function will be executed, which accepts any http method.
+Any query, body or path parameters will be automatically parsed from the request and passed to the function as parameters.
 
-    export const POST = (props) => {
-        return `Hello, ${props.name || 'World'} via POST!`;
-    };
-    ```
+```javascript
+// api/hello.ts
+export default (props) => { // default export functions will be executed for any http method that is not explicitly defined
+    return `Hello, ${props.name || 'World'}!`;
+};
 
-    **Testing Backend Modules with curl**:
-    ```sh
-    # Default export
-    curl -X GET "http://localhost:9002/backend/hello?name=Axion"
+export const GET = (props) => { // GET method will be executed for the api/hello endpoint. If available, takes precedence over the default export function
+    return `Hello, ${props.name || 'World'} via GET!`;
+};
 
-    # GET method
-    curl -X GET "http://localhost:9002/backend/hello/GET?name=Axion"
+export const POST = (props) => { // POST method will be executed for the api/hello endpoint. If available, takes precedence over the default export function
+    return `Hello, ${props.name || 'World'} via POST!`;
+};
 
-    # POST method
-    curl -X POST "http://localhost:9002/backend/hello/POST" -d '{"name":"Axion"}'
-    ```
+export const PUT = (props) => { // PUT method will be executed for the api/hello endpoint. If available, takes precedence over the default export function
+    return `Hello, ${props.name || 'World'} via PUT!`;
+};
+
+export const DELETE = (props) => { // DELETE method will be executed for the api/hello endpoint. If available, takes precedence over the default export function
+    return `Hello, ${props.name || 'World'} via DELETE!`;
+};
+```
+
+**Testing Backend Modules with curl**:
+```sh
+# Default export
+curl -X GET "http://localhost:9002/api/hello?name=Axion" // will execute the default export function
+
+# GET method
+curl -X GET "http://localhost:9002/api/hello/GET?name=Axion"
+
+# POST method
+curl -X POST "http://localhost:9002/api/hello/POST" -d '{"name":"Axion"}'
+```
 
 2. **Creating Front-End Modules**: Use `.jsx` or `.tsx` extensions.
+
+    Axion functions will assume that front-end modules are React components, and will automatically render them in the browser. Any files with the .jsx or .tsx extension will be considered as React components. 
+
     ```jsx
     // pages/home.jsx
-    import React from 'react';
+    import React from 'npm:react';
 
     const HomePage = (props) => {
         return <div>Welcome, {props.user || 'Guest'}!</div>;
@@ -153,7 +212,7 @@ Both methods will pull Axion Functions' code from GitHub and execute it on your 
 3. **Path Parameters**: Use `[filename]` syntax for dynamic routes.
     ```jsx
     // pages/[userId]/profile.jsx
-    import React from 'react';
+    import React from 'npm:react';
 
     const UserProfile = (props) => {
         return <div>User Profile for ID: {props.userId}</div>;
@@ -164,6 +223,7 @@ Both methods will pull Axion Functions' code from GitHub and execute it on your 
 
     **Testing Dynamic Routes in Browser**:
     - Open your browser and navigate to `http://localhost:9002/pages/123/profile` to see the UserProfile component for user ID 123.
+
 
 ### Full-Stack Example: Mini Task Management Application
 
@@ -177,19 +237,19 @@ import { v4 as uuidv4 } from 'npm:uuid';
 let tasks = [];
 
 // Get all tasks
-export const GET = () => {
+export const GET = ({...params}) => { // GET is the default method for the api/tasks endpoint. Any query parameters will be automatically passed to the function
     return tasks;
 };
 
 // Add a new task
-export const POST = ({name}) => {
+export const POST = ({name}) => { // name is the body parameter, and will be automatically parsed from the request body and passed to the function
     const task = { id: uuidv4(), name };
     tasks.push(task);
     return task;
 };
 
 // Delete a task
-export const DELETE = ({id}) => {
+export const DELETE = ({id}) => { // :id path parameter will automatically be passed to the function
     tasks = tasks.filter(task => task.id !== id);
     return { success: true };
 };
@@ -199,7 +259,7 @@ export const DELETE = ({id}) => {
 
 ```sh
 # Get all tasks
-curl -X GET "http://localhost:9002/api/tasks"
+curl -X GET "http://localhost:9002/api/tasks?name=Axion"
 
 # Add a new task
 curl -X POST "http://localhost:9002/api/tasks" -H "Content-Type: application/json" -d '{"name":"Sample Task"}'
@@ -213,9 +273,9 @@ This front-end component will interact with the backend to display the list of t
 
 ```jsx
 // pages/tasks.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'npm:react';
 
-const TasksPage = () => {
+const TasksPage = ({...props}) => {
     const [tasks, setTasks] = useState([]);
     const [taskName, setTaskName] = useState('');
 
@@ -291,7 +351,7 @@ Axion Functions supports "shared" modules, which allow you to reuse code across 
 
 ```javascript
 // backend/shared.js
-import { v4 as uuidv4 } from 'npm:uuid';
+import { v4 as uuidv4 } from 'npm:uuid'; // in Deno, we use the npm: prefix to import modules from npm, without the need for npm install
 
 export default (modules) => ({ ...modules, uuid: uuidv4 });
 ```
@@ -307,7 +367,9 @@ export const POST = (body) => {
 };
 ```
 
-In this example, the uuid function is shared across the backend directory and its subdirectories, allowing you to easily generate unique IDs in multiple modules without repeating the import statement.
+In this example, the uuid function is shared across the backend directory and its subdirectories, allowing you to easily generate unique IDs in multiple modules without repeating the import statement. 
+
+You'll be able to deconstruct it from the exported function name being executed (in this example, from `POST` function inside the `api/tasks.ts` file).
 
 ### Layout Components
 Axion Functions also supports "layout" components, which allow you to define a common structure or layout for your frontend components. This is particularly useful for elements like headers, footers, and menus that should be consistent across multiple pages.
@@ -332,7 +394,7 @@ export default ({ children }) => {
 
 ```jsx
 // pages/home.jsx
-import React from 'react';
+import React from 'npm:react';
 
 const HomePage = () => {
     return <div>Welcome to the Home Page!</div>;
@@ -400,42 +462,23 @@ Axion Functions aims to make the development process as straightforward as possi
 
 ### Environment Variables
 
-**FUNCTIONS_DIR** : Specifies the root directory to be served as modules or components. Files and directories outside this root will not be available on the web but can still be used in the project. Defaults to . (current directory).
-
-```sh
-export FUNCTIONS_DIR=src
-```
+**FUNCTIONS_DIR** : Specifies the root directory to be served as modules or components. Files and directories outside this root will not be available on the web but can still be used in the project. Defaults to `.` (root project directory).
 
 **DIR_ENTRYPOINT** : Specifies the default file name to be considered as the main entry point in a directory. This makes it unnecessary to specify it when importing by the path of its parent directory. Defaults to index.
 
-```sh
-export DIR_ENTRYPOINT=main
-```
 **FILE_LOADER_URL**: Defines the URL where the file loader is running if the developer wants to run it separately. Defaults to http://localhost:9000.
 
-```sh
-export FILE_LOADER_URL=http://localhost:9001
-```
 **FILE_LOADER_PORT**: Specifies the port for the file loader. Defaults to 9000.
 
-```sh
-export FILE_LOADER_PORT=9001
-```
+
 **DEFAULT_LOADER_TYPE**: Specifies the loader type to load the files. Options are local or github, and it defaults to local.
 
-```sh
-export DEFAULT_LOADER_TYPE=github
-```
+
 **USE_CACHE**: Determines if the cache should be enabled by default when loading a file. Defaults to false if DEFAULT_LOADER_TYPE is local and true otherwise.
 
-```sh
-export USE_CACHE=true
-```
+
 **DEBUG**: Enables Axion Functions logs for debugging purposes. Defaults to false.
 
-```sh
-export DEBUG=true
-```
 
 ### Configuration File
 You can also set these configurations in a axion.config.json file at the root of your project. Use camelCase for the properties.
@@ -488,7 +531,6 @@ Axion functions is still in pre-release phase, and we are actively working on im
 Our roadmap for Axion Functions includes the following features and improvements:
 
 - **Improved Documentation**: Enhance the documentation with more examples, tutorials, and guides.
-- **Trully Serverless Hosting**: Don't bother deploying your code, we'll serve it right from where it is - your git repository - and securely make it available for the world.
 - **Performance Optimization**: Optimize the framework for faster execution and better resource management.
 - **Testing and Quality Assurance**: Implement automated testing and quality assurance processes to ensure the stability and reliability of the framework.
 - **Community Contributions**: Encourage community contributions and feedback to improve the framework and make it more accessible to developers.
