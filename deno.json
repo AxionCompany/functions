@@ -1,7 +1,7 @@
 {
     "tasks": {
         "start": "ENV=production deno run -A -r --no-lock --unstable --unstable-kv --unstable-sloppy-imports main.ts",
-        "dev": "ENV=development WATCH=true PORT=9002 deno run -A -r --no-lock --unstable --unstable-kv --unstable-sloppy-imports main.ts",
+        "dev": "ENV=development WATCH=true PORT=9002 deno run -A -r --no-lock --unstable --no-prompt --unstable-kv --unstable-sloppy-imports main.ts",
         "file-loader": "ENV=production deno run -A --reload=http://local@localhost:9000 --no-lock --unstable --unstable-kv --unstable-sloppy-imports file-loader.ts",
         "api": "ENV=production deno run -A --reload=http://localhost:9000 --no-lock --unstable --unstable-kv --unstable-sloppy-imports api.ts"
     },

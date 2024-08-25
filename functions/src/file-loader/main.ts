@@ -9,7 +9,7 @@ export default ({ config, modules }: any) => {
 
   return async ({ pathname, url, headers, queryParams, data, __requestId__ }: any, res: any) => {
 
-    const { bundle: shouldBundle, customBaseUrl, shared, ...searchParams } = queryParams;
+    const { bundle: shouldBundle, shared, ...searchParams } = queryParams;
     // check if headers type is application/json
     const contentTypeHeaders = headers["content-type"];
 
@@ -39,12 +39,12 @@ export default ({ config, modules }: any) => {
     config.debug && console.log(`Loaded file ${url.href} in ${Date.now() - startTime}ms`)
 
     if (shouldBundle) {
-      if (customBaseUrl) {
-        path = new URL(customBaseUrl).pathname + pathname;
-        path = path.replace('//', '/');
-      }
+
       const bundleUrl = url
-      bundleUrl.search = '';
+      bundleUrl.pathname = matchPath;
+
+      const { bundle: _, ...queryParamsWithoutBundle } = queryParams
+      bundleUrl.search = new URLSearchParams(queryParamsWithoutBundle).toString();
 
       const bundleContent = await bundler(
         bundleUrl,
@@ -72,7 +72,6 @@ export default ({ config, modules }: any) => {
     if (!isImport) {
       return { content, redirect, params, path, variables, matchPath };
     }
-
 
     if (['js', 'jsx', 'ts', 'tsx'].includes(matchPath?.split('.').pop())) {
       // if (params) { // add export for params in content
