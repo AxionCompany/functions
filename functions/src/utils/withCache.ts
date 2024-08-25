@@ -20,10 +20,16 @@ const Cache = async (projectId: string, prefix = '') => {
     if (connections.has(projectId)) {
         kv = connections.get(projectId);
     } else {
+        if (!(typeof Deno.openKv === 'function')) {
+            console.warn('Deno Kv not available in namespace... Bypassing cache usage. If you want to enable cache, run with --unstable-kv in Deno versions prior to 2.0.')
+            return (cb: Function, config: any, ...params: any[]) => cb(...params);
+        }
         await createDirIfNotExists(['.', prefix, 'cache'].filter(Boolean).join('/'));
         kv = await Deno.openKv(['.', prefix, 'cache', 'cache.db'].filter(Boolean).join('/'));
         connections.set(projectId, kv);
     }
+
+
 
     const getCache = async (keys: string[]) => {
         const cachedData: any = await get(kv, ['cache', ...keys])
@@ -53,10 +59,6 @@ const Cache = async (projectId: string, prefix = '') => {
 
     return async (cb: Function, config: { useCache: boolean | undefined, keys: string[], cachettl: number | undefined }, ...params: any[]) => {
 
-        if (!(typeof Deno.openKv ==='function')){
-            console.warn('Deno Kv not available in namespace... Bypassing cache usage. If you want to enable cache, run with --unstable-kv in Deno versions prior to 2.0.')
-            return await cb(...params)
-        }
         config.useCache = config.useCache !== false;
         config.cachettl = config.cachettl || 1000 * 60 * 10; // 10 minutes
 
