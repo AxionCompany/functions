@@ -44,13 +44,15 @@ const customTypes = function (type: string, options: ValidationOptions = {}): Cu
 }
 
 const defaultOptions = {
-    query: false,
+    query: true,
     optional: true,
-    removeOperators: false
+    removeOperators: false,
+    useDotNotation: false
 };
 
 interface ValidationOptions {
     query?: boolean;
+    useDotNotation?: boolean;
     optional?: boolean;
     shouldIgnore?: (args: { schemaKey: string; schema: any; valueKey: string; value: any }) => boolean;
     valueKey?: string;
@@ -82,8 +84,12 @@ const mongoOperators: Record<string, (type: any) => any> = {
  */
 
 const Validator = (schemas: Record<string, any>) =>
-    (type: any, value: any, options: ValidationOptions = {}) =>
-        validateParams(type, value, { ...options, schemas });
+    (type: any, value: any, options: ValidationOptions = {}) => {
+        options = { ...defaultOptions, ...options };
+        return options.useDotNotation
+            ? getDotNotationObject(validateParams(type, value, { ...options, schemas }))
+            : validateParams(type, value, { ...options, schemas });
+    }
 
 const validateParams = (type: any, value: any, options: ValidationOptions = {}): any => {
     options = { ...defaultOptions, ...options };
@@ -105,15 +111,15 @@ const validateParams = (type: any, value: any, options: ValidationOptions = {}):
     if (typeof type === "string") {
         if (type.includes("!")) {
             isOptional = false;
-            type = type.replace("!","");
+            type = type.replace("!", "");
         }
         if (type.includes("?")) {
             isOptional = true;
-            type = type.replace("?","");
+            type = type.replace("?", "");
         }
-        if (type.includes("^")){
+        if (type.includes("^")) {
             // is unique. only remove the symbol
-            type = type.replace("^","");
+            type = type.replace("^", "");
         }
 
         let validateValue = z[type] || customTypes(type, options);
