@@ -82,12 +82,13 @@ const cleanupIsolate = async (isolateId: string): Promise<void> => {
                 Deno.kill(isolateMetadata.pid, 'SIGKILL');
                 delete isolateMetadata.pid;
             }
-            isolatesMetadata.set(isolateId, { ...isolateMetadata, status: 'down' });
+            isolatesMetadata.set(isolateId, { ...isolateMetadata, status: 'down', activeRequests: 0 });
         } catch (err) {
             console.error("Error terminating isolate", err);
         }
     }
 };
+
 
 export const cleanupIsolates = (): void => {
     console.log("Cleaning up isolates");
@@ -301,13 +302,21 @@ export default ({ config, modules }: any) => async (req: Request) => {
                 env: isolateMetadata.variables
             })
 
+            if (config.isolateType === 'worker') {
+                isolateInstance.onerror = (error) => {
+                    console.error(`Error in isolate ${isolateId}:`, error);
+                    cleanupIsolate(isolateId);
+                    // You might want to implement logic here to restart the isolate or mark it as failed
+                };
+            }
+
             await waitForServer(`http://localhost:${port}/__healthcheck__`);
 
             isolateMetadata = getIsolate(isolateId);
 
             if (config.isolateType === 'subprocess') {
                 isolateMetadata?.pid && cleanupIsolate(isolateId);
-                setIsolate(isolateId, { ...isolateMetadata, port, pid: isolateInstance.pid, instance: isolateInstance, status: 'up', loadedAt: Date.now() });
+                setIsolate(isolateId, { ...isolateMetadata, port, pid: isolateInstance.pid, instance: isolateInstance, status: 'up', loadedAt: Date.now(), });
             } else {
                 isolateMetadata?.worker && cleanupIsolate(isolateId);
                 setIsolate(isolateId, { ...isolateMetadata, port, worker: isolateInstance, status: 'up', loadedAt: Date.now() });
@@ -321,6 +330,10 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
     try {
         const port = getPortFromIsolateId(isolateId);
+
+        // Increment active requests counter
+        const isolate = getIsolate(isolateId);
+        setIsolate(isolateId, { ...isolate, activeRequests: (isolate.activeRequests || 0) + 1 });
 
         const moduleResponse = await fetch(new URL(
             `${url.pathname}?${new URLSearchParams({
@@ -345,11 +358,26 @@ export default ({ config, modules }: any) => async (req: Request) => {
                 controller.enqueue(chunk);
             },
             flush(controller) {
-                config.isolateMaxIdleTime
                 controller.terminate();
                 if (!config.isolateMaxIdleTime) return
-                resetIsolateTimer(isolateId, config.isolateMaxIdleTime);  // Reset timer after the last chunk is processed
-            }
+                // Decrement active requests counter and reset timer if needed
+                const currentIsolate = getIsolate(isolateId);
+                const newActiveRequests = Math.max(0, currentIsolate.activeRequests - 1);
+                setIsolate(isolateId, { ...currentIsolate, activeRequests: newActiveRequests });
+                if (newActiveRequests === 0 && config.isolateMaxIdleTime) {
+                    resetIsolateTimer(isolateId, config.isolateMaxIdleTime);  // Reset timer after the last chunk is processed
+                }
+            },
+            async cancel(){
+                if (!config.isolateMaxIdleTime) return
+                // Decrement active requests counter and reset timer if needed
+                const currentIsolate = getIsolate(isolateId);
+                const newActiveRequests = Math.max(0, currentIsolate.activeRequests - 1);
+                setIsolate(isolateId, { ...currentIsolate, activeRequests: newActiveRequests });
+                if (newActiveRequests === 0 && config.isolateMaxIdleTime) {
+                    resetIsolateTimer(isolateId, config.isolateMaxIdleTime);  // Reset timer after the last chunk is processed
+                }
+            },
         });
 
         const responseStream = moduleResponse.body?.pipeThrough(transformStream);
