@@ -48,16 +48,20 @@ You now have a basic Axion Functions application up and running!
 
 ## Our Commitment
 
-Our end goal is to increase productivity for JS developers, and our commitment is to always push the frontier 
+Our end goal is to increase productivity for JS developers, and our commitment is to always push to the frontier of what web technology allowes, and keeping the utmost simplicity for JS software developers. 
 
 ## Why we built Axion Functions
-Axion Functions was developed by Axion Company, a custom software development company. The main motivation behind creating this framework was to streamline the development process for our projects, which predominantly use the JavaScript stack. We found ourselves solving similar coding problems across different projects and wanted a way to reuse code snippets efficiently, both for backend modules and frontend components.
+Axion Functions was developed by Axion Company, a custom software development company. The main motivation behind creating this framework was to facilitate the development process for our projects, which predominantly use the JavaScript stack. We found ourselves solving similar coding problems across different projects and wanted a way to reuse code snippets efficiently, both for backend modules and frontend components. 
+Beyond reusing front-end components or backend modules that were common across different projects, we've realized other aspects of the lifecycle of a project can be optimized as well, many of which we hope to address with this framework going forward, but always with the core mantra in mind: keep the utmost simplicity for software developers:
+- Observability
+- Performance
+- Deployment in Distributed Systems
 
 ### Inspiration
 The framework draws significant inspiration from several sources:
 
 - **Module Federation in Webpack** : Developed by the amazing Zach Jackson, Module Federation provides a way to dynamically import modules across different projects. We extended this concept to Deno, taking advantage of its compatibility with Node modules and its ability to import modules from HTTP URLs with security restrictions.
-- **Deno Deploy** : We were amazed by the speed and developer experience of Deno Deploy. The concepts of process isolation and the N+2 port requirement in Axion Functions are inspired by Deno Deploy's architecture, which ensures fast, isolated, and efficient execution of code.
+- **Deno Deploy** : We were amazed by the speed and developer experience of Deno Deploy. The concepts of process isolation and the N+2 port requirement in Axion Functions are (albeit different) inspired by Deno Deploy's architecture, which ensures fast, isolated, and efficient execution of code.
 - **Next.js** : Next.js is a popular React framework that simplifies the development of full-stack applications. We wanted to create a similar experience for Deno developers, allowing them to write backend modules and frontend components in a unified environment with automatic routing and rendering.
 
 ### Why Deno?
@@ -85,14 +89,14 @@ Axion Functions runs on the Deno runtime. Ensure you have Deno installed on your
 
 ## Starting the Application Server
 
-The recommended way of starting the application is bt creating a `deno.json` file with the following content:
+The recommended way of starting the application is by creating a `deno.json` file with the following content:
 
 ```json
 {
-    "tasks": {
-        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --reload=http://localhost --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts",
-        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=http://localhost,https://raw.githubusercontent.com/AxionCompany/functions/release -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts"
-    },
+    "tasks":  {
+        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts",
+        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=https://raw.githubusercontent.com/AxionCompany/functions/release -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts"
+    }
 }
 ```
 This configuration defines two tasks:
@@ -108,7 +112,7 @@ This configuration defines two tasks:
 }
 ```
 
-This configuration specifies that the current directory (.) should be served as the root directory for modules and components, and the default entry point for directories is main.
+This configuration specifies that the current directory (` .`) should be served as the root directory for modules and components, and the default entry point for directories is `main`.
 
 ### Start the Application
 
@@ -128,8 +132,8 @@ If you prefer to use npm, you can create a package.json file with the following 
 ```json
 {
     "scripts": {
-        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --reload=http://localhost --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts",
-        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=http://localhost,https://raw.githubusercontent.com/AxionCompany/functions/release -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts"
+        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts",
+        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=https://raw.githubusercontent.com/AxionCompany/functions/release -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts"
     }
 }
 ```
@@ -462,23 +466,13 @@ Axion Functions aims to make the development process as straightforward as possi
 
 ### Environment Variables
 
-**FUNCTIONS_DIR** : Specifies the root directory to be served as modules or components. Files and directories outside this root will not be available on the web but can still be used in the project. Defaults to `.` (root project directory).
-
-**DIR_ENTRYPOINT** : Specifies the default file name to be considered as the main entry point in a directory. This makes it unnecessary to specify it when importing by the path of its parent directory. Defaults to index.
-
-**FILE_LOADER_URL**: Defines the URL where the file loader is running if the developer wants to run it separately. Defaults to http://localhost:9000.
-
-**FILE_LOADER_PORT**: Specifies the port for the file loader. Defaults to 9000.
-
-
-**DEFAULT_LOADER_TYPE**: Specifies the loader type to load the files. Options are local or github, and it defaults to local.
-
-
-**USE_CACHE**: Determines if the cache should be enabled by default when loading a file. Defaults to false if DEFAULT_LOADER_TYPE is local and true otherwise.
-
-
-**DEBUG**: Enables Axion Functions logs for debugging purposes. Defaults to false.
-
+- **FUNCTIONS_DIR** : Specifies the root directory to be served as modules or components. Files and directories outside this root will not be available on the web but can still be used in the project. Defaults to `.` (root project directory).
+- **DIR_ENTRYPOINT** : Specifies the default file name to be considered as the main entry point in a directory. This makes it unnecessary to specify it when importing by the path of its parent directory. Defaults to index.
+- **FILE_LOADER_URL**: Defines the URL where the file loader is running if the developer wants to run it separately. Defaults to http://localhost:9000.
+- **FILE_LOADER_PORT**: Specifies the port for the file loader. Defaults to 9000.
+- **DEFAULT_LOADER_TYPE**: Specifies the loader type to load the files. Options are local or github, and it defaults to local.
+- **USE_CACHE**: Determines if the cache should be enabled by default when loading a file. Defaults to false if DEFAULT_LOADER_TYPE is local and true otherwise.
+- **DEBUG**: Enables Axion Functions logs for debugging purposes. Defaults to false.
 
 ### Configuration File
 You can also set these configurations in a axion.config.json file at the root of your project. Use camelCase for the properties.
@@ -517,7 +511,26 @@ Axions are the prebuilt modules and components that we have developed for our ap
 ### Using Axions
 The Axion Functions repository comes with a set of prebuilt axions, both for backend modules and frontend components. These axions are battle-tested in production environments and maintained by our team.
 
-We provide a builtin we for using them in your project by using the `importAxion` function. This function will automatically load the axion from the specified path and execute it in your project. 
+We provide a builtin we for using them in your project by using the adding a reference to this repository directly in your `deno.json` importmap. 
+```javascript
+//deno.json
+{
+    "tasks": {
+        ...tasks
+    },
+    "imports": {
+        "axion-modules/":"https://raw.githubusercontent.com/AxionCompany/functions/release/functions/modules/",
+        ... other imports
+    }
+}
+```
+
+and then, use them in your project like so:
+```javascript
+import MongoDbCrud from "axion-modules/features/crud/mongodb";
+
+// use the function as you'd like here...
+```
 
 We intend to provide better documentation and a dedicated website for browsing and using these axions in the future, but for now, please, refer to `/functions/components` and `/functions/modules` directories in the source code for examples.
 
