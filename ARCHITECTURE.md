@@ -180,16 +180,6 @@ Configuration options:
 - Isolate metadata is cached to avoid unnecessary recreation of isolates.
 - CSS processing results are cached and streamed asynchronously for optimal performance.
 
-## Configuration and Customization
-
-The Axion Framework allows for extensive configuration and customization:
-
-1. Project-wide configuration:
-   - `adapters.{ts|js}`: Overrides default behaviors of axion-functions.
-   - `axion.config.json`: Defines project-wide settings
-   - `deno.json`: Configures Deno-specific options
-
-   Certainly! I'll add a section about how adapters can be used to modify the Axion components' behavior. Here's an addition to the ARCHITECTURE.md file focusing on adapters:
 
 ## Adapters
 
@@ -223,9 +213,42 @@ Adapters can export and modify the following properties and functions:
     }
     ```
 
-2. `shouldUpgradeAfter`: A timestamp indicating when isolates should be upgraded.
+2. `shouldUpgradeAfter`: A timestamp indicating when isolates should be upgraded. Instead of needing to deploy an application (if you are using any remote file-loader option like github), you unly need to update this variable in order to update your app to the newest version. Before redirecting trafic, it performs a healthchek, and if it passes, traffic is redirected to the newly instantiated isolate. Else, it goes back to the previous healthy isolate serving the requests.
 
-3. Custom properties: Any additional properties can be added and will be passed to the Proxy component.
+3. `isolateType`:  The 'isolateType' property is a crucial configuration option in Axion Functions that determines how isolated environments (isolates) are created for executing code. This property can be customized in the adapters.ts file and is implemented in the isolateFactory.ts file within the proxy directory.
+
+There are two main types of isolates supported:
+
+- **Subprocess Isolate**
+- **Web Worker Isolate**
+
+Let's break down how these are defined and used:
+
+- In adapters.ts, the 'isolateType' is set:
+```javascript
+export default (adapters: any) => {
+// other code here...
+return { ...adapters, isolateType:'worker' } // can either be 'worker' or 'subprocess'
+}
+```
+
+Let's look at the key differences between these two types:
+
+- **Subprocess Isolate**:
+    - Created using Deno.Command
+    - Runs as a separate process
+    - Has more flexibility in terms of permissions and environment variables
+    - Suitable for heavier workloads or when full process isolation is needed
+- **Web Worker Isolate**:
+    - Created using the Web Worker API
+    - Runs in a separate thread within the same process
+    - Lighter weight and faster to create
+    - Suitable for most use cases, especially when quick startup and lower resource usage are priorities
+
+The choice between these two types allows developers to optimize their application based on their specific needs. For most cases, the Web Worker Isolate (default) provides a good balance of isolation and performance. However, for situations requiring stricter isolation or specific system-level permissions, the Subprocess Isolate can be used.
+
+To change the isolate type, you would modify the 'isolateType' property in the adapters.ts file. This flexibility allows Axion Functions to cater to a wide range of use cases and performance requirements.
+
 
 ### Usage in the System
 
@@ -251,20 +274,21 @@ export default async function adapter(config: any) {
       password: 'secret-password'
     },
     shouldUpgradeAfter: Date.now() + 3600000, // Upgrade after 1 hour
-    customRouting: (url: string) => {
-      // Custom routing logic
-    },
-    // Any other custom properties or functions
+    isolateType:'subprocess',
+    mapFilePathToIsolateId: ({formattedFilePath})=>formattedFileUrl) // one isolate per file
+    
   };
 }
 ```
 
-### Benefits of Using Adapters
+## Configuration and Customization
 
-1. **Flexibility**: Easily modify system behavior without changing core components.
-2. **Modularity**: Encapsulate project-specific configurations and behaviors.
-3. **Dynamic Configuration**: Adapt the system behavior based on runtime conditions.
-4. **Extension Points**: Provide hooks for adding custom functionality to various parts of the request lifecycle.
+The Axion Framework allows for extensive configuration and customization:
+
+1. Project-wide configuration:
+   - `adapters.{ts|js}`: Overrides default behaviors of axion-functions.
+   - `axion.config.json`: Defines project-wide settings
+   - `deno.json`: Configures Deno-specific options
 
 2. Custom loaders:
    - Implement custom file loaders by extending the base loader functionality
