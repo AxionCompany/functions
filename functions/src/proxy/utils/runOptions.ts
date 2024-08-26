@@ -1,11 +1,15 @@
 // permissions object, each key is a permission, and can receive either an array or a boolean
 const runOptions = (customPermissions: object = {}, { config, variables, modules }): any => {
 
+    const readWritePermissions = config.isolateType === 'subProcess'
+        ? ['.']
+        : [`${config.projectPath}`]
+
     let permissions: any = {
         "deny-run": true,
         "allow-env": false,
-        "allow-write": [`.`],
-        "allow-read": [`.`],
+        "allow-write": readWritePermissions,
+        "allow-read": readWritePermissions,
         "allow-ffi": true,
         "allow-net": true,
         "unstable-sloppy-imports": true,
@@ -16,6 +20,8 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
         "import-map": `data:application/json,${modules.template(JSON.stringify({ imports: config?.denoConfig?.imports, scope: config?.denoConfig?.scope }), variables)}`,
         ...customPermissions,
     };
+
+
 
     if (config.isolateType === 'subprocess') {
         permissions = Object

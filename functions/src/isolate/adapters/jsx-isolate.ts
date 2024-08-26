@@ -24,7 +24,7 @@ if (portString && configString) {
         const { port: _port, ..._config } = event.data;
         port = _port;
         config = _config;
-        cachePathPrefix = "./data/" + config.projectId;
+        cachePathPrefix = config.projectPath;
     };
 }
 
