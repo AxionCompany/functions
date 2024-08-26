@@ -15,6 +15,7 @@ const stream = async (params, res) => {
     }, 1000);
 
     await sleep(15000); // wait for 15 seconds
+    throw new Error('acabou aqui, testando se vai quebrar')
 
     return // should always end a function with a return statement
 
