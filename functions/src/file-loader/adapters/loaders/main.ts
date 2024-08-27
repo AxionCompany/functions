@@ -51,10 +51,10 @@ export default ({ config, modules }: any) => {
                         priority: 1,
                         content,
                         variables,
-                        matchPath: _currentPath,
+                        matchPath: _currentPath.replace(/\\/g, '/'),
                         params,
                         redirect: !extname(path),
-                        path: join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')),
+                        path: join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')).replace(/\\/g, '/'),
                     });
                 }
                 // Priority 2: Check if the entry name matches a variable
@@ -73,10 +73,10 @@ export default ({ config, modules }: any) => {
                         priority: 2,
                         content,
                         variables,
-                        matchPath: _currentPath,
+                        matchPath: _currentPath.replace(/\\/g, '/'),
                         params: newParams,
                         redirect: !extname(path),
-                        path: join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')),
+                        path: join(fullPath || '', path + (!extname(path) ? extname(entry.name) : '')).replace(/\\/g, '/'),
                     })
                 }
 

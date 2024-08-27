@@ -8,7 +8,11 @@ const getAllFiles = async ({ url, name, extensions, returnProp, ...rest }: any) 
         .map((_, i, arr) => {
             const urlParts = arr.slice(0, i + 1)
             urlParts.push(name);
-            return new URL(`${urlParts.join('/')}?${urlData.search ?? ''}`, url).href
+            const newUrl = new URL(url);
+            newUrl.pathname = urlParts.join('/');
+            newUrl.search = urlData.search;
+            return newUrl.href
+
         })
         .forEach((url) => possibleFileUrls.push(url));
 

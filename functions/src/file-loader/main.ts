@@ -62,8 +62,8 @@ export default ({ config, modules }: any) => {
     if (redirect) {
       // logic for redirecting to the new path, so the loader will get the correct file extension from the path in URL.
       // Downside is that there will be an overhead of another request being made to the new path.
-      if (!path.startsWith('/')) path = `/${path}`;
-      const redirectUrl = new URL(`${path}?${new URLSearchParams(searchParams).toString()}`, url.href);
+      const redirectUrl = new URL(url.href);
+      redirectUrl.search = new URLSearchParams(searchParams).toString();
       redirectUrl.pathname = path;
       config.debug && console.log(`Redirecting to ${redirectUrl.href}`);
       return res.redirect(redirectUrl.href);

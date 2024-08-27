@@ -13,7 +13,7 @@ export default (adapters: any) => {
     //     return isolateId
     // };
     const isolateMaxIdleTime = 5000;
-    return { ...adapters, isolateType: 'worker', mapFilePathToIsolateId, isolateMaxIdleTime, permissions: { "allow-env": ["NO_COLOR"], "allow-sys": true } }
+    return { ...adapters, isolateType: 'worker', mapFilePathToIsolateId, isolateMaxIdleTime, permissions: {"allow-sys": true } }
 }
 
 
