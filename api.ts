@@ -138,7 +138,7 @@ async function watchFiles(env: any) {
       const dir = Deno.cwd();
       const files = event.paths.map(path => path.split(dir).join(''));
 
-      if (files.some(file => file.includes(env.CACHE_DIR || `/cache/.deno`))) {
+      if (files.some(file => file.includes('cache'))) {
         continue;
       }
 
