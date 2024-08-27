@@ -35,8 +35,6 @@ const Cache = async (projectId: string, prefix = '') => {
         connections.set(projectId, kv);
     }
 
-
-
     const getCache = async (keys: string[]) => {
         const cachedData: any = await get(kv, ['cache', ...keys])
         if (cachedData?.value !== null) {

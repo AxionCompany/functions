@@ -142,8 +142,6 @@ async function watchFiles(env: any) {
         continue;
       }
 
-      // clean up isolates
-      // await cleanupIsolates();
       shouldUpgradeAfter = new Date().getTime();
       event.paths.forEach(path => {
         self?.postMessage && self?.postMessage({ message: `Files modified: ${files}` });
