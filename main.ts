@@ -33,9 +33,7 @@ const startApi = async (iter = 0) => {
         if (event?.data?.message?.status === 'ok') {
             return
         }
-        api.terminate();
         console.log('API Restarting:', event.data.message);
-        if (iter < maxRestarts) startApi(iter + 1);
     }
     api.onerror = (event) => {
         console.error('Error in API Worker:', event.message);

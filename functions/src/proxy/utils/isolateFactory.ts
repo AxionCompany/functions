@@ -54,7 +54,7 @@ function createWebWorkerIsolate({ isolateId, projectId, reload, modules, port, i
         }
     }
 
-    const runOptionsObj = !config.permissions['allow-all']
+    const runOptionsObj = !config?.permissions?.['allow-all']
         ? runOptions({ ...config.permissions }, { config: { projectId, projectPath, ...config }, modules, variables: env })
         : undefined
 
