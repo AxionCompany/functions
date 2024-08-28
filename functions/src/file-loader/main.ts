@@ -45,7 +45,6 @@ export default ({ config, modules }: any) => {
 
       const { bundle: _, ...queryParamsWithoutBundle } = queryParams;
       bundleUrl.search = new URLSearchParams(queryParamsWithoutBundle).toString();
-
       const bundleContent = await bundler(
         bundleUrl,
         { shared: shared?.split(','), ...variables, ...data, ...params, environment: config.environment }

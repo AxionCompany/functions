@@ -1,12 +1,11 @@
 import { context } from "npm:esbuild";
 import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader/mod.ts";
 import replaceTemplate from "../../../utils/template.ts";
-import denoConfig from "../../../../../deno.json" with { type: "json" };
 
 export default async (path, { ...options } = {}) => {
 
     // Define Import Map;
-    const { imports } = denoConfig;
+    const imports = { ...options?.denoConfig?.imports };
     const importMap = replaceTemplate(JSON.stringify({ imports: { ...imports, ...options?.denoConfig?.imports } }), options)
     const importMapURL = `data:application/json,${importMap}`;
 

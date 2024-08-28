@@ -131,7 +131,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
         // remove extension from matchPath
         filePathUrl.pathname = ext ? filePathUrl.pathname.replace(ext, '') : filePathUrl.pathname;
-        filePathUrl.pathname.replaceAll(/\[([^\[\]]+)\]/g, ':$1');
+        filePathUrl.pathname = filePathUrl.pathname.replaceAll(/\[([^\[\]]+)\]/g, ':$1');
 
         const dirEntrypointIndex = filePathUrl.pathname?.lastIndexOf(`/${config?.dirEntrypoint}`)
         filePathUrl.pathname = dirEntrypointIndex > -1 ? filePathUrl.pathname.slice(0, dirEntrypointIndex) : filePathUrl.pathname;
@@ -198,16 +198,16 @@ export default ({ config, modules }: any) => async (req: Request) => {
         isolateMetadata = getIsolate(isolateId);
     };
 
+
+    // append lastLoadedAt for updating the module/component
+    const loadedAt = isolateMetadata?.loadedAt
+    const searchParams = new URLSearchParams({ ...queryParams, loadedAt }).toString();
+    importUrl.search = searchParams
+
     if (!isolateMetadata || queryParams.bundle || !isExactMatch) {
         config.debug && console.log('Isolate not found. Importing metadata', importUrl.href);
 
-        const _url = importUrl;
-
-        const loadedAt = isolateMetadata?.loadedAt
-        const searchParams = new URLSearchParams({ ...queryParams, loadedAt }).toString();;
-        _url.search = searchParams;
-
-        const isolateMetadataRes = await fetch(_url.href, {
+        const isolateMetadataRes = await fetch(importUrl.href, {
             redirect: "follow",
             headers: { "content-type": "application/json" },
             method: "POST",
@@ -294,6 +294,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
                 modules,
                 port,
                 isJSX,
+                functionsDir: config.functionsDir,
                 denoConfig: config.denoConfig,
                 type: config.isolateType,
                 reload,
