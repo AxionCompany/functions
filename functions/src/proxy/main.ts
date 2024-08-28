@@ -202,11 +202,10 @@ export default ({ config, modules }: any) => async (req: Request) => {
         config.debug && console.log('Isolate not found. Importing metadata', importUrl.href);
 
         const _url = importUrl;
-        if (!(isolateMetadata?.loadedAt) || (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter)) {
-            const appendVersion = String(new Date().getTime());
-            const searchParams = new URLSearchParams({ ...queryParams, appendVersion }).toString();;
-            _url.search = searchParams;
-        }
+
+        const loadedAt = isolateMetadata?.loadedAt
+        const searchParams = new URLSearchParams({ ...queryParams, loadedAt }).toString();;
+        _url.search = searchParams;
 
         const isolateMetadataRes = await fetch(_url.href, {
             redirect: "follow",
@@ -368,7 +367,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
                     resetIsolateTimer(isolateId, config.isolateMaxIdleTime);  // Reset timer after the last chunk is processed
                 }
             },
-            async cancel(){
+            async cancel() {
                 if (!config.isolateMaxIdleTime) return
                 // Decrement active requests counter and reset timer if needed
                 const currentIsolate = getIsolate(isolateId);

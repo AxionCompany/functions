@@ -137,10 +137,12 @@ async function watchFiles(env: any) {
     if (event.kind === "modify" && event.paths.some(path => /\.(html|js|jsx|tsx|ts)$/.test(path))) {
       const dir = Deno.cwd();
       const files = event.paths.map(path => path.split(dir).join(''));
-
-      if (files.some(file => file.includes('cache'))) {
-        continue;
-      }
+      if (files.some(file =>
+        file.indexOf('data') > -1 && (
+          (file.indexOf('cache') > file.indexOf('data')) ||
+          (file.lastIndexOf('data') > file.indexOf('data'))
+        )
+      )) continue
 
       shouldUpgradeAfter = new Date().getTime();
       event.paths.forEach(path => {

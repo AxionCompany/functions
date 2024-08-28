@@ -43,7 +43,7 @@ export default ({ config, modules }: any) => {
       const bundleUrl = url
       bundleUrl.pathname = matchPath;
 
-      const { bundle: _, ...queryParamsWithoutBundle } = queryParams
+      const { bundle: _, ...queryParamsWithoutBundle } = queryParams;
       bundleUrl.search = new URLSearchParams(queryParamsWithoutBundle).toString();
 
       const bundleContent = await bundler(
