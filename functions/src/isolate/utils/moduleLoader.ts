@@ -1,6 +1,6 @@
 import getAllFiles from "./getAllFiles.ts";
 
-export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
+export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir }: any) => {
 
   // Load target module
   importUrl = new URL(importUrl);
@@ -110,11 +110,11 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
     // Initial dependencies
     {
       url,
-      env, 
+      env,
       ...dependencies,
       LayoutModules,
       indexHtml: indexHtmlFiles?.slice(-1)?.[0]?.content,
-      layoutUrls: bundledLayouts?.map(file => file.path),
+      layoutUrls: bundledLayouts?.map(file => file.path?.replaceAll(`${functionsDir}/`, '')),
       bundledLayouts: bundledLayouts?.map(file => file.content),
       bundledModule: bundledModule?.content
     }

@@ -5,7 +5,7 @@ import server from "./functions/src/server/main.ts";
 import getEnv from "./functions/src/utils/environmentVariables.ts";
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 import Cache from "./functions/src/utils/withCache.ts";
-import denoConfig from "./deno.json" with { type: "json" };
+import axionDenoConfig from "./deno.json" with { type: "json" };
 
 self?.addEventListener("unhandledrejection", event => {
   event.preventDefault();
@@ -60,7 +60,7 @@ server({
         urlWithBasicAuth.password = password;
       };
       let axionConfig = axionConfigs.get(axionConfigUrl.origin);
-      let _denoConfig = denoConfigs.get(denoConfigUrl.origin);
+      let denoConfig = denoConfigs.get(denoConfigUrl.origin);
 
       const responseMock = Object.entries(res).reduce((acc, [key, value]) => {
         acc[key] = (() => { });
@@ -82,15 +82,15 @@ server({
         axionConfigs.set(axionConfigUrl.origin, axionConfig);
       }
 
-      if (!_denoConfig) {
+      if (!denoConfig) {
         debug && console.log('deno.json not found in cache for', denoConfigUrl.origin, 'fetching from server...')
-        _denoConfig = await fileLoader({
+        denoConfig = await fileLoader({
           queryParams: {},
           headers: { 'content-type': 'text/plain' },
           pathname: '/deno.json',
           url: denoConfigUrl,
         }, responseMock);
-        _denoConfig = JSON.parse(_denoConfig || '{}')
+        denoConfig = JSON.parse(denoConfig || '{}')
         const nodeConfig = await fileLoader({
           queryParams: {},
           headers: { 'content-type': 'text/plain' },
@@ -98,22 +98,25 @@ server({
           url: new URL('/package.json', denoConfigUrl),
         }, responseMock);
         const nodeConfigJson = JSON.parse(nodeConfig || '{}');
-        _denoConfig.imports = _denoConfig?.imports || {};
+        denoConfig.imports = denoConfig?.imports || {};
         Object.entries(nodeConfigJson?.dependencies || {}).forEach(([key, value]) => {
           if (value.startsWith('http') || value.startsWith('file') || value.startsWith('npm:') || value.startsWith('node:')) {
-            _denoConfig.imports[key] = value;
+            denoConfig.imports[key] = value;
           } else {
-            _denoConfig.imports[key] = `npm:${key}@${value}`;
+            denoConfig.imports[key] = `npm:${key}@${value}`;
           }
         });
-        denoConfigs.set(denoConfigUrl.origin, { ...denoConfig, ..._denoConfig });
-      }
 
+        denoConfig.imports = { ...axionDenoConfig.imports, ...denoConfig.imports };
+        denoConfig.scopes = { ...axionDenoConfig.scopes, ...denoConfig.scopes };
+        denoConfigs.set(denoConfigUrl.origin, denoConfig);
+
+      }
 
       return FileLoader({
         config: { ...config, ...axionConfig },
         modules
-      })({ ...params, url: urlWithBasicAuth, data: { ...params?.data, denoConfig: { ...params?.data?.denoConfig, ...denoConfig } } }, res);
+      })({ ...params, url: urlWithBasicAuth, data: { ...params?.data, denoConfig: { ...denoConfig, ...params?.data?.denoConfig, } } }, res);
     }
 
     return RequestHandler({
