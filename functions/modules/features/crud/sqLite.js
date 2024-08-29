@@ -126,7 +126,6 @@ export default (args) => {
     const schemas = args.schemas;
     const Validator = args.Validator || SchemaValidator(schemas)
     const path = config.dbPath || './data/my.db';
-    // ensure the directory exists (config.dbPath)
     if (!connectedDbs.has(path)) {
         const start = Date.now();
         db = new Database(path, config.dbOptions);
@@ -165,8 +164,6 @@ export default (args) => {
             if (type === "any" || typeof type === 'object') return `${key} TEXT${isUnique ? ' UNIQUE' : ''}${isNullable ? '' : ' NOT NULL'}`;
             // Add more type mappings 
         })?.filter(Boolean)?.join(", ");
-
-        console.log(`CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`);
 
         return `CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`;
     };

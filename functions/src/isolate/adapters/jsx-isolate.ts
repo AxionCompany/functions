@@ -25,6 +25,7 @@ if (portString && configString) {
         port = _port;
         config = _config;
         cachePathPrefix = config.projectPath;
+        Deno.cwd = () => cachePathPrefix;
     };
 }
 

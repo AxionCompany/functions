@@ -17,10 +17,12 @@ if (portString && configString) {
     config = JSON.parse(configString || '{}');
 } else {
     self.onmessage = function (event: any) {
+
         const { port: _port, ..._config } = event.data;
         port = _port;
         config = _config;
-        cachePathPrefix = "./data/" + config.projectId;
+        cachePathPrefix = config.projectPath;
+        Deno.cwd = () => cachePathPrefix;
     };
 }
 // await for port and config
