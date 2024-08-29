@@ -51,6 +51,60 @@ const UserProfile = (props) => <div>User Profile for ID: {props.userId}</div>;
 export default UserProfile;
 ```
 
+## Redirects
+
+Modules receive a second argument `res` which is a response object. Use
+`res.redirect` to redirect to another page.
+
+```javascript
+// main.ts
+export default (props, res) => {
+    return res.redirect("/pages/home");
+};
+```
+
+## Custom Status Codes
+
+Modules receive a second argument `res` which is a response object. Use
+`res.status` and `res.statusText` to return a custom status code and text.
+
+```javascript
+// main.ts
+export default (props, res) => {
+    res.status(404);
+    res.statusText("Not Found");
+    return "Not Found";
+};
+```
+
+## Error Handling
+
+Throw an error to return a custom status code and text.
+
+```javascript
+// main.ts
+export default (props) => {
+    throw new { status: 404, message: "Not Found" }();
+};
+```
+
+## Streams
+
+Modules receive a second argument `res` which is a response object. Use
+`res.stream` to add chunks to response stream.
+
+```javascript
+// main.ts
+export default async (props, res) => {
+    res.stream(`Hello, ${props.name || "World"}!`);
+    const interval = setInterval(() => {
+        res.stream(`It's ${new Date().toLocaleTimeString()}!`);
+    }, 1000);
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    return () => clearInterval(interval);
+};
+```
+
 ## Shared Modules (`.ts` or `.js`)
 
 ```javascript
@@ -72,7 +126,10 @@ export default (modules) => {
 ```
 
 ## Middlewares
-Middlewares will run each time a new request is received, before the function execution. Receives and returns the (possibly) mutated request object.
+
+Middlewares will run each time a new request is received, before the function
+execution. Receives and returns the (possibly) mutated request object.
+
 ```javascript
 // middlewares.js
 // add a request counter to parameters
@@ -87,7 +144,9 @@ const middlewares = async (req) => {
 ```
 
 ## Interceptors
-Interceptors will run in every function execution that has `__requestId__` passed as a property. Does not performs any mutations.
+
+Interceptors will run in every function execution that has `__requestId__`
+passed as a property. Does not performs any mutations.
 
 ```javascript
 // interceptors.js
@@ -114,7 +173,10 @@ export const afterRun = (
 ```
 
 ## Layout Components (`.jsx` or `.tsx`)
-Layouts are HOC components. Can be accumulated in different parts of the file directory.
+
+Layouts are HOC components. Can be accumulated in different parts of the file
+directory.
+
 ```jsx
 // pages/layout.jsx
 // add a header to all components inside pages/*
@@ -128,12 +190,15 @@ export default ({ children }) => (
 ```
 
 ## Custom HTML
+
 Only the closest `index.html` to the executed file path is used (if exists).
 
 Create `index.html` in desired directory
 
 ## Global CSS
-`globals.css`can be accumulated over the file structure to compound different css classes available for different parts of the code
+
+`globals.css`can be accumulated over the file structure to compound different
+css classes available for different parts of the code
 
 Create `globals.css` in desired directory.
 
@@ -146,6 +211,11 @@ Create `globals.css` in desired directory.
 ## Configuration
 
 Use `axion.config.json` or environment variables:
+
+- `functionsDir`: Directory where modules/components will be exposed. (default:
+  `.`)
+- `dirEntrypoint`: Default file to be resolved when accessing a directory
+  (default: `index`)
 
 ```json
 {
@@ -178,6 +248,14 @@ import MongoDbCrud from "axion-modules/features/crud/mongodb";
 - Backend: `curl http://localhost:9002/api/hello?name=Axion`
 - Frontend: Open `http://localhost:9002/pages/home` in browser
 
-```
 This cheat sheet provides a quick reference for the main features and usage patterns of Axion Functions.
-```
+
+
+=====
+LLM GUIDELINES
+
+- Do not use next.js or any other front-end framework other than react itself. Use window.location to change page / set query string params if necessary;
+- `axion.config.json`, `shared.{js,ts}`, `middlewares.{js,ts}` and `layout.{jsx,tsx}` are optional. Prefer simplicity over complexity, and use them only if needed or in bigger projects.
+- The function response will be returned as body of response automatically as plain text. If it's json parseable, it'll be added the json headers. If no errors, 200 status is assumed my default. On error you can throw {message, status} object, so the response status will be obtained from that.
+- As we're using Deno, there's no need to "npm install". Just append the "npm:" specifier directly in your imports or (preferably) centralize imports in the importmap ("imports" property in Deno.json) by defining an alias.
+- Unless users specify otherwise, always use daisyui for styling your front-end.
