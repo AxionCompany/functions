@@ -3,7 +3,7 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
 
     const readWritePermissions = config.isolateType === 'subProcess'
         ? ['.']
-        : [`${config.projectPath}`]
+        : [`${config.projectPath}`,`${config.projectPath}/../node_modules`, `${config.projectPath}/../../node_modules` ]
 
     let permissions: any = {
         "deny-run": true,
