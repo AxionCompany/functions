@@ -1,5 +1,5 @@
 import getAllFiles from './getAllFiles.ts';
-import postcss from "postcss";
+import postcss from "npm:postcss";
 
 const processCss = async (config: any, html: string, importUrl: string) => {
     if (typeof config === 'function') {

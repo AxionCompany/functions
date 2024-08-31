@@ -1,6 +1,7 @@
 import getAllFiles from "./getAllFiles.ts";
 
 export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
+
   // Load target module
   importUrl = new URL(importUrl);
 
@@ -109,13 +110,16 @@ export default async ({ url, env, importUrl, dependencies, isJSX }: any) => {
     // Initial dependencies
     {
       url,
-      env, ...dependencies, LayoutModules,
+      env, 
+      ...dependencies,
+      LayoutModules,
       indexHtml: indexHtmlFiles?.slice(-1)?.[0]?.content,
       layoutUrls: bundledLayouts?.map(file => file.path),
       bundledLayouts: bundledLayouts?.map(file => file.content),
       bundledModule: bundledModule?.content
     }
   );
+
   const middlewares = async (req) => {
     for (const Middleware of Middlewares) {
       if (Middleware) {

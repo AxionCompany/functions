@@ -51,7 +51,6 @@ export default (
       if (data.__done__ || data.__error__) {
         shouldClose = true;
         flushBuffer();
-
       }
 
       if (!headersSent && data.options) {
@@ -177,7 +176,7 @@ export default (
           })
         });
 
-        const processData = ({ chunk, options, __requestId__, __done__ }: any) => {
+        const processData = ({ chunk, options, __requestId__, __done__, __error__ }: any) => {
 
           options = options || {};
 
@@ -190,7 +189,7 @@ export default (
             };
           }
 
-          return { chunk, options, __requestId__, __done__ };
+          return { chunk, options, __requestId__, __done__, __error__ };
         }
 
         const { getStream, enqueue } = createStreamBuffer(1, { processData, sendOptions });
@@ -242,7 +241,6 @@ export default (
         );
       }
     };
-
 
     return await handleRequest(req);
   }

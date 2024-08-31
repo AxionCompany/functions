@@ -27,7 +27,8 @@ export default async (config: any) => {
       }
 
       data.params = getParams(data);
-
+      const url = data.url;
+      
       // merge dependencies
       let dependencies = { ...localDependencies, ...remoteDependencies };
 
@@ -147,7 +148,7 @@ const moduleInstance: any = async (
         // async build css with all elements and dependent components
         completeCss = dependencies.withCache(
           dependencies.processCss,
-          { keys: ['css', url], expireIn: 1000 * 60 },
+          { keys: ['css', importUrl], expireIn: 1000 * 60 },
           dependencies.postCssConfig, compiledHtml, importUrl
         )
       }

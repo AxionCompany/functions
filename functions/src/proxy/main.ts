@@ -1,13 +1,16 @@
-import runOptions from "./utils/runOptions.ts";
+import isolateFactory from "./utils/isolateFactory.ts";
 
+const cachedFileUrls = new Map<string, any>();
 const isolatesMetadata = new Map<string, any>();
 
 const getIsolate = (isolateId: string) => {
     return isolatesMetadata.get(isolateId);
 }
-const getIsolateKeys = () => {
-    return Array.from(isolatesMetadata.keys());
+
+const getCachedFileUrls = () => {
+    return Array.from(cachedFileUrls.keys());
 }
+
 const setIsolate = (isolateId: string, isolateMetadata: any) => {
     return isolatesMetadata.set(isolateId, isolateMetadata);
 }
@@ -18,7 +21,7 @@ const killIsolate = (isolateId: string) => {
 };
 
 // Function to reset the timer
-const resetIsolateTimer = (isolateId: string, timeout:number) => {
+const resetIsolateTimer = (isolateId: string, timeout: number) => {
 
     if (getIsolate(isolateId)?.timer) clearTimeout(getIsolate(isolateId)?.timer);
 
@@ -28,7 +31,7 @@ const resetIsolateTimer = (isolateId: string, timeout:number) => {
             clearTimeout(getIsolate(isolateId)?.timer);
             console.log(`Isolate idle for 5 seconds. Terminating isolate with ID:`, isolateId, getIsolate(isolateId)?.timer);
             killIsolate(isolateId);
-        }, timeout || 5*60*1000)
+        }, timeout)
     })
 };
 
@@ -66,17 +69,22 @@ const getPortFromIsolateId = (isolateId: string): number => {
     return parseInt(isolatesMetadata.get(isolateId).port);
 }
 
-const cleanupIsolate = async (isolateId: string): void => {
-    // console.log("Cleaning up isolate with ID:", isolateId);
+const cleanupIsolate = async (isolateId: string): Promise<void> => {
     const isolateMetadata = getIsolate(isolateId);
-    if (isolateMetadata && isolateMetadata.status && isolateMetadata.status !== 'down') {
-        // kill process, delete isolate and its references
+    if (isolateMetadata?.status !== 'down') {
         try {
-            // console.log("SIGKILL issued. Terminating isolate with ID:", isolateId);
-            isolatesMetadata.set(isolateId, { ...isolatesMetadata.get(isolateId), status: 'down' });
-            Deno.kill(isolatesMetadata.get(isolateId)?.pid, 'SIGKILL');
+            if (isolateMetadata?.worker) {
+                console.log('terminating worker', isolateId);
+                isolateMetadata.worker.terminate();
+                delete isolateMetadata.worker;
+            } else if (isolateMetadata?.pid) {
+                console.log('terminating subprocess', isolateId);
+                Deno.kill(isolateMetadata.pid, 'SIGKILL');
+                delete isolateMetadata.pid;
+            }
+            isolatesMetadata.set(isolateId, { ...isolateMetadata, status: 'down' });
         } catch (err) {
-            // console.error("Error terminating isolate", err);
+            console.error("Error terminating isolate", err);
         }
     }
 };
@@ -88,8 +96,57 @@ export const cleanupIsolates = (): void => {
     }
 }
 
-
 export default ({ config, modules }: any) => async (req: Request) => {
+
+    if (!config?.isolateType) config.isolateType = 'subprocess';
+
+    const formatImportUrl = config.formatImportUrl || ((importUrl: URL) => {
+        const pathname = importUrl.pathname;
+        const ext = modules.path.extname(pathname);
+        // remove extension from matchPath
+        let matchPath = ext ? pathname?.replace(ext, '') : pathname;
+        matchPath = matchPath?.replaceAll(/\[([^\[\]]+)\]/g, ':$1');
+        const dirEntrypointIndex = matchPath?.lastIndexOf(`/${config?.dirEntrypoint}`)
+        matchPath = dirEntrypointIndex > -1 ? matchPath.slice(0, dirEntrypointIndex) : matchPath;
+
+        const isolateSearchUrl = new URL(importUrl.href)
+        isolateSearchUrl.pathname = matchPath;
+        return isolateSearchUrl.href;
+    });
+
+    const mapFilePathToIsolateId = ((_fileUrl: URL) => {
+
+        const customMapperId = config.mapFilePathToIsolateId ||
+            (({ formattedFileUrl }: { fileUrl: string, formattedFileUrl: string }) => `1`)
+
+        // Format File Path
+        const filePathUrl = new URL(_fileUrl)
+        // remove search params from the URL
+        filePathUrl.search = '';
+
+        // matchPath is the path to match in the URL
+        let ext = filePathUrl.pathname.split('.').pop();
+        ext = ext ? `.${ext}` : ext;
+
+        // remove extension from matchPath
+        filePathUrl.pathname = ext ? filePathUrl.pathname.replace(ext, '') : filePathUrl.pathname;
+        filePathUrl.pathname.replaceAll(/\[([^\[\]]+)\]/g, ':$1');
+
+        const dirEntrypointIndex = filePathUrl.pathname?.lastIndexOf(`/${config?.dirEntrypoint}`)
+        filePathUrl.pathname = dirEntrypointIndex > -1 ? filePathUrl.pathname.slice(0, dirEntrypointIndex) : filePathUrl.pathname;
+
+        const cachedFileUrl = cachedFileUrls.get(filePathUrl.href)
+        if (cachedFileUrl) {
+            cachedFileUrls.set(filePathUrl.href, { ...cachedFileUrl, urls: [...new Set([...cachedFileUrl.urls, formattedImportUrl])] });
+            return cachedFileUrl.isolateId;
+        } else {
+            const isolateId = customMapperId({ fileUrl: _fileUrl.href, formattedFileUrl: filePathUrl.href });
+            // update cached file urls
+            cachedFileUrls.set(filePathUrl.href, { isolateId, urls: [formattedImportUrl] });
+            return isolateId
+        }
+
+    })
 
     const url = new URL(req.url);
     const queryParams = Object.fromEntries(url.searchParams.entries());
@@ -98,35 +155,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
     importUrl.pathname = modules.path.join(importUrl.pathname, url.pathname).split('/').filter(Boolean).join('/');
     importUrl.search = url.search;
 
-    const setIsolateSearchUrl = config.setIsolateSearchUrl ||
-        ((importUrl: URL) => {
-            const pathname = importUrl.pathname;
-            const ext = modules.path.extname(pathname);
-            // remove extension from matchPath
-            let matchPath = ext ? pathname?.replace(ext, '') : pathname
-            const dirEntrypointIndex = matchPath?.lastIndexOf(`/${config?.dirEntrypoint}`)
-            matchPath = dirEntrypointIndex > -1 ? matchPath.slice(0, dirEntrypointIndex) : matchPath;
-
-            const isolateSearchUrl = new URL(importUrl.href)
-            isolateSearchUrl.pathname = matchPath;
-            return isolateSearchUrl.href;
-        })
-
-    const setIsolateUrlPattern = config.setIsolateUrlPattern ||
-        ((matchUrl: URL) => {
-            // matchPath is the path to match in the URL
-            const pathname = matchUrl.pathname;
-            const ext = modules.path.extname(pathname);
-            // remove extension from matchPath
-            let matchPath = ext ? pathname?.replace(ext, '') : pathname
-            matchPath = matchPath?.replaceAll(/\[([^\[\]]+)\]/g, ':$1');
-            const dirEntrypointIndex = matchPath?.lastIndexOf(`/${config?.dirEntrypoint}`)
-            matchPath = dirEntrypointIndex > -1 ? matchPath.slice(0, dirEntrypointIndex) : matchPath;
-            // isolateId is the URL to match in the URL
-            const isolateUrlPattern = new URL(matchUrl.href)
-            isolateUrlPattern.pathname = matchPath;
-            return isolateUrlPattern.href;
-        })
+    const formattedImportUrl = formatImportUrl(importUrl);
 
     let isolateMetadata: any = {};
     let isJSX = false;
@@ -135,27 +164,24 @@ export default ({ config, modules }: any) => async (req: Request) => {
     // the more path params the url has, more towards the end of the array it will be
     const matchesParams = (url: string) => url.split('/').filter((part) => part.startsWith(':')).length;
     // get array of possible urls to match
-    const isolateIdPatterns = getIsolateKeys()?.sort((a, b) => {
-        return matchesParams(b) - matchesParams(a);
-    })
+    const sortedFileUrls = getCachedFileUrls()?.sort((a, b) => matchesParams(b) - matchesParams(a));
 
     let isExactMatch;
 
-    for (const key of isolateIdPatterns) {
-        const { pathname, hostname, username } = new URL(key);
+    for (const fileUrl of sortedFileUrls) {
+        const { pathname, hostname, username } = new URL(fileUrl);
         const pattern = new URLPattern({ username, pathname, hostname })
-        const isolateSearchUrl = setIsolateSearchUrl(importUrl);
-        config.debug && console.log('matching', username, pathname, hostname, 'with', isolateSearchUrl)
-        const matched = pattern.exec(isolateSearchUrl);
+        config.debug && console.log('matching', username, pathname, hostname, 'with', formattedImportUrl)
+        const matched = pattern.exec(formattedImportUrl);
         if (matched) {
-            config.debug && console.log('matched', matched)
-            const keyPaths = isolatesMetadata.get(key)?.paths;
+            config.debug && console.log('matched', fileUrl, cachedFileUrls.get(fileUrl))
+            const importUrls = cachedFileUrls.get(fileUrl)?.urls;
             const matchParams = matched?.pathname?.groups;
 
-            isExactMatch = keyPaths?.some((p: string) => p === importUrl.href)
-            isolateId = key;
+            isExactMatch = importUrls?.some((p: string) => p === importUrl.href);
+            isolateId = cachedFileUrls.get(fileUrl).isolateId;
 
-            isolateMetadata = { ...getIsolate(key), params: matchParams };
+            isolateMetadata = { ...isolatesMetadata.get(isolateId), params: matchParams };
             break;
         }
     }
@@ -169,7 +195,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
         config.debug && console.log('Isolate has finished loading', isolateId);
         isolateMetadata = getIsolate(isolateId);
     };
-
 
     if (!isolateMetadata || queryParams.bundle || !isExactMatch) {
         config.debug && console.log('Isolate not found. Importing metadata', importUrl.href);
@@ -204,14 +229,14 @@ export default ({ config, modules }: any) => async (req: Request) => {
         if (queryParams.bundle) {
             return new Response(
                 _isolateMetadata?.content,
-                { status: 200, headers: { 'Content-Type': 'text/javascript' } }
+                { status: 200, headers: { 'Content-Type': 'text/javascript', 'Access-Control-Allow-Origin': '*' } }
             );
         }
 
         // matchPath is the path to match in the URL
         const matchUrl = new URL(importUrl.href);
         matchUrl.pathname = _isolateMetadata?.matchPath;
-        isolateId = setIsolateUrlPattern(matchUrl);
+        isolateId = mapFilePathToIsolateId(matchUrl);
 
         // get updated state of isolate metadata
         isolateMetadata = getIsolate(isolateId) || {};
@@ -228,54 +253,58 @@ export default ({ config, modules }: any) => async (req: Request) => {
     clearTimeout(getIsolate(isolateId)?.timer);
 
     const ext = modules.path.extname(isolateMetadata?.path);
-    isJSX = ext === ".jsx" || ext === ".tsx";
+    isJSX = ext === '.jsx' || ext === '.tsx';
 
     const shouldUpgrade = !isolateMetadata?.loadedAt || (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
-    if ((['up', 'loading'].indexOf(isolateMetadata?.status) === -1) || shouldUpgrade) {
+    if ((!['up', 'loading'].includes(isolateMetadata?.status)) || shouldUpgrade) {
         setIsolate(isolateId, { ...isolateMetadata, status: 'loading' });
         try {
-
-            const { origin: reloadUrlOrigin, username: reloadUrlUsername } = new URL(isolateId);
-            const reloadUrl = new URL(reloadUrlOrigin);
-            reloadUrl.username = reloadUrlUsername;
-
+            console.log("Spawning isolate", isolateId);
             const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null;
             let reload;
+            const reloadUrl = new URL(formattedImportUrl);
+            reloadUrl.pathname = '';
+
 
             if (shouldUpgrade) {
-                reload = [new URL(isolateId).origin, metaUrl, url.origin, reloadUrl.href]
+                reload = [reloadUrl.href, metaUrl, url.origin]
                 config.debug && console.log("Upgrading isolate id", isolateId);
             } else {
                 config.debug && console.log("Spawning isolate id", isolateId);
             }
 
             const port = await getAvailablePort(3500, 4000);
-            const projectId = new URL(isolateId).username;
-            config.projectId = projectId;
 
+            const projectId = config.projectId || new URL(formattedImportUrl).username
+            config.projectId = projectId;
             await modules.fs.ensureDir(`./data/${projectId}`);
-            const command = new Deno.Command(Deno.execPath(), {
-                env: { DENO_DIR: config.cacheDir || `./cache/.deno`, },
-                cwd: `./data/${projectId}`,
-                args: [
-                    'run',
-                    ...runOptions({ reload, ...config.permissions }, { config, modules, variables: isolateMetadata.variables }),
-                    new URL(`../isolate/adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, import.meta.url).href, // path to isolate.ts
-                    `${port}`, // port
-                    JSON.stringify({
-                        isolateId,
-                        projectId,
-                        isJSX,
-                        env: { ...isolateMetadata.variables },
-                        ...config,
-                    }), // isolate metadata
-                ].filter(Boolean),
-            });
-            const process = command.spawn();
+
+            const isolateInstance = await isolateFactory({
+                isolateType: config.isolateType,
+                isolateId,
+                projectId,
+                modules,
+                port,
+                isJSX,
+                denoConfig: config.denoConfig,
+                type: config.isolateType,
+                reload,
+                permissions: config.permissions,
+                env: isolateMetadata.variables
+            })
+
             await waitForServer(`http://localhost:${port}/__healthcheck__`);
+
             isolateMetadata = getIsolate(isolateId);
-            isolateMetadata?.pid && cleanupIsolate(isolateId);
-            setIsolate(isolateId, { ...isolateMetadata, port, pid: process.pid, process, status: 'up', loadedAt: Date.now() });
+
+            if (config.isolateType === 'subprocess') {
+                isolateMetadata?.pid && cleanupIsolate(isolateId);
+                setIsolate(isolateId, { ...isolateMetadata, port, pid: isolateInstance.pid, instance: isolateInstance, status: 'up', loadedAt: Date.now() });
+            } else {
+                isolateMetadata?.worker && cleanupIsolate(isolateId);
+                setIsolate(isolateId, { ...isolateMetadata, port, worker: isolateInstance, status: 'up', loadedAt: Date.now() });
+            }
+
         } catch (error) {
             console.error(`Failed to spawn isolate: ${isolateId}`, error);
             return new Response(JSON.stringify({ error: { message: 'Bad Request. Failed to initialize Isolate' } }), { status: 500, headers: { 'Content-Type': 'application/json' } });
@@ -286,7 +315,13 @@ export default ({ config, modules }: any) => async (req: Request) => {
         const port = getPortFromIsolateId(isolateId);
 
         const moduleResponse = await fetch(new URL(
-            `${url.pathname}?${new URLSearchParams({ ...queryParams, ...isolateMetadata.params, "__importUrl__": btoa(importUrl.href) })}`,
+            `${url.pathname}?${new URLSearchParams({
+                ...queryParams,
+                ...isolateMetadata.params,
+                "__importUrl__": btoa(importUrl.href),
+                "__isJSX__": isJSX,
+                "__proxyUrl__": btoa(url.href),
+            })}`,
             `http://localhost:${port}`
         ), {
             method: req.method,
@@ -302,8 +337,10 @@ export default ({ config, modules }: any) => async (req: Request) => {
                 controller.enqueue(chunk);
             },
             flush(controller) {
+                config.isolateMaxIdleTime
                 controller.terminate();
-                if (!getIsolate(isolateId)?.timer) resetIsolateTimer(isolateId, config.isolateMaxIdleTime);  // Reset timer after the last chunk is processed
+                if (!config.isolateMaxIdleTime) return
+                resetIsolateTimer(isolateId, config.isolateMaxIdleTime);  // Reset timer after the last chunk is processed
             }
         });
 
@@ -320,5 +357,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
         cleanupIsolate(isolateId);
         return new Response(JSON.stringify(error), { status: 500, statusText: 'Bad Request', headers: { 'Content-Type': 'application/json' } });
     }
-
 };
+
+
