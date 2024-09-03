@@ -90,11 +90,21 @@ export default ({ config, db, schemas, Validator }) => {
         const validatedData = Validator([schema], data, {
           path: `createMany_input:${key}`,
         });
+        const now = new Date();
+        const dataWithTimestamps = validatedData.map(item => ({
+          ...item,
+          createdAt: now,
+          updatedAt: now,
+        }));
         const response = await db(key).insertMany(
-          validatedData,
+          dataWithTimestamps,
           options,
         );
-        const validatedResponse = Validator([schema], response, {
+        const insertedIds = response.insertedIds;
+        const insertedDocuments = await db(key).find({
+          _id: { $in: Object.values(insertedIds) }
+        }).toArray();
+        const validatedResponse = Validator([schema], insertedDocuments, {
           path: `createMany_output:${key}`,
         });
         return validatedResponse;
