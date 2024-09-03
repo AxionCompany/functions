@@ -36,8 +36,8 @@ function toSqlQuery(query, config) {
 
     const { jsonExtract, jsonContains, jsonNotContains, operatorsMap } = dialectConfigs[config.dialect];
 
-    function parseCondition(field, condition, isNested = false, table) {
-        const path = isNested ? jsonExtract(field) : field;
+    function parseCondition(field, condition, table) {
+        const path = field;
 
         if (typeof condition === 'object' && !Array.isArray(condition)) {
             for (const [operator, value] of Object.entries(condition)) {
@@ -79,16 +79,17 @@ function toSqlQuery(query, config) {
                         default:
                             sqlConditions.push(`${table}.${path} ${operatorsMap[operator]} ${value}`);
                     }
+                } else {
+                    sqlConditions.push(`json_extract(${table}.${path}, '$.${operator}') = $${path}_${(operator.replaceAll('.', '_').replaceAll('[', '_').replaceAll(']', '_'))}`);
                 }
             }
         } else {
-            sqlConditions.push(`${table}.${path} = $${(path)}`);
+            sqlConditions.push(`${table}.${field} = $${(path)}`);
         }
     }
 
     function parseQuery(query, table) {
         for (const [field, condition] of Object.entries(query)) {
-            const isNested = field.includes('.');
             if (field === '$and' || field === '$or' || field === '$nor') {
                 const subConditions = condition.map(subQuery => {
                     const subConditionList = [];
@@ -98,7 +99,7 @@ function toSqlQuery(query, config) {
                 });
                 sqlConditions.push(`(${subConditions.join(` ${operatorsMap[field]} `)})`);
             } else {
-                parseCondition(field, condition, isNested, table);
+                parseCondition(field, condition, table);
             }
         }
     }
@@ -125,12 +126,12 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
         sqlite: {
             jsonSet: (field, value) => {
                 const isNested = typeof value === 'object';
-                return `${field} = json_set(COALESCE(${field},'{}'), ${isNested
-                    ? Object.keys(value).map((key) => `${Array.isArray(value) ? `'$[${key}]'` : `'$.${key}'`}, ($${field}_${key.replaceAll('.', '_')})`).join(', ')
+                const setSql = `${field} = json_set(COALESCE(${field},'{}'), ${isNested
+                    ? Object.keys(value).map((key) =>`'$.${key}', ($${field}_${key.replaceAll('.', '_').replaceAll('[', '_').replaceAll(']', '_')})`).join(', ')
                     : `'$', json($${field})`
                     })`;
+                return setSql;
             },
-          
             jsonInsert: (field) => `${field} = json($${field})`,
             jsonRemove: (field) => `json_remove(${field}, '$')`,
             arrayInsert: (field) => {

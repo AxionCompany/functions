@@ -55,7 +55,11 @@ const serializers = {
             return value
                 ? Object.entries(value).reduce((acc, [key, value]) => {
                     const currentSchema = schema[key];
-                    if (schema[key] === 'any' || typeof schema[key] === 'object' || (typeof currentSchema === 'string' && currentSchema?.includes("->"))) {
+                    if (
+                        schema[key] === 'any' ||
+                        typeof schema[key] === 'object' ||
+                        (typeof currentSchema === 'string' && currentSchema?.includes("->"))
+                    ) {
                         acc[key] = JSON.parse(value);
                     } else {
                         acc[key] = value;
@@ -89,7 +93,7 @@ const formattedNestedData = (data) => Object.entries(data)
 function convertToPositionalParams(sql, params) {
     params = Object.entries(params).reduce((acc, [key, value]) => {
         if (key.includes('.')) {
-            key = key.replaceAll('.', '_');
+            key = key.replaceAll('.', '_').replaceAll('[', '_').replaceAll(']', '_');
         }
         acc[key] = value;
         return acc;
@@ -259,8 +263,6 @@ export default (args) => {
                 config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| SQL:', insertSql, '| Params:', JSON.stringify(params));
                 const start = Date.now();
 
-                console.log('DB STATUS', db)
-
                 const response = await db.transaction(async () => {
                     // Prepare Statemens
                     const queryStmt = await db.prepare(querySql);
@@ -347,14 +349,16 @@ export default (args) => {
                 const executionId = crypto.randomUUID();
 
                 // Validate query
-                const validatedQuery = Validator(schema, query, {
+                const validatedQuery = formattedNestedData(Validator(schema, query, {
                     query: true,
                     path: `find_input_sql:${key}`,
-                });
+                    useDotNotation: true,
+                }));
                 const validatedParams = Validator(schema, query, {
                     query: true,
                     path: `find_input_params:${key}`,
                     removeOperators: true,
+                    useDotNotation: true,
                 });
 
                 // Query SQL Statement
@@ -412,14 +416,16 @@ export default (args) => {
             findOne: async (query, options) => {
                 const executionId = crypto.randomUUID();
                 // Validate query
-                const validatedQuery = Validator(schema, query, {
+                const validatedQuery = formattedNestedData(Validator(schema, query, {
                     query: true,
                     path: `findOne_input_sql:${key}`,
-                });
+                    useDotNotation: true,
+                }));
                 const validatedParams = Validator(schema, query, {
                     query: true,
                     path: `findOne_input_params:${key}`,
                     removeOperators: true,
+                    useDotNotation: true,
                 });
 
                 // Query SQL Statement
@@ -434,14 +440,19 @@ export default (args) => {
                     const { joins, selectFields } = populate(schema, options.populate);
                     sql += `, ${selectFields.join(", ")} FROM ${key} ${joins.join(" ")} ${whereClauses ? `WHERE ${whereClauses}` : ""} LIMIT 1`;
                 } else {
-                    sql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""} LIMIT 1`;
+                    sql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
                 }
+                if (options?.sort) {
+                    const sortClause = Object.entries(options.sort).map(([k, v]) => `${k} ${v === 1 ? "ASC" : "DESC"}`).join(", ");
+                    sql += ` ORDER BY ${sortClause}`;
+                }
+                sql += ` LIMIT 1`;
 
                 const { sql: _sql, params } = convertToPositionalParams(sql, validatedParams);
                 sql = _sql;
 
                 const start = Date.now();
-                config.debug && console.log("CRUD Execution Id:", executionId, "| findOne", "| SQL:", sql, "| Params:", JSON.stringify(validatedParams));
+                config.debug && console.log("CRUD Execution Id:", executionId, "| findOne", "| SQL:", sql, "| Params:", JSON.stringify(params));
                 // Prepare Statemens
                 const stmt = await db.prepare(sql);
                 // Execute SQL Statement
@@ -459,26 +470,31 @@ export default (args) => {
             update: async (query, data, options) => {
                 const executionId = crypto.randomUUID();
                 // Validate query
-                const validatedQuery = Validator(schema, query, {
+                const validatedQuery = formattedNestedData(Validator(schema, query, {
                     query: true,
                     useDotNotation: true,
                     path: `update_inputQuery:${key}`,
-                });
+                    dotNotationWithBrackets: true
+                }));
                 const _validatedQueryParams = Validator(schema, query, {
                     path: `update_inputParams:${key}`,
                     removeOperators: true,
+                    useDotNotation: true,
+                    dotNotationWithBrackets: true
                 });
                 // Validate data
                 const validatedData = formattedNestedData(Validator(schema, data, {
                     path: `update_inputData:${key}`,
                     query: true,
                     useDotNotation: true,
+                    dotNotationWithBrackets: true
                 }));
                 const validatedDataParams = Validator(schema, data, {
                     path: `update_inputDataParams:${key}`,
                     removeOperators: true,
                     query: true,
                     useDotNotation: true,
+                    dotNotationWithBrackets: true
                 });
 
                 if (config.addTimestamps) {
@@ -487,7 +503,6 @@ export default (args) => {
                 }
 
                 const _sqlParams = { ..._validatedQueryParams, ...validatedDataParams };
-
 
                 // Query SQL Statement
                 const whereClauses = toSqlQuery(validatedQuery, { table: key })
@@ -505,7 +520,6 @@ export default (args) => {
                 config.addTimestamps && (_sqlParams.updatedAt = new Date().toISOString());
                 const { sql: updateSql, params: sqlParams } = convertToPositionalParams(_updateSql, _sqlParams);
                 const { sql, params: validatedQueryParams } = convertToPositionalParams(querySql, _validatedQueryParams);
-                console.log('SQL PARAMS', _sqlParams, _updateSql, querySql, _validatedQueryParams)
                 querySql = sql;
 
                 const start = Date.now();
