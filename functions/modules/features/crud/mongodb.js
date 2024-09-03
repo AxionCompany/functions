@@ -105,7 +105,7 @@ export default ({ config, db, schemas, Validator }) => {
         const now = Date.now();
         let lookup = [];
         let dynamicPopulate = {}
-
+      
         if (options?.populate) {
           // add lookup pipeline for populate options
           const populateQuery = populate(schema, options.populate)
@@ -113,33 +113,45 @@ export default ({ config, db, schemas, Validator }) => {
           dynamicPopulate = populateQuery.dynamicPopulate;
           delete options.populate;
         }
-
+      
         let projectStage;
         if (options?.project) {
           projectStage = { $project: options.project };
         }
-
+      
         let sortStage;
         if (options?.sort) {
           sortStage = { $sort: options.sort };
         }
-
+      
         const validatedQuery = Validator(schema, query, {
           query: true,
           path: `find_input:${key}`,
         });
-
-
+      
+        let skipStage;
+        if (options?.skip) {
+          skipStage = { $skip: options.skip };
+        }
+      
+        let limitStage;
+        if (options?.limit) {
+          limitStage = { $limit: options.limit };
+        } else {
+          limitStage = { $limit: 100 };
+        }
+      
         const pipeline = [
           { $match: { ...validatedQuery, ...query._unsafe } },
           ...lookup,
           projectStage,
           sortStage,
-          { $limit: 100 },
+          skipStage,
+          limitStage,
         ].filter(Boolean)
-
+      
         let responses = await db(key).aggregate(pipeline)?.toArray();
-
+      
         if (responses.length && Object.keys(dynamicPopulate).length) {
           responses = await Promise.all(responses.map(async (response) => {
             const dynamicPopulatedPromises = Object.entries(dynamicPopulate).map(([dynamicKey, path]) =>
@@ -156,7 +168,7 @@ export default ({ config, db, schemas, Validator }) => {
         const validatedResponse = Validator([schema], responses, {
           path: `find_output:${key}`,
         });
-
+      
         return validatedResponse;
       },
       findOne: async (query, options) => {
