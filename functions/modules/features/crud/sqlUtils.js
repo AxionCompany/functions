@@ -132,11 +132,11 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
                         const jsonPath = `json_type(${field}, '$') = 'array'`;
                         return `CASE WHEN ${jsonPath} THEN '${key}' ELSE '$.${key}' END, (?${field}_dot_${key.replaceAll('.', '_dot_').replaceAll('[', '_openbracket_').replaceAll(']', '_closebracket_')})`;
                     }).join(', ')
-                    : `'$', json($${field})`
+                    : `'$', json(?${field})`
                     })`;
                 return setSql;
             },
-            jsonInsert: (field) => `${field} = json($${field})`,
+            jsonInsert: (field) => `${field} = json(?${field})`,
             jsonRemove: (field) => `json_remove(${field}, '$')`,
             arrayInsert: (field) => {
                 return `${field} = json_set(COALESCE(${field}, '[]'), '$[#]',json(?${(field)}))`;
@@ -155,7 +155,7 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
             Object.entries(data).forEach(([key, value]) => {
                 if (typeof value === 'undefined') return
                 columns.push(key);
-                values.push(`$${key}`);
+                values.push(`?${key}`);
             })
             sqlQuery = `(${columns.join(', ')}) VALUES (${values.join(', ')})`;
             break;
