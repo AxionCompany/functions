@@ -6,21 +6,18 @@ export default ({ config, db, schemas, Validator }) => {
 
   Validator = Validator || SchemaValidator(schemas)
 
-  const createCollections = async (schemas, db) => {
+  const createCollections = async (schema, db) => {
     db = await db;
-    for (const key in schemas) {
-      const schema = schemas[key];
-      const collection = db.collection(key);
-  
-      for (const field in schema) {
-        let type = schema[field];
-        if (typeof type === 'string' && type.includes('^')) {
-          await collection.createIndex({ [field]: 1 }, { unique: true });
-        }
+    const collection = db.collection(key);
+
+    for (const field in schema) {
+      const type = schema[field];
+      if (typeof type === 'string' && type.includes('^')) {
+        await collection.createIndex({ [field]: 1 }, { unique: true });
       }
     }
   };
-  
+
 
   const populate = (schema, populateKeys,) => {
     // add lookup pipeline for populate options
@@ -59,9 +56,11 @@ export default ({ config, db, schemas, Validator }) => {
     return { dynamicPopulate, lookup };
   }
   for (const key in schemas) {
+    // get the current schema
     const schema = schemas[key];
 
-    createCollections(schemas, db);
+    // create the collection
+    createCollections(schema, db);
 
     models[key] = {
       create: async (data, options) => {
