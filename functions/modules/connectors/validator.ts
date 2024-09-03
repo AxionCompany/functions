@@ -53,6 +53,7 @@ const defaultOptions = {
 interface ValidationOptions {
     query?: boolean;
     useDotNotation?: boolean;
+    dotNotationWithBrackets?: boolean;
     optional?: boolean;
     shouldIgnore?: (args: { schemaKey: string; schema: any; valueKey: string; value: any }) => boolean;
     valueKey?: string;
@@ -103,7 +104,7 @@ const validateParams = (type: any, value: any, options: ValidationOptions = {}):
         return value;
     }
 
-    if (options.query && value) value = expandAndMergeDotNotation(value);
+    if (options.query && value) value = expandAndMergeDotNotation(value, { useBrackets: options.dotNotationWithBrackets });
 
     options.path = (options.model ? `${options.model}` : "") + (options.path || "");
     delete options.model;
@@ -192,7 +193,7 @@ const stringify = (value: any) => {
  * @param obj - The object with dot notation keys.
  * @returns The expanded object.
  */
-function expandAndMergeDotNotation(obj: Record<string, any>) {
+function expandAndMergeDotNotation(obj: Record<string, any>, { useBrackets = false } = {}) {
     const mergeDeep = (target: Record<string, any>, source: Record<string, any>) => {
         for (const key in source) {
             if (source[key] && typeof source[key] === "object") {
@@ -204,8 +205,8 @@ function expandAndMergeDotNotation(obj: Record<string, any>) {
         }
     };
 
-    const expandKey = (key: string, value: any) => {
-        const parts = key.split(".");
+    const expandKey = (key: string, value: any, useBrackets: boolean = false) => {
+        const parts = useBrackets ? key.split(/[\[\]]+/).filter(Boolean) : key.split(".");
         let current: Record<string, any> = {};
         let temp = current;
         for (let i = 0; i < parts.length - 1; i++) {
@@ -216,13 +217,14 @@ function expandAndMergeDotNotation(obj: Record<string, any>) {
     };
 
     for (const key in obj) {
-        if (key.includes(".")) {
+        if (key.includes(".") || (useBrackets && key.includes("["))) {
             const value = obj[key];
-            const expanded = expandKey(key, value);
+            const expanded = expandKey(key, value, useBrackets);
             mergeDeep(obj, expanded);
             delete obj[key];
         }
     }
+
 
     return obj;
 }
@@ -239,12 +241,12 @@ function getDotNotationObject(obj: Record<string, any>, parentPath: string = "")
     const isObject = (val: any) => typeof val === "object" && val !== null && !(val instanceof Date) && !(val instanceof ObjectId);
 
     const traverse = (currentObject: any, currentPath: string) => {
-        if (isObject(currentObject)) {
+        if (Array.isArray(currentObject)) {
+            currentObject.forEach((item, index) => traverse(item, `${currentPath}[${index}]`));
+        } else if (isObject(currentObject)) {
             for (const key in currentObject) {
                 traverse(currentObject[key], `${currentPath}${currentPath ? "." : ""}${key}`);
             }
-        } else if (Array.isArray(currentObject)) {
-            currentObject.forEach((item, index) => traverse(item, `${currentPath}[${index}]`));
         } else {
             result[currentPath] = currentObject;
         }

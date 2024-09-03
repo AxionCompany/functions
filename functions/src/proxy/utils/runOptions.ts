@@ -21,8 +21,6 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
         ...customPermissions,
     };
 
-
-
     if (config.isolateType === 'subprocess') {
         permissions = Object
             .entries(permissions)
