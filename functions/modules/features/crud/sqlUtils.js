@@ -25,8 +25,8 @@ function toSqlQuery(query, config) {
     const dialectConfigs = {
         sqlite: {
             jsonExtract: (field) => `json_extract(${field}, '$')`,
-            jsonContains: (field, value) => `EXISTS (SELECT 1 FROM json_each(${field}) WHERE json_each.value = ${value ? value : `$${field}`})`,
-            jsonNotContains: (field, value) => `NOT EXISTS (SELECT 1 FROM json_each(json_extract(${field}, '$')) WHERE json_each.value = ${value ? value : `$${field}`})`,
+            jsonContains: (field, value) => `EXISTS (SELECT 1 FROM json_each(${field}) WHERE json_each.value = ${value ? value : `?${field}`})`,
+            jsonNotContains: (field, value) => `NOT EXISTS (SELECT 1 FROM json_each(json_extract(${field}, '$')) WHERE json_each.value = ${value ? value : `?${field}`})`,
             operatorsMap: {
                 ...defaultOperatorsMap,
                 $regex: "REGEXP"
@@ -80,11 +80,12 @@ function toSqlQuery(query, config) {
                             sqlConditions.push(`${table}.${path} ${operatorsMap[operator]} ${value}`);
                     }
                 } else {
-                    sqlConditions.push(`json_extract(${table}.${path}, '$.${operator}') = $${path}_${(operator.replaceAll('.', '_').replaceAll('[', '_').replaceAll(']', '_'))}`);
+                    const jsonPath = `json_type(${field}, '$') = 'array'`;
+                    sqlConditions.push(`json_extract(${table}.${path}, CASE WHEN ${jsonPath} THEN '${operator}' ELSE '$.${operator}' END) = ?${path}_dot_${(operator.replaceAll('.', '_dot_').replaceAll('[', '_openbracket_',).replaceAll(']', '_closebracket_'))}`);
                 }
             }
         } else {
-            sqlConditions.push(`${table}.${field} = $${(path)}`);
+            sqlConditions.push(`${table}.${field} = ?${(path)}`);
         }
     }
 
@@ -127,7 +128,10 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
             jsonSet: (field, value) => {
                 const isNested = typeof value === 'object';
                 const setSql = `${field} = json_set(COALESCE(${field},'{}'), ${isNested
-                    ? Object.keys(value).map((key) =>`'$.${key}', ($${field}_${key.replaceAll('.', '_').replaceAll('[', '_').replaceAll(']', '_')})`).join(', ')
+                    ? Object.keys(value).map((key) => {
+                        const jsonPath = `json_type(${field}, '$') = 'array'`;
+                        return `CASE WHEN ${jsonPath} THEN '${key}' ELSE '$.${key}' END, (?${field}_dot_${key.replaceAll('.', '_dot_').replaceAll('[', '_openbracket_').replaceAll(']', '_closebracket_')})`;
+                    }).join(', ')
                     : `'$', json($${field})`
                     })`;
                 return setSql;
@@ -135,7 +139,7 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
             jsonInsert: (field) => `${field} = json($${field})`,
             jsonRemove: (field) => `json_remove(${field}, '$')`,
             arrayInsert: (field) => {
-                return `${field} = json_set(COALESCE(${field}, '[]'), '$[#]',json($${(field)}))`;
+                return `${field} = json_set(COALESCE(${field}, '[]'), '$[#]',json(?${(field)}))`;
             }
         }
     };
@@ -177,7 +181,7 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
                     }
                 }
 
-                return `${field} = $${field}`;
+                return `${field} = ?${field}`;
 
             }).filter(Boolean).join(', ');
 

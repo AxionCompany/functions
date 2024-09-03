@@ -3,6 +3,7 @@ import { toSqlQuery, toSqlWrite } from "./sqlUtils.js";
 import { Validator as SchemaValidator } from "../../connectors/validator.ts";
 // import Database from 'npm:libsql';
 import Database from 'npm:libsql@0.4.0-pre.10/promise'; // Using the promise api. 
+import _get from 'npm:lodash.get';
 
 // let hasConnected = false;
 // let db;
@@ -91,24 +92,19 @@ const formattedNestedData = (data) => Object.entries(data)
     }, {})
 
 function convertToPositionalParams(sql, params) {
-    params = Object.entries(params).reduce((acc, [key, value]) => {
-        if (key.includes('.')) {
-            key = key.replaceAll('.', '_').replaceAll('[', '_').replaceAll(']', '_');
-        }
-        acc[key] = value;
-        return acc;
-    }, {});
 
-
-    const paramNames = Object.keys(params);
     const positionalParams = [];
     const paramMap = {};
 
     // Replace named parameters in the SQL with positional parameters (?)
-    const transformedSql = sql.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)/g, (_, paramName) => {
-        if (paramNames.includes(paramName)) {
+    const transformedSql = sql.replace(/\?([a-zA-Z_$][a-zA-Z0-9_$]*)/g, (_, paramName) => {
+
+        paramName = paramName.replaceAll('_dot_', '.').replaceAll('_openbracket_', '[').replaceAll('_closebracket_', ']');
+        paramName = paramName.split('.').map((p, i) => i === 0 ? p : `['${p}']`).join('');
+
+        if (_get(params, paramName)) {
             if (!(paramName in paramMap)) {
-                positionalParams.push(params[paramName]);
+                positionalParams.push(_get(params, paramName));
                 paramMap[paramName] = positionalParams.length;  // Track the index of each parameter
             }
             return '?';
@@ -352,13 +348,11 @@ export default (args) => {
                 const validatedQuery = formattedNestedData(Validator(schema, query, {
                     query: true,
                     path: `find_input_sql:${key}`,
-                    useDotNotation: true,
                 }));
                 const validatedParams = Validator(schema, query, {
                     query: true,
                     path: `find_input_params:${key}`,
                     removeOperators: true,
-                    useDotNotation: true,
                 });
 
                 // Query SQL Statement
@@ -394,13 +388,13 @@ export default (args) => {
                 if (groupClauses?.length) {
                     sql += ` GROUP BY ${groupClauses.join(", ")}`;
                 }
-                
+
                 const { sql: _sql, params } = convertToPositionalParams(sql, validatedParams);
                 sql = _sql;
                 const start = Date.now();
 
                 config.debug && console.log("CRUD Execution Id:", executionId, "| find", "| SQL:", sql, "| Params:", JSON.stringify(params));
-                
+
                 // Prepare Statemens
                 const stmt = await db.prepare(sql);
                 // Execute SQL Statement
@@ -421,13 +415,10 @@ export default (args) => {
                 const validatedQuery = formattedNestedData(Validator(schema, query, {
                     query: true,
                     path: `findOne_input_sql:${key}`,
-                    useDotNotation: true,
                 }));
                 const validatedParams = Validator(schema, query, {
                     query: true,
                     path: `findOne_input_params:${key}`,
-                    removeOperators: true,
-                    useDotNotation: true,
                 });
 
                 // Query SQL Statement
@@ -475,41 +466,28 @@ export default (args) => {
                 const validatedQuery = formattedNestedData(Validator(schema, query, {
                     query: true,
                     useDotNotation: true,
-                    path: `update_inputQuery:${key}`,
-                    dotNotationWithBrackets: true
                 }));
-                console.log('validatedQuery', validatedQuery);
                 const _validatedQueryParams = Validator(schema, query, {
                     path: `update_inputParams:${key}`,
                     removeOperators: true,
-                    useDotNotation: true,
-                    dotNotationWithBrackets: true
                 });
-                console.log('_validatedQueryParams', _validatedQueryParams);
                 // Validate data
                 const validatedData = formattedNestedData(Validator(schema, data, {
                     path: `update_inputData:${key}`,
-                    // query: true,
-                    // useDotNotation: true,
-                    // dotNotationWithBrackets: true
+                    query: true,
                 }));
-                console.log('validatedData', validatedData);
                 const validatedDataParams = Validator(schema, data, {
                     path: `update_inputDataParams:${key}`,
                     removeOperators: true,
-                    // query: true,
-                    // useDotNotation: true,
-                    // dotNotationWithBrackets: true
+                    query: true,
                 });
-                console.log('validatedDataParams', validatedDataParams);
+
                 if (config.addTimestamps) {
                     validatedData.updatedAt = new Date().toISOString();
                     validatedDataParams.updatedAt = new Date().toISOString();
                 }
 
                 const _sqlParams = { ..._validatedQueryParams, ...validatedDataParams };
-
-                console.log('sqlParams', _sqlParams);
 
                 // Query SQL Statement
                 const whereClauses = toSqlQuery(validatedQuery, { table: key })
@@ -524,8 +502,6 @@ export default (args) => {
                 const setClauses = toSqlWrite('update', validatedData, { table: key, dialect: 'sqlite' });
                 const _updateSql = `UPDATE ${key} ${setClauses} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
 
-                console.log('setClauses', setClauses);
-                console.log('_updateSql', _updateSql);
                 config.addTimestamps && (_sqlParams.updatedAt = new Date().toISOString());
                 const { sql: updateSql, params: sqlParams } = convertToPositionalParams(_updateSql, _sqlParams);
                 const { sql, params: validatedQueryParams } = convertToPositionalParams(querySql, _validatedQueryParams);
@@ -559,20 +535,22 @@ export default (args) => {
                 const executionId = crypto.randomUUID();
 
                 // Validate query
-                const validatedQuery = Validator(schema, query, {
+                const validatedQuery = formattedNestedData(Validator(schema, query, {
                     query: true,
                     path: `updateMany_inputQuery:${key}`,
-                });
+                }));
                 const _validatedQueryParams = Validator(schema, query, {
                     query: true,
                     removeOperators: true,
                 });
-                const validatedData = Validator(schema, data, {
+                const validatedData = formattedNestedData(Validator(schema, data, {
                     path: `updateMany_inputData:${key}`,
-                });
+                    query: true,
+                }));
                 const validatedDataParams = Validator(schema, data, {
                     path: `updateMany_inputDataParams:${key}`,
                     removeOperators: true,
+                    query: true,
                 });
 
                 if (config.addTimestamps) {
@@ -584,7 +562,6 @@ export default (args) => {
 
                 // Query SQL Statement
                 // Where clause
-                // Query SQL Statement
                 const whereClauses = toSqlQuery(validatedQuery, { table: key })
                 let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
                     if (typeof value === 'object' || value === 'any') {
@@ -593,7 +570,7 @@ export default (args) => {
                     return `${key}.${field}`;
                 }).join(", ")}`;
                 querySql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ''}`;
-                // const whereClauses = toSqlQuery(validatedQuery, { table: key });
+
                 const setClauses = toSqlWrite(validatedData);
                 const _updateSql = `UPDATE ${key} ${setClauses} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
 
