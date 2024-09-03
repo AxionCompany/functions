@@ -174,7 +174,7 @@ export default (args) => {
 
     const buildJsonObjectQuery = (schema, alias, isArray = false) => {
         const fields = Object.keys(schema);
-        return `${isArray ? ` json_group_array( CASE WHEN Post._id IS NOT NULL THEN ` : ''}json_object(${fields.map(field => `'${field}', ${(schema[field] === 'any' || typeof schema[field] === 'object')
+        return `${isArray ? ` json_group_array( CASE WHEN ${alias}._id IS NOT NULL THEN ` : ''}json_object(${fields.map(field => `'${field}', ${(schema[field] === 'any' || typeof schema[field] === 'object')
             ? `json(${alias}.${field})`
             : `${alias}.${field}`
             }`).join(", ")
@@ -394,11 +394,13 @@ export default (args) => {
                 if (groupClauses?.length) {
                     sql += ` GROUP BY ${groupClauses.join(", ")}`;
                 }
+                
                 const { sql: _sql, params } = convertToPositionalParams(sql, validatedParams);
                 sql = _sql;
                 const start = Date.now();
 
                 config.debug && console.log("CRUD Execution Id:", executionId, "| find", "| SQL:", sql, "| Params:", JSON.stringify(params));
+                
                 // Prepare Statemens
                 const stmt = await db.prepare(sql);
                 // Execute SQL Statement
@@ -476,33 +478,38 @@ export default (args) => {
                     path: `update_inputQuery:${key}`,
                     dotNotationWithBrackets: true
                 }));
+                console.log('validatedQuery', validatedQuery);
                 const _validatedQueryParams = Validator(schema, query, {
                     path: `update_inputParams:${key}`,
                     removeOperators: true,
                     useDotNotation: true,
                     dotNotationWithBrackets: true
                 });
+                console.log('_validatedQueryParams', _validatedQueryParams);
                 // Validate data
                 const validatedData = formattedNestedData(Validator(schema, data, {
                     path: `update_inputData:${key}`,
-                    query: true,
-                    useDotNotation: true,
-                    dotNotationWithBrackets: true
+                    // query: true,
+                    // useDotNotation: true,
+                    // dotNotationWithBrackets: true
                 }));
+                console.log('validatedData', validatedData);
                 const validatedDataParams = Validator(schema, data, {
                     path: `update_inputDataParams:${key}`,
                     removeOperators: true,
-                    query: true,
-                    useDotNotation: true,
-                    dotNotationWithBrackets: true
+                    // query: true,
+                    // useDotNotation: true,
+                    // dotNotationWithBrackets: true
                 });
-
+                console.log('validatedDataParams', validatedDataParams);
                 if (config.addTimestamps) {
                     validatedData.updatedAt = new Date().toISOString();
                     validatedDataParams.updatedAt = new Date().toISOString();
                 }
 
                 const _sqlParams = { ..._validatedQueryParams, ...validatedDataParams };
+
+                console.log('sqlParams', _sqlParams);
 
                 // Query SQL Statement
                 const whereClauses = toSqlQuery(validatedQuery, { table: key })
@@ -517,6 +524,8 @@ export default (args) => {
                 const setClauses = toSqlWrite('update', validatedData, { table: key, dialect: 'sqlite' });
                 const _updateSql = `UPDATE ${key} ${setClauses} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
 
+                console.log('setClauses', setClauses);
+                console.log('_updateSql', _updateSql);
                 config.addTimestamps && (_sqlParams.updatedAt = new Date().toISOString());
                 const { sql: updateSql, params: sqlParams } = convertToPositionalParams(_updateSql, _sqlParams);
                 const { sql, params: validatedQueryParams } = convertToPositionalParams(querySql, _validatedQueryParams);
