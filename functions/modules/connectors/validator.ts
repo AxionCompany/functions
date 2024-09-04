@@ -157,8 +157,14 @@ const validateParams = (type: any, value: any, options: ValidationOptions = {}):
 
         let newFieldType: any = {};
         Object.entries(value).forEach(([k, v], index) => {
+            const _isArray = Array.isArray(type);
+
             const operator: Function | undefined = mongoOperators[k];
-            const newType = operator ? operator(type) : (Array.isArray(value) ? type[0] : type[k]);
+            const newType = operator ?
+                operator(type)
+                : _isArray
+                    ? type[0]
+                    : type[k];
 
             const validatedResult = validateParams(newType, v, {
                 ...options,
