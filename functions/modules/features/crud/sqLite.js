@@ -1,12 +1,8 @@
 
 import { toSqlQuery, toSqlWrite } from "./sqlUtils.js";
 import { Validator as SchemaValidator } from "../../connectors/validator.ts";
-// import Database from 'npm:libsql';
 import Database from 'npm:libsql@0.4.0-pre.10/promise'; // Using the promise api. 
 import _get from 'npm:lodash.get';
-
-// let hasConnected = false;
-// let db;
 
 const connectedDbs = new Map();
 
@@ -119,6 +115,62 @@ function convertToPositionalParams(sql, params) {
     };
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const writeQueue = [];
+let isProcessingQueue = false;
+const maxRetries = 3;
+
+const processQueue = async () => {
+
+    if (isProcessingQueue || writeQueue.length === 0) return;
+
+    // process queue
+    isProcessingQueue = true;
+
+    // group by dbPath
+    const groupedQueue = writeQueue.reduce((acc, { dbPath, ...queueItem }, index) => {
+        if (!acc[dbPath]) {
+            acc[dbPath] = [queueItem];
+        } else {
+            acc[dbPath].push(queueItem)
+        }
+        writeQueue.splice(index, 1);
+        return acc;
+    }, {});
+
+
+    for (const [dbPath, queue] of Object.entries(groupedQueue)) {
+
+        const { db } = connectedDbs.get(dbPath);
+
+        (db.transaction(async () => {
+            for (const { sql, params, resolve, reject } of queue) {
+                let retries = queue.retries || 0;
+                console.log('PROCESSING QUEUE | SQL:', sql, '| PARAMS:', params, '| RETRIES:', retries);
+                try {
+                    const stmt = db.prepare(sql);
+                    stmt.run(params);
+                    if (typeof stmt?.finalize === 'function') stmt.finalize();
+                    resolve();
+                } catch (error) {
+                    console.log(error)
+                    retries++;
+                    if (retries > maxRetries) {
+                        writeQueue.push({ dbPath, sql, params, resolve, reject, retries });
+                    } else {
+                        console.error(`Failed to execute query: ${sql} with params: ${params}`);
+                    }
+                    resolve();
+                }
+            }
+        }))();
+    }
+
+    isProcessingQueue = false;
+
+};
+
+setInterval(processQueue, 1000);
 
 export default (args) => {
     let db;
@@ -259,6 +311,19 @@ export default (args) => {
                 config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| SQL:', insertSql, '| Params:', JSON.stringify(params));
                 const start = Date.now();
 
+                if (options?.async) {
+                    console.log('ADDING TO QUEUE', insertSql, params,);
+                    return new Promise((resolve, reject) => {
+                        writeQueue.push({
+                            dbPath: path,
+                            sql: insertSql,
+                            params: serializeParams(params),
+                            resolve,
+                            reject
+                        });
+                    });
+                }
+
                 const response = await db.transaction(async () => {
                     // Prepare Statemens
                     const queryStmt = await db.prepare(querySql);
@@ -314,6 +379,22 @@ export default (args) => {
 
                 const start = Date.now();
                 const results = [];
+
+                if (options?.async) {
+                    for (const { sql, params } of arrayParams) {
+                        new Promise((resolve, reject) => {
+                            writeQueue.push({
+                                dbPath: path,
+                                sql: sql,
+                                params: serializeParams(params),
+                                resolve,
+                                reject
+                            });
+                        });
+                    }
+                    return
+                }
+
                 for (const { sql, params } of arrayParams) {
                     const response = await db.transaction(async () => {
                         config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| SQL:', sql, '| Params:', JSON.stringify(params));
@@ -510,6 +591,19 @@ export default (args) => {
                 const start = Date.now();
                 config.debug && console.log('CRUD Execution Id:', executionId, '| update', '| SQL:', updateSql, '| Params:', JSON.stringify(sqlParams));
 
+                if (options?.async) {
+                    console.log('ADDING TO QUEUE', updateSql, sqlParams,);
+                    return new Promise((resolve, reject) => {
+                        writeQueue.push({
+                            dbPath: path,
+                            sql: updateSql,
+                            params: serializeParams(sqlParams),
+                            resolve,
+                            reject
+                        });
+                    });
+                }
+
                 const response = await db.transaction(async () => {
                     // Prepare Statemens
                     const queryStmt = await db.prepare(querySql);
@@ -583,6 +677,19 @@ export default (args) => {
                 const start = Date.now();
                 config.debug && console.log("CRUD Execution Id:", executionId, "| updateMany", "| SQL:", updateSql, "| Params:", JSON.stringify(sqlParams));
                 // Execute SQL Statement
+
+                if (options?.async) {
+                    return new Promise((resolve, reject) => {
+                        writeQueue.push({
+                            dbPath: path,
+                            sql: updateSql,
+                            params: serializeParams(sqlParams),
+                            resolve,
+                            reject
+                        });
+                    });
+                }
+
                 const respose = await db.transaction(async () => {
                     // Prepare Statemens
                     const updateStmt = await db.prepare(updateSql);
@@ -624,8 +731,22 @@ export default (args) => {
                 const { sql: deleteSql, params: sqlParams } = convertToPositionalParams(_deleteSql, validatedQueryParams);
 
                 config.debug && console.log('CRUD Execution Id:', executionId, '| delete', '| SQL:', deleteSql, '| Params:', JSON.stringify(validatedQueryParams));
-                // Prepare Statemens
+
+
+                if (options?.async) {
+                    return new Promise((resolve, reject) => {
+                        writeQueue.push({
+                            dbPath: path,
+                            sql: deleteSql,
+                            params: serializeParams(sqlParams),
+                            resolve,
+                            reject
+                        });
+                    });
+                }
+
                 const start = Date.now();
+                // Prepare Statemens
                 const deleteStmt = await db.prepare(deleteSql);
                 // Execute SQL Statement
                 deleteStmt.run(serializeParams(sqlParams));
@@ -661,6 +782,18 @@ export default (args) => {
                 const { sql: deleteSql, params: sqlParams } = convertToPositionalParams(_deleteSql, validatedQueryParams);
 
                 config.debug && console.log('CRUD Execution Id:', executionId, '| deleteMany', '| SQL:', deleteSql, '| Params:', JSON.stringify(sqlParams));
+
+                if (options?.async) {
+                    return new Promise((resolve, reject) => {
+                        writeQueue.push({
+                            dbPath: path,
+                            sql: deleteSql,
+                            params: serializeParams(sqlParams),
+                            resolve,
+                            reject
+                        });
+                    });
+                }
 
                 const response = await db.transaction(async () => {
                     const deleteStmt = await db.prepare(deleteSql);
