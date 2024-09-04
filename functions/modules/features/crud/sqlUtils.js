@@ -129,8 +129,9 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
                 const isNested = typeof value === 'object';
                 const setSql = `${field} = json_set(COALESCE(${field},'{}'), ${isNested
                     ? Object.keys(value).map((key) => {
-                        const jsonPath = `json_type(${field}, '$') = 'array'`;
-                        return `CASE WHEN ${jsonPath} THEN '${key}' ELSE '$.${key}' END, (?${field}_dot_${key.replaceAll('.', '_dot_').replaceAll('[', '_openbracket_').replaceAll(']', '_closebracket_')})`;
+                        const isObject = typeof value[key] === 'object';
+                        const isArray = isObject && Array.isArray(value[key]);
+                        return `'${key.startsWith('$[') ? key : `$.${key}`}', ${isObject ? `json${isArray ? '_array' : ''}` : ''}(?${field}_dot_${key.replaceAll('.', '_dot_').replaceAll('[', '_openbracket_').replaceAll(']', '_closebracket_')})`
                     }).join(', ')
                     : `'$', json(?${field})`
                     })`;
