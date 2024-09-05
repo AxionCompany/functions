@@ -15,6 +15,7 @@ const [portString, configString]: string[] = Deno?.args || [];
 if (portString && configString) {
     port = parseInt(portString) || 3000;
     config = JSON.parse(configString || '{}');
+    Deno.cwd = () => config.projectPath;
 } else {
     self.onmessage = function (event: any) {
 
@@ -22,6 +23,7 @@ if (portString && configString) {
         port = _port;
         config = _config;
         cachePathPrefix = config.projectPath;
+        Deno.cwd = () => config.projectPath;
     };
 }
 // await for port and config

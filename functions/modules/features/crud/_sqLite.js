@@ -1,9 +1,7 @@
 
 import { toSqlQuery, toSqlWrite } from "./sqlUtils.js";
 import { Validator as SchemaValidator } from "../../connectors/validator.ts";
-// import Database from 'npm:libsql@0.4.0-pre.10/promise'; // Using the promise api. 
-import { createClient } from "npm:@libsql/client/node";
-
+import Database from 'npm:libsql@0.4.0-pre.10/promise'; // Using the promise api. 
 import _get from 'npm:lodash.get';
 
 const connectedDbs = new Map();
@@ -43,13 +41,11 @@ const serializers = {
     stringifyArrays: {
         serialize: (value) => {
             return value
-                ? value.map((i) => ['number', 'bigint', 'string', 'function'].indexOf(typeof i) === -1
+                ? value.map((i) => ['number', 'string'].indexOf(typeof i) === -1
                     ? JSON.stringify(i)
-                    : typeof i === 'function'
-                        ? `function:${i.name}`
-                        : typeof i === 'string' && i.indexOf(' ') >= 0
-                            ? `${i}`
-                            : i)
+                    : typeof i === 'string' && i.indexOf(' ') >= 0
+                        ? `${i}`
+                        : i)
                 : null
         },
         deserialize: (value, schema) => {
@@ -115,7 +111,7 @@ function convertToPositionalParams(sql, params) {
 
     return {
         sql: transformedSql,
-        params: positionalParams.map(param => typeof param === 'undefined' ? null : param)
+        params: positionalParams
     };
 }
 
@@ -125,31 +121,57 @@ const maxRetries = 3;
 
 const processQueue = async () => {
 
+    console.log('CHECKING QUEUE', writeQueues);
     for (const [dbPath, { queue }] of writeQueues) {
+        console.log('Processing queue:', queue.length);
 
         if (queue.length === 0 || !connectedDbs.has(dbPath)) return;
+        writeQueues.set(dbPath, { ...writeQueues.get(dbPath), isProcessingQueue: true });
 
-        const { db } = connectedDbs.get(dbPath);
-        const batch = queue.map(({ sql, params, id, resolve, reject }) => ({ sql, args: params, id, resolve, reject }));
-        batch.forEach(b => {
-            b.args = b.args.map(arg => arg === undefined ? 'nulo' : arg);
-            b.args.some(a => a === undefined) && console.log('BATCH:', b.sql, b.args);
-        })
-        const results = await db.batch(batch.map(({ sql, args }) => ({ sql, args }))).catch((e) => {
-            console.log('ERROR:', e);
-        });
+        const { config } = connectedDbs.get(dbPath);
+        const db = await new Database(dbPath, config);
+        
+        try {
 
-        results?.forEach((result, i) => {
-            const { id, resolve, reject } = batch[i];
-            if (!result || result.error) {
-                console.log('ERROR:', result.error);
-            }
-            resolve(result);
+            db.transaction(async () => {
+                const processedItems = queue
+                    .filter(q => !q.status)
+                    .map(async (item) => {
+                        item.status = 'processing';
+                        console.log('Processing queue:', queue.length);
+                        const { sql, params, resolve, reject, id } = item;
+                        let retries = queue.retries || 0;
+                        db.prepare(sql)
+                            .then(async stmt => {
+                                stmt.run(params)
+                                if (typeof stmt?.finalize === 'function') stmt.finalize();
+                            })
+                            .catch(error => {
+                                console.log(error)
+                                retries++;
+                                if (retries > maxRetries) {
+                                    queue.push({ id: crypto.randomUUID(), dbPath, sql, params, resolve, reject, retries });
+                                } else {
+                                    console.error(`Failed to execute query: ${sql} with params: ${params}`);
+                                }
+                            })
 
-            const updatedQueue = writeQueues.get(dbPath).queue;
-            updatedQueue.splice(updatedQueue.findIndex((item) => item.id === id), 1);
-        });
+
+                        return id
+                    });
+
+                processedItems.forEach(async (id) => {
+                    queue.splice(queue.findIndex((i) => i.id === id), 1);
+                });
+
+            })();
+
+        } catch (err) {
+            console.error(`Failed to execute transaction for db: ${dbPath}`, err);
+        }
+        // db.close();
     }
+
 };
 
 setInterval(processQueue, 1000);
@@ -162,16 +184,7 @@ export default (args) => {
     const path = config.dbPath || './data/my.db';
     if (!connectedDbs.has(path)) {
         const start = Date.now();
-        console.log('CONNECTION INFO', {
-            url: path,
-            ...config.dbOptions
-        })
-        db = createClient({
-            url: path,
-            ...config.dbOptions
-        });
-
-        // db = new Database(path, config.dbOptions);
+        db = new Database(path, config.dbOptions);
         console.log('Database connection time:', Date.now() - start, 'ms');
         connectedDbs.set(path, { db, config: config.dbOptions });
     } else {
@@ -301,7 +314,7 @@ export default (args) => {
                     return `${key}.${field}`;
                 }).join(", ")}`;
 
-                querySql += ` FROM ${key} WHERE _id = ?`;
+                querySql += ` FROM ${key} WHERE _id = last_insert_rowid()`;
                 // Inster SQL Statement
                 const _insertSql = `INSERT INTO ${key} ${toSqlWrite('insert', validatedData)}`;
                 const { sql: insertSql, params } = convertToPositionalParams(_insertSql, validatedParams);
@@ -310,7 +323,6 @@ export default (args) => {
                 const start = Date.now();
 
                 if (options?.async) {
-                    // return
                     return new Promise((resolve, reject) => {
                         writeQueue.push({
                             dbPath: path,
@@ -322,26 +334,27 @@ export default (args) => {
                     });
                 }
 
-                const { rows: _0, columns: _1, rowsAffected: _2, lastInsertRowid } = await db.execute({
-                    sql: insertSql,
-                    args: serializeParams(params)
-                });
-
-                const { rows } = await db.execute({
-                    sql: querySql,
-                    args: serializeParams([lastInsertRowid])
-                });
-
-                const insertedRow = rows[0];
-
-                const validatedResponse = Validator(schema, deserializeParams(insertedRow, schema), {
-                    path: `create_output:${key}`,
-                });
+                const response = await db.transaction(async () => {
+                    // Prepare Statemens
+                    const queryStmt = await db.prepare(querySql);
+                    const insertStmt = await db.prepare(insertSql);
+                    // Execute Statements
+                    await insertStmt.run(serializeParams(params));
+                    const insertedRow = await queryStmt.get()
+                    // Validate the response
+                    const validatedResponse = Validator(schema, deserializeParams(insertedRow, schema), {
+                        path: `create_output:${key}`,
+                    });
+                    // Close the Transactions
+                    return validatedResponse;
+                })();
 
                 config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| Response:', JSON.stringify(response), '| Duration:', Date.now() - start, 'ms');
 
-                return validatedResponse;
+                config.finalizePreparedStatements && queryStmt.finalize();
+                config.finalizePreparedStatements && insertStmt.finalize();
 
+                return response;
             },
             createMany: async (data, options) => {
                 const executionId = crypto.randomUUID();
@@ -369,13 +382,13 @@ export default (args) => {
                     return `${key}.${field}`;
                 }).join(", ")}`;
 
-                querySql += ` FROM ${key} WHERE _id = ?`;
+                querySql += ` FROM ${key} WHERE _id = last_insert_rowid()`;
                 // Inster SQL Statement
                 const _insertSql = `INSERT INTO ${key} ${toSqlWrite('insert', validatedData[0])}`;
                 const arrayParams = validatedParams.map((params) => convertToPositionalParams(_insertSql, params));
 
                 const start = Date.now();
-                // const results = [];
+                const results = [];
 
                 if (options?.async) {
                     for (const { sql, params } of arrayParams) {
@@ -392,21 +405,30 @@ export default (args) => {
                     return
                 }
 
-                const responseRaw = await db.batch(arrayParams.map(({ sql, params }) => ({ sql, args: params })))
-                const response = Promise.all(responseRaw.map(async (responseItem) => {
-                    const { rows } = await db.execute({
-                        sql: querySql,
-                        args: serializeParams([responseItem.lastInsertRowid])
-                    });
+                for (const { sql, params } of arrayParams) {
+                    const response = await db.transaction(async () => {
+                        config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| SQL:', sql, '| Params:', JSON.stringify(params));
+                        // Prepare Statemens
+                        const queryStmt = await db.prepare(querySql);
+                        const insertStmt = await db.prepare(sql);
+                        // Execute Statements
+                        await insertStmt.run(serializeParams(params));
+                        const insertedRow = await queryStmt.get()
 
-                    return deserializeParams(rows[0]);
-                }));
-
-                const results = Validator([schema], response, {
-                    path: `create_output:${key}`,
-                });
+                        // Validate the response
+                        const validatedResponse = Validator(schema, deserializeParams(insertedRow, schema), {
+                            path: `create_output:${key}`,
+                        });
+                        return validatedResponse;
+                    })();
+                    results.push(response);
+                }
+                // Close the Transactions
 
                 config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| Response:', JSON.stringify(results), '| Duration:', Date.now() - start, 'ms');
+
+                config.finalizePreparedStatements && queryStmt.finalize();
+                config.finalizePreparedStatements && insertStmt.finalize();
 
                 return results;
             },
@@ -464,12 +486,12 @@ export default (args) => {
 
                 config.debug && console.log("CRUD Execution Id:", executionId, "| find", "| SQL:", sql, "| Params:", JSON.stringify(params));
 
+                // Prepare Statemens
+                const stmt = await db.prepare(sql);
                 // Execute SQL Statement
-                const { rows: responses } = await db.execute({
-                    sql,
-                    args: serializeParams(params)
-                });
-
+                const responses = await stmt.all(serializeParams(params));
+                // Close the statement
+                config.finalizePreparedStatements && stmt.finalize();
                 // Validate the response
                 const validatedResponse = Validator([schema], responses?.map((i) => deserializeParams(i, schema)), {
                     path: `find_output:${key}`,
@@ -515,11 +537,12 @@ export default (args) => {
 
                 const start = Date.now();
                 config.debug && console.log("CRUD Execution Id:", executionId, "| findOne", "| SQL:", sql, "| Params:", JSON.stringify(params));
-
-                const { rows: [response] } = await db.execute({
-                    sql,
-                    args: serializeParams(params)
-                });
+                // Prepare Statemens
+                const stmt = await db.prepare(sql);
+                // Execute SQL Statement
+                const response = await stmt.get(serializeParams(params)) || null;
+                // Close the statement
+                config.finalizePreparedStatements && stmt.finalize();
                 // Validate the response
                 const validatedResponse = Validator(schema, deserializeParams(response, schema), {
                     path: `findOne_output:${key}`,
@@ -590,22 +613,25 @@ export default (args) => {
                     });
                 }
 
-                await db.execute({
-                    sql: updateSql,
-                    args: serializeParams(sqlParams)
-                });
-
-                const { rows: [updatedRow] } = await db.execute({
-                    sql: querySql,
-                    args: serializeParams(validatedQueryParams)
-                });
-
-                const response = Validator(schema, deserializeParams(updatedRow, schema), {
-                    path: `update_output:${key}`
-                });
+                const response = await db.transaction(async () => {
+                    // Prepare Statemens
+                    const queryStmt = await db.prepare(querySql);
+                    const updateStmt = await db.prepare(updateSql);
+                    // Execute Statements
+                    await updateStmt.run(serializeParams(sqlParams));
+                    const updatedRow = await queryStmt.get(serializeParams(validatedQueryParams));
+                    // Validate the response
+                    const validatedResponse = Validator(schema, deserializeParams(updatedRow, schema), {
+                        path: `update_output:${key}`,
+                    });
+                    // Close the Transactions
+                    return validatedResponse;
+                })();
 
                 config.debug && console.log('CRUD Execution Id:', executionId, '| update', '| Response:', JSON.stringify(response)), '| Duration:', Date.now() - start, 'ms';
 
+                config.finalizePreparedStatements && updateStmt.finalize();
+                config.finalizePreparedStatements && queryStmt.finalize();
                 return response;
             },
             updateMany: async (query, data, options) => {
@@ -673,21 +699,25 @@ export default (args) => {
                     });
                 }
 
-                await db.execute({
-                    sql: updateSql,
-                    args: serializeParams(sqlParams)
-                });
-                const { rows: updatedRows } = await db.execute({
-                    sql: querySql,
-                    args: serializeParams(validatedQueryParams)
-                });
-
-                const respose = Validator([schema], updatedRows?.map((i) => deserializeParams(i, schema)), {
-                    path: `updateMany_output:${key}`,
-                });
+                const respose = await db.transaction(async () => {
+                    // Prepare Statemens
+                    const updateStmt = await db.prepare(updateSql);
+                    const queryStmt = await db.prepare(querySql);
+                    // Execute Statements
+                    await updateStmt.run(serializeParams({ ...sqlParams, ...(config.addTimestamps ? { updatedAt: new Date().toISOString() } : {}) }));
+                    // Validate the response
+                    const updatedRows = await queryStmt.all(serializeParams(validatedQuery));
+                    const validatedResponse = Validator([schema], updatedRows?.map((i) => deserializeParams(i, schema)), {
+                        path: `updateMany_output:${key}`,
+                    });
+                    // Close the Transactions
+                    return validatedResponse;
+                })();
 
                 config.debug && console.log("CRUD Execution Id:", executionId, "| updateMany", "| Response:", JSON.stringify(respose), "| Duration:", Date.now() - start, "ms");
-
+                // Close the statement
+                config.finalizePreparedStatements && updateStmt.finalize();
+                config.finalizePreparedStatements && queryStmt.finalize();
                 // Return the response
                 return respose;
             },
@@ -710,6 +740,7 @@ export default (args) => {
                 const { sql: deleteSql, params: sqlParams } = convertToPositionalParams(_deleteSql, validatedQueryParams);
 
                 config.debug && console.log('CRUD Execution Id:', executionId, '| delete', '| SQL:', deleteSql, '| Params:', JSON.stringify(validatedQueryParams));
+
 
                 if (options?.async) {
                     return new Promise((resolve, reject) => {
@@ -796,12 +827,8 @@ export default (args) => {
         };
     }
     const start = Date.now();
-    // console.log({sql: commands.join(";\n"), args: []})
-    !config.syncUrl && commands.forEach((command) => {
-        db.execute({ sql: command, args: [] })
-    })
-    // db.execute({ sql: commands.join(";\n"), args: [] })
-    // .then(res => console.log('Table creation time:', Date.now() - start, 'ms'));
+
+    db.exec(commands.join(";")).then(res => console.log('Table creation time:', Date.now() - start, 'ms'));
 
     connectedDbs.get(path).status = 'connected';
 
