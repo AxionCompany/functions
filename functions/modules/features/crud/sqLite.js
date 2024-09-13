@@ -393,7 +393,7 @@ export default (args) => {
                         path: `create_output:${key}`,
                     });
 
-                    config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| Response:', JSON.stringify(response), '| Duration:', Date.now() - start, 'ms');
+                    config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| Response:', JSON.stringify(validatedResponse), '| Duration:', Date.now() - start, 'ms');
 
                     return validatedResponse;
                 } finally {
