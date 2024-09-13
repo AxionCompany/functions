@@ -79,7 +79,15 @@ const cleanupIsolate = async (isolateId: string): Promise<void> => {
                 delete isolateMetadata.worker;
             } else if (isolateMetadata?.pid) {
                 console.log('terminating subprocess', isolateId);
-                Deno.kill(isolateMetadata.pid, 'SIGKILL');
+                try {
+                    Deno.kill(isolateMetadata.pid, 'SIGKILL');
+                } catch (killError) {
+                    if (!(killError instanceof Deno.errors.NotFound)) {
+                        throw killError;
+                    }
+                    // Process already terminated, log and continue
+                    console.log(`Process ${isolateId} already terminated`);
+                }
                 delete isolateMetadata.pid;
             }
             isolatesMetadata.set(isolateId, { ...isolateMetadata, status: 'down', activeRequests: 0 });
@@ -205,7 +213,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
         config.debug && console.log('Isolate has finished loading', isolateId);
         isolateMetadata = getIsolate(isolateId);
     };
-
 
     // append lastLoadedAt for updating the module/component
     const loadedAt = isolateMetadata?.loadedAt
