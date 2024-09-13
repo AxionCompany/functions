@@ -39,7 +39,9 @@ function toSqlQuery(query, config) {
     function parseCondition(field, condition, table) {
         const path = field;
 
-        if (typeof condition === 'object' && !Array.isArray(condition)) {
+        if (condition === null || condition === undefined) {
+            sqlConditions.push(`${table}.${field} IS NULL`);
+        } else if (typeof condition === 'object' && !Array.isArray(condition)) {
             for (const [operator, value] of Object.entries(condition)) {
                 if (operatorsMap[operator]) {
                     switch (operator) {
@@ -130,8 +132,8 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
                 const setSql = `${field} = json_set(COALESCE(${field},'{}'), ${isNested
                     ? Object.keys(value).map((key) => {
                         const isObject = typeof value[key] === 'object';
-                        const isArray = isObject && Array.isArray(value[key]);
-                        return `'${key.startsWith('$[') ? key : `$.${key}`}', ${isObject ? `json${isArray ? '_array' : ''}` : ''}(?${field}_dot_${key.replaceAll('.', '_dot_').replaceAll('[', '_openbracket_').replaceAll(']', '_closebracket_')})`
+                        const sql = `'${key.startsWith('$[') ? key : `$.${key}`}', ${isObject ? `json` : ''}(?${field}_dot_${key.replaceAll('.', '_dot_').replaceAll('[', '_openbracket_').replaceAll(']', '_closebracket_')})`
+                        return sql;
                     }).join(', ')
                     : `'$', json(?${field})`
                     })`;
@@ -163,9 +165,8 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
         }
 
         case 'update': {
-
             const updateConditions = Object.entries(data).map(([field, value]) => {
-                if (typeof value === 'undefined') return
+                if (typeof value === 'undefined' || value === null) return;
                 if (Array.isArray(value)) {
                     return `${jsonInsert(field)}`;
                 } else if (typeof value === 'object') {
@@ -181,15 +182,13 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
                         return `${jsonSet(field, value)}`;
                     }
                 }
-
+        
                 return `${field} = ?${field}`;
-
             }).filter(Boolean).join(', ');
-
-
+        
             sqlQuery = `SET ${updateConditions}`;
             break;
-        }
+        }        
 
         default:
             throw new Error('Unsupported operation');

@@ -99,7 +99,7 @@ export const cleanupIsolates = (): void => {
 
 export default ({ config, modules }: any) => async (req: Request) => {
 
-    if (!config?.isolateType) config.isolateType = 'worker';
+    if (!config?.isolateType) config.isolateType = config.env.ISOLATE_TYPE || 'subprocess';
 
     const formatImportUrl = config.formatImportUrl || ((importUrl: URL) => {
         const pathname = importUrl.pathname;
@@ -156,6 +156,14 @@ export default ({ config, modules }: any) => async (req: Request) => {
     importUrl.pathname = modules.path.join(importUrl.pathname, url.pathname).split('/').filter(Boolean).join('/');
     importUrl.search = url.search;
 
+    importUrl.pathname.split('/').filter(Boolean).forEach((part) => {
+        if (part.startsWith('_')) { // prevent access to private paths (within files / directories starting with '_')
+            return new Response(
+                JSON.stringify({ status: 401, message: `Error trying to access private path '${part}' in '${importUrl.href}'.` }),
+                { status: 401, headers: { 'Content-Type': 'application/json' } }
+            );
+        }
+    });
 
     const formattedImportUrl = formatImportUrl(importUrl);
 

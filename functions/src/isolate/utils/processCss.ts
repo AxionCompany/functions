@@ -1,4 +1,3 @@
-import { FaLessThan } from "npm:react-icons";
 import getAllFiles from './getAllFiles.ts';
 import postcss from "npm:postcss";
 

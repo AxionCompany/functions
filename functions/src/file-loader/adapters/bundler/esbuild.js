@@ -33,9 +33,7 @@ export default async (path, { ...options } = {}) => {
         config.external = ['react', 'react-dom', ...(options.shared || [])]
     }
 
-
     config.entryPoints = [path.href];
-
 
     let ctx = await context(config);
     const result = await ctx.rebuild();

@@ -111,6 +111,12 @@ export default (
               } else {
                 formData[key] = [formData[key], base64data];
               }
+            } else {
+              try {
+                formData[key] = JSON.parse(value);
+              } catch {
+                formData[key] = value;
+              }
             }
           }
         }
