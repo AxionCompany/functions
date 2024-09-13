@@ -163,7 +163,7 @@ function convertToPositionalParams(sql, params) {
     };
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const writeQueues = new Map();
 const maxRetries = 3;
 
