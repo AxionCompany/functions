@@ -48,7 +48,9 @@ export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir }
   // Load shared modules
   loadPromises.push(Promise.all(
     sharedModulesData.map((file) => {
-      return import(new URL(`/${file?.matchPath}`, importUrl).href)
+      const _url = new URL(`/${file?.matchPath}`, importUrl)
+      _url.search = importUrl.search
+      return import(_url.href)
         .then((mod) => mod.default)
         .catch(err => {
           console.log(`Error Importing Shared Module \`${file?.matchPath}\`: ${err.toString()}`);
@@ -57,10 +59,12 @@ export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir }
     })
   ));
 
-  // Load middleware modules
+  // Load middleware modules  
   loadPromises.push(Promise.all(
     middlewaresData.map((file) => {
-      return import(new URL(`/${file?.matchPath}`, importUrl).href)
+      const _url = new URL(`/${file?.matchPath}`, importUrl)
+      _url.search = importUrl.search
+      return import(_url.href)
         .then((mod) => mod.default)
         .catch(err => {
           console.log(`Error Importing Middleware Module \`${file?.matchPath}\`: ${err.toString()}`);
@@ -75,8 +79,10 @@ export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir }
   if (!interceptorUrl) {
     loadPromises.push(Promise.resolve({}));
   } else {
+    const _url = new URL(`/${interceptorUrl}`, importUrl)
+    _url.search = importUrl.search
     loadPromises.push(
-      import(new URL(`/${interceptorUrl}`, importUrl).href)
+      import(_url.href)
         .then((mod) => mod)
         .catch(err => {
           console.log(`Error Importing Interceptor Module \`${interceptorUrl}\`: ${err.toString()}`);
@@ -89,7 +95,9 @@ export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir }
     // Load layout modules
     loadPromises.push(Promise.all(
       bundledLayouts.map((file) => {
-        return import(new URL(`/${file?.matchPath}`, importUrl).href)
+        const _url = new URL(`/${file?.matchPath}`, importUrl)
+        _url.search = importUrl.search
+        return import(_url.href)
           .then((mod) => mod.default)
           .catch(err => {
             console.log(`Error Importing Layout Module \`${file?.matchPath}\`: ${err.toString()}`);
@@ -135,7 +143,6 @@ export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir }
   const { beforeRun, afterRun } = InterceptorModule || {};
 
   try {
-
     // Load target module
     const ESModule = await import(importUrl).then(mod => mod).catch(err => {
       throw {

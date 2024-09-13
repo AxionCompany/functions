@@ -34,6 +34,10 @@ const startApi = async (iter = 0) => {
             return
         }
         console.log('API Restarting:', event.data.message);
+        if (env.ENV !== 'production') {
+            api.terminate();
+            if (iter < maxRestarts) startApi(iter + 1);
+        }
     }
     api.onerror = (event) => {
         console.error('Error in API Worker:', event.message);

@@ -74,6 +74,64 @@ const mongoOperators: Record<string, (type: any) => any> = {
     "$addToSet": (type) => Array.isArray(type) ? type[0] : type
 };
 
+const operators = {
+    // MongoDB Write Operators
+    $set: (schema: any, value: any) => schema,
+    $unset: () => null,
+    $inc: (schema: any) => schema,
+    $mul: (schema: any) => schema,
+    $push: (schema: any, value: any, field: string) => {
+        if (!Array.isArray(schema[field])) {
+            throw new Error(`$push requires an array schema for field "${field}"`);
+        }
+        return schema[field][0]; // Return the schema for the array items
+    },
+    $pop: (schema: any) => schema,
+    $pull: (schema: any) => schema,
+    $addToSet: (schema: any, value: any, field: string) => {
+        if (!Array.isArray(schema[field])) {
+            throw new Error(`$addToSet requires an array schema for field "${field}"`);
+        }
+        return schema[field][0]; // Return schema for array items
+    },
+    $rename: (schema: any, value: any) => schema,
+    $min: (schema: any) => schema,
+    $max: (schema: any) => schema,
+
+    // MongoDB Read Operators
+    $eq: (schema: any) => schema,
+    $ne: (schema: any) => schema,
+    $gt: (schema: any) => schema,
+    $gte: (schema: any) => schema,
+    $lt: (schema: any) => schema,
+    $lte: (schema: any) => schema,
+    $in: (schema: any) => schema,
+    $nin: (schema: any) => schema,
+    $exists: (schema: any) => schema,
+    $regex: (schema: any) => schema,
+
+    // MongoDB Logical Operators
+    $or: (schema: any, value: any) => {
+        if (!Array.isArray(value)) {
+            throw new Error(`$or requires an array of conditions`);
+        }
+        return schema; // Return schema for further validation
+    },
+    $and: (schema: any, value: any) => {
+        if (!Array.isArray(value)) {
+            throw new Error(`$and requires an array of conditions`);
+        }
+        return schema;
+    },
+    $nor: (schema: any, value: any) => {
+        if (!Array.isArray(value)) {
+            throw new Error(`$nor requires an array of conditions`);
+        }
+        return schema;
+    },
+    $not: (schema: any, value: any) => schema // Handle $not condition
+};
+
 
 /**
  * Validates and transforms data according to the provided schema.
@@ -92,98 +150,161 @@ const Validator = (schemas: Record<string, any>) =>
             : validateParams(type, value, { ...options, schemas });
     }
 
-const validateParams = (type: any, value: any, options: ValidationOptions = {}): any => {
-    options = { ...defaultOptions, ...options };
-    let isOptional = true;
+    const validateParams = (type: any, value: any, options: ValidationOptions = {}): any => {
+    
+        options = { ...defaultOptions, ...options };
+    
+        const allowDotNotation = options?.allowDotNotation ?? true;
+        const rejectExtraProperties = options?.rejectExtraProperties ?? false;
+    
+        options.path = (options.model ? `${options.model}` : "") + (options.path || "");
+        delete options.model;
+    
+        const recursiveValidation = (schema: any, val: any, currentPath: string): any => {
+            let isRequired = false;
+            if (typeof schema === "string") {
+                let localSchema = schema;
+        
+                // Parse modifiers: "!", "?", and "^"
+                if (localSchema.includes("!")) {
+                    isRequired = true;
+                    localSchema = localSchema.replace("!", "");
+                }
+                if (localSchema.includes("?")) {
+                    localSchema = localSchema.replace("?", "");
+                }
+                if (localSchema.includes("^")) {
+                    // Skip uniqueness enforcement for now, but remove the symbol
+                    localSchema = localSchema.replace("^", "");
+                }
 
-    const valueKey = options?.valueKey;
-    const schemaKey = options?.schemaKey;
-    const shouldIgnore = options?.shouldIgnore;
+                // TODO: Fix this
+                if (localSchema === 'object') {
+                    localSchema='any'
+                }
 
-    if (shouldIgnore && shouldIgnore({ schemaKey, schema: type, valueKey, value })) {
-        return value;
-    }
+                let validateValue = z.coerce?.[localSchema] || z[localSchema] || customTypes(localSchema, options);
+        
+                if (!validateValue) {
+                    throw new Error(`Undefined schema type: ${localSchema} at path: ${currentPath}`);
+                }
 
-    if (options.query && value) value = expandAndMergeDotNotation(value, { useBrackets: options.dotNotationWithBrackets });
-
-    options.path = (options.model ? `${options.model}` : "") + (options.path || "");
-    delete options.model;
-
-    if (typeof type === "string") {
-        if (type.includes("!")) {
-            isOptional = false;
-            type = type.replace("!", "");
-        }
-        if (type.includes("?")) {
-            isOptional = true;
-            type = type.replace("?", "");
-        }
-        if (type.includes("^")) {
-            // is unique. only remove the symbol
-            type = type.replace("^", "");
-        }
-
-        let validateValue = z[type] || customTypes(type, options);
-
-        if (!validateValue) {
-            throw new Error(`Undefined schema type: ${type} at path: ${options.path}`);
-        }
-
-        validateValue = validateValue();
-
-        if (isOptional) {
-            validateValue = validateValue.optional().nullable();
-        }
-        try {
-            return validateValue.parse(value);
-        } catch (err) {
-            throw new Error(`Error in schema validation at path "${options.path}". | Received ${stringify(value)} | Expected:${stringify(type)} | ${JSON.stringify({
-                ...err?.issues?.[0],
-                path: options.path,
-                value,
-                type,
-            })}`);
-        }
-    } else if (type && typeof type === 'object') {
-        if (isOptional && !value) return
-        if (typeof value === 'string') {
-            throw new Error(
-                `Error in schema validation at path "${options.path}". | Received ${stringify(value)} | Expected:${stringify(type)} | ${JSON.stringify({
-                    path: options.path,
-                    value,
-                    type,
-                })}`);
-        }
-
-        let newFieldType: any = {};
-        Object.entries(value).forEach(([k, v], index) => {
-            const _isArray = Array.isArray(type);
-
-            const operator: Function | undefined = mongoOperators[k];
-            const newType = operator ?
-                operator(type)
-                : _isArray
-                    ? type[0]
-                    : type[k];
-
-            const validatedResult = validateParams(newType, v, {
-                ...options,
-                valueKey: k,
-                path: [options.path, k].join(".")
-            });
-            if (operator && operator(type) && options.removeOperators) {
-                newFieldType = validatedResult;
-                return
+                validateValue = validateValue();
+        
+                if (!isRequired) {
+                    validateValue = validateValue.optional().nullable();
+                }
+        
+                // If the field is required and missing or undefined, throw an error
+                if (isRequired && (val === undefined || val === null)) {
+                    throw new Error(`Field "${currentPath}" is required but missing or null.`);
+                }
+        
+                try {
+                    const parsedValue = validateValue.parse(val);
+                    return parsedValue;
+                } catch (err) {
+                    throw new Error(`Error in schema validation at path "${currentPath}". | Received ${stringify(val)} | Expected:${stringify(localSchema)} | ${JSON.stringify({
+                        ...err?.issues?.[0],
+                        path: currentPath,
+                        value: val,
+                        type: localSchema,
+                    })}`);
+                }
             }
-            if (typeof validatedResult === "undefined") return
-            newFieldType[k] = validatedResult;
-        });
-        // transform newFieldType to array if type is array
-        if (Array.isArray(value)) newFieldType = Object.values(newFieldType).filter(Boolean);
-
-        return newFieldType;
-    }
-}
+        
+            // Handle arrays and objects
+            else if (schema && typeof schema === 'object') {
+                if (!isRequired && !val) return;
+        
+                let validatedResult: any = Array.isArray(schema) ? [] : {};
+        
+                // **Check for null or undefined values before calling Object.entries**
+                if (val === null || val === undefined) {
+                    throw new Error(`Invalid value at path "${currentPath}": expected an object, but received ${val}.`);
+                }
+        
+                if (Array.isArray(schema)) {
+                    const arraySchema = schema[0];
+        
+                    if (Array.isArray(val)) {
+                        return val.map((item, idx) => recursiveValidation(arraySchema, item, `${currentPath}[${idx}]`));
+                    } else if (typeof val === 'object') {
+                        Object.entries(val).forEach(([key, v]) => {
+                            const match = key.match(/^\$\[(\d+)\]$/); // Match $[n] array notation
+        
+                            if (match) {
+                                const index = parseInt(match[1], 10);
+                                const result = recursiveValidation(arraySchema, v, `${currentPath}[$${index}]`);
+                                if (typeof result !== "undefined") {
+                                    validatedResult[key] = result;
+                                }
+                            } else {
+                                throw new Error(`Expected array at "${currentPath}", but got non-array key: ${key}`);
+                            }
+                        });
+                        return validatedResult;
+                    } else {
+                        throw new Error(`Expected array at "${currentPath}", but got non-array value.`);
+                    }
+                }
+        
+                Object.entries(val).forEach(([key, v]) => {
+                    // Handle MongoDB-like operators
+                    if (options.allowOperators && operators.hasOwnProperty(key)) {
+                        const operatorCallback = operators[key];
+        
+                        const result = operatorCallback(schema, v, key); // Pass schema and value for validation
+        
+                        if (options.removeOperators) {
+                            validatedResult = { ...validatedResult, ...result };
+                        } else {
+                            validatedResult[key] = result;
+                        }
+                        return;
+                    }
+        
+                    // Check for dot notation error before checking extra properties
+                    if (!allowDotNotation && key.includes(".")) {
+                        throw new Error(`Dot notation is not allowed at path: ${currentPath}.${key}`);
+                    }
+        
+                    // Handle extra properties based on rejectExtraProperties option
+                    const topKey = key.split(".")[0];
+                    if (!schema.hasOwnProperty(topKey)) {
+                        if (rejectExtraProperties) {
+                            throw new Error(`Extra property "${key}" is not allowed at path: ${currentPath}`);
+                        }
+                        return;
+                    }
+        
+                    // Handle regular or dotted notation keys
+                    let currentSchema = schema;
+                    let pathParts = key.includes(".") ? (allowDotNotation ? key.split(".") : [key]) : [key];
+                    let newCurrentPath = currentPath;
+        
+                    pathParts.forEach((part, index) => {
+                        if (currentSchema && typeof currentSchema === 'object') {
+                            currentSchema = Array.isArray(currentSchema) ? currentSchema[0] : currentSchema[part];
+                            newCurrentPath = index === 0 ? `${currentPath}.${part}` : `${newCurrentPath}.${part}`;
+                        }
+                    });
+        
+                    const result = recursiveValidation(currentSchema, v, newCurrentPath);
+                    if (typeof result !== "undefined") {
+                        validatedResult[key] = result;
+                    }
+                });
+        
+                return validatedResult;
+            }
+        
+            throw new Error(`Unsupported schema type at path: ${currentPath}`);
+        };
+    
+        return recursiveValidation(type, value, options.path);
+    };
+    
 
 const stringify = (value: any) => {
     if (typeof value === 'object') {

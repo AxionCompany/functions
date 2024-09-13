@@ -1,8 +1,6 @@
 import { parse } from "npm:@typescript-eslint/typescript-estree@^8.0.0";
 
-
 export default ({ code, url }) => {
-
 
     // Parse code to AST
     const ast = parse(code, { jsx: true, loc: true, range: true });

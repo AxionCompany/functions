@@ -1,10 +1,52 @@
 
 import { toSqlQuery, toSqlWrite } from "./sqlUtils.js";
-import { Validator as SchemaValidator } from "../../connectors/validator.ts";
+import { Validator as SchemaValidator, getDotNotationObject } from "../../connectors/validator.ts";
 // import Database from 'npm:libsql@0.4.0-pre.10/promise'; // Using the promise api. 
 import { createClient } from "npm:@libsql/client/node";
 
 import _get from 'npm:lodash.get';
+import _has from 'npm:lodash.has';
+
+const DB_POOL_SIZE = 5; // Adjust this value based on your needs
+
+class DatabasePool {
+    constructor(url, options) {
+        this.url = url;
+        this.options = options;
+        this.pool = [];
+        this.initPool();
+    }
+
+    initPool() {
+        for (let i = 0; i < DB_POOL_SIZE; i++) {
+            const client = createClient({
+                url: this.url,
+                ...this.options
+            });
+            this.pool.push(client);
+        }
+    }
+
+    async getConnection() {
+        if (this.pool.length > 0) {
+            return this.pool.pop();
+        }
+        // If all connections are in use, create a new one
+        return createClient({
+            url: this.url,
+            ...this.options
+        });
+    }
+
+    releaseConnection(connection) {
+        if (this.pool.length < DB_POOL_SIZE) {
+            this.pool.push(connection);
+        } else {
+            // If the pool is full, close the connection
+            connection.close();
+        }
+    }
+}
 
 const connectedDbs = new Map();
 
@@ -79,10 +121,10 @@ const formattedNestedData = (data) => Object.entries(data)
         if (field.includes('.')) {
             const [newField, ...fields] = field.split('.');
             field = newField;
-            if (!acc[field]) {
-                acc[field] = { [fields.join('.')]: value }
+            if (!acc[newField]) {
+                acc[newField] = { [fields.join('.')]: value }
             } else {
-                acc[field][fields.join('.')] = value;
+                acc[newField][fields.join('.')] = value;
             }
         }
         else {
@@ -99,12 +141,14 @@ function convertToPositionalParams(sql, params) {
     // Replace named parameters in the SQL with positional parameters (?)
     const transformedSql = sql.replace(/\?([a-zA-Z_$][a-zA-Z0-9_$]*)/g, (_, paramName) => {
 
-        paramName = paramName.replaceAll('_dot_', '.').replaceAll('_openbracket_', '[').replaceAll('_closebracket_', ']');
-        paramName = paramName.split('.').map((p, i) => i === 0 ? p : `['${p}']`).join('');
+        paramName = paramName // replace placeholders for special characters in variable names by the actual characters
+            .replaceAll('_dot_', '.')
+            .replaceAll('_openbracket_', '[')
+            .replaceAll('_closebracket_', ']');
 
-        if (_get(params, paramName)) {
+        if (_has(params, paramName)) {
             if (!(paramName in paramMap)) {
-                positionalParams.push(_get(params, paramName));
+                positionalParams.push(_get(params, paramName) || null);
                 paramMap[paramName] = positionalParams.length;  // Track the index of each parameter
             }
             return '?';
@@ -129,55 +173,57 @@ const processQueue = async () => {
 
         if (queue.length === 0 || !connectedDbs.has(dbPath)) return;
 
-        const { db } = connectedDbs.get(dbPath);
-        const batch = queue.map(({ sql, params, id, resolve, reject }) => ({ sql, args: params, id, resolve, reject }));
-        batch.forEach(b => {
-            b.args = b.args.map(arg => arg === undefined ? 'nulo' : arg);
-            b.args.some(a => a === undefined) && console.log('BATCH:', b.sql, b.args);
-        })
-        const results = await db.batch(batch.map(({ sql, args }) => ({ sql, args }))).catch((e) => {
-            console.log('ERROR:', e);
-        });
+        const dbPool = connectedDbs.get(dbPath).dbPool;
+        const db = await dbPool.getConnection();
+        try {
 
-        results?.forEach((result, i) => {
-            const { id, resolve, reject } = batch[i];
-            if (!result || result.error) {
-                console.log('ERROR:', result.error);
-            }
-            resolve(result);
+            const batch = queue.map(({ sql, params, id, resolve, reject }) => ({ sql, args: params, id, resolve, reject }));
+            batch.forEach(b => {
+                b.args = b.args.map(arg => arg === undefined ? 'nulo' : arg);
+            })
+            const results = await db.batch(batch.map(({ sql, args }) => ({ sql, args }))).catch((e) => {
+                console.log('ERROR:', e);
+            });
 
-            const updatedQueue = writeQueues.get(dbPath).queue;
-            updatedQueue.splice(updatedQueue.findIndex((item) => item.id === id), 1);
-        });
+            results?.forEach((result, i) => {
+                const { id, resolve, reject } = batch[i];
+                if (!result || result.error) {
+                    console.log('ERROR:', result.error);
+                }
+                resolve(result);
+
+                const updatedQueue = writeQueues.get(dbPath).queue;
+                updatedQueue.splice(updatedQueue.findIndex((item) => item.id === id), 1);
+            });
+        }
+        catch (e) { console.log('ERROR IN PROCESS QUEUE:', e) }
+        finally {
+            dbPool.releaseConnection(db);
+        }
     }
 };
 
 setInterval(processQueue, 1000);
 
 export default (args) => {
-    let db;
+    let dbPool;
     const config = args.config || {};
     const schemas = args.schemas;
     const Validator = args.Validator || SchemaValidator(schemas)
     const path = config.dbPath || './data/my.db';
+
     if (!connectedDbs.has(path)) {
         const start = Date.now();
-        console.log('CONNECTION INFO', {
-            url: path,
-            ...config.dbOptions
-        })
-        db = createClient({
-            url: path,
-            ...config.dbOptions
-        });
 
-        // db = new Database(path, config.dbOptions);
-        console.log('Database connection time:', Date.now() - start, 'ms');
-        connectedDbs.set(path, { db, config: config.dbOptions });
+        dbPool = new DatabasePool(path, config.dbOptions);
+
+        console.log('Database connection pool created in:', Date.now() - start, 'ms');
+        connectedDbs.set(path, { dbPool, config: config.dbOptions });
     } else {
-        db = connectedDbs.get(path).db;
-        console.log('Database already connected');
+        dbPool = connectedDbs.get(path).dbPool;
+        console.log('Database pool already exists');
     }
+
     const writeQueue = {
         push: (data) => {
             if (!writeQueues.has(path)) writeQueues.set(path, { isProcessing: false, queue: [] });
@@ -219,6 +265,7 @@ export default (args) => {
     };
 
     const buildJsonObjectQuery = (schema, alias, isArray = false) => {
+
         const fields = Object.keys(schema);
         return `${isArray ? ` json_group_array( CASE WHEN ${alias}._id IS NOT NULL THEN ` : ''}json_object(${fields.map(field => `'${field}', ${(schema[field] === 'any' || typeof schema[field] === 'object')
             ? `json(${alias}.${field})`
@@ -242,6 +289,9 @@ export default (args) => {
                 isArray = true;
             }
             const [type, from] = relation?.split("->") ?? [];
+            if (!schemas[from]) {
+                throw new Error(`Error while populating field '${key}': The schema '${from}' does not exist`);
+            }
             const isDynamic = from?.startsWith('$');
             const fromTable = isDynamic ? schema[from.slice(1)] : from;
 
@@ -276,532 +326,603 @@ export default (args) => {
 
         models[key] = {
             create: async (data, options) => {
-                const executionId = crypto.randomUUID();
+                const db = await dbPool.getConnection();
+                try {
 
-                const validatedData = Validator(schema, data, {
-                    path: `create_input:${key}`,
-                });
-                const validatedParams = Validator(schema, data, {
-                    path: `create_input:${key}`,
-                    removeOperators: true,
-                });
+                    const executionId = crypto.randomUUID();
 
-                if (config.addTimestamps) {
-                    validatedData.createdAt = new Date().toISOString();
-                    validatedData.updatedAt = new Date().toISOString();
-                    validatedParams.createdAt = new Date().toISOString()
-                    validatedParams.updatedAt = new Date().toISOString()
-                };
-
-                // Query SQL Statement
-                let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
-                    if (typeof value === 'object' || value === 'any') {
-                        return `json_extract(${key}.${field}, '$') as ${field}`;
-                    }
-                    return `${key}.${field}`;
-                }).join(", ")}`;
-
-                querySql += ` FROM ${key} WHERE _id = ?`;
-                // Inster SQL Statement
-                const _insertSql = `INSERT INTO ${key} ${toSqlWrite('insert', validatedData)}`;
-                const { sql: insertSql, params } = convertToPositionalParams(_insertSql, validatedParams);
-
-                config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| SQL:', insertSql, '| Params:', JSON.stringify(params));
-                const start = Date.now();
-
-                if (options?.async) {
-                    // return
-                    return new Promise((resolve, reject) => {
-                        writeQueue.push({
-                            dbPath: path,
-                            sql: insertSql,
-                            params: serializeParams(params),
-                            resolve,
-                            reject
-                        });
+                    const validatedData = Validator(schema, data, {
+                        path: `create_input:${key}`,
+                        allowOperators: true,
                     });
-                }
+                    const validatedParams = Validator(schema, data, {
+                        path: `create_input:${key}`,
+                        allowOperators: true,
+                        removeOperators: true,
+                    });
 
-                const { rows: _0, columns: _1, rowsAffected: _2, lastInsertRowid } = await db.execute({
-                    sql: insertSql,
-                    args: serializeParams(params)
-                });
+                    if (config.addTimestamps) {
+                        validatedData.createdAt = new Date().toISOString();
+                        validatedData.updatedAt = new Date().toISOString();
+                        validatedParams.createdAt = new Date().toISOString()
+                        validatedParams.updatedAt = new Date().toISOString()
+                    };
 
-                const { rows } = await db.execute({
-                    sql: querySql,
-                    args: serializeParams([lastInsertRowid])
-                });
+                    // Query SQL Statement
+                    let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
+                        if (typeof value === 'object' || value === 'any') {
+                            return `json_extract(${key}.${field}, '$') as ${field}`;
+                        }
+                        return `${key}.${field}`;
+                    }).join(", ")}`;
 
-                const insertedRow = rows[0];
+                    querySql += ` FROM ${key} WHERE _id = ?`;
+                    // Inster SQL Statement
+                    const _insertSql = `INSERT INTO ${key} ${toSqlWrite('insert', validatedData)}`;
+                    const { sql: insertSql, params } = convertToPositionalParams(_insertSql, validatedParams);
 
-                const validatedResponse = Validator(schema, deserializeParams(insertedRow, schema), {
-                    path: `create_output:${key}`,
-                });
+                    config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| SQL:', insertSql, '| Params:', JSON.stringify(params));
+                    const start = Date.now();
 
-                config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| Response:', JSON.stringify(response), '| Duration:', Date.now() - start, 'ms');
-
-                return validatedResponse;
-
-            },
-            createMany: async (data, options) => {
-                const executionId = crypto.randomUUID();
-
-                const validatedData = Validator([schema], data, {
-                    path: `create_input:${key}`,
-                });
-                const validatedParams = Validator([schema], data, {
-                    path: `create_input:${key}`,
-                    removeOperators: true,
-                });
-
-                if (config.addTimestamps) {
-                    validatedData.forEach(d => d.createdAt = new Date().toISOString());
-                    validatedData.forEach(d => d.updatedAt = new Date().toISOString());
-                    validatedParams.forEach(d => d.createdAt = new Date().toISOString());
-                    validatedParams.forEach(d => d.updatedAt = new Date().toISOString());
-                };
-
-                // Query SQL Statement
-                let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
-                    if (typeof value === 'object' || value === 'any') {
-                        return `json_extract(${key}.${field}, '$') as ${field}`;
-                    }
-                    return `${key}.${field}`;
-                }).join(", ")}`;
-
-                querySql += ` FROM ${key} WHERE _id = ?`;
-                // Inster SQL Statement
-                const _insertSql = `INSERT INTO ${key} ${toSqlWrite('insert', validatedData[0])}`;
-                const arrayParams = validatedParams.map((params) => convertToPositionalParams(_insertSql, params));
-
-                const start = Date.now();
-                // const results = [];
-
-                if (options?.async) {
-                    for (const { sql, params } of arrayParams) {
-                        new Promise((resolve, reject) => {
+                    if (options?.async) {
+                        // return
+                        return new Promise((resolve, reject) => {
                             writeQueue.push({
                                 dbPath: path,
-                                sql: sql,
+                                sql: insertSql,
                                 params: serializeParams(params),
                                 resolve,
                                 reject
                             });
                         });
                     }
-                    return
-                }
 
-                const responseRaw = await db.batch(arrayParams.map(({ sql, params }) => ({ sql, args: params })))
-                const response = Promise.all(responseRaw.map(async (responseItem) => {
+                    const { rows: _0, columns: _1, rowsAffected: _2, lastInsertRowid } = await db.execute({
+                        sql: insertSql,
+                        args: serializeParams(params)
+                    });
+
                     const { rows } = await db.execute({
                         sql: querySql,
-                        args: serializeParams([responseItem.lastInsertRowid])
+                        args: serializeParams([lastInsertRowid])
                     });
 
-                    return deserializeParams(rows[0]);
-                }));
+                    const insertedRow = rows[0];
 
-                const results = Validator([schema], response, {
-                    path: `create_output:${key}`,
-                });
+                    const validatedResponse = Validator(schema, deserializeParams(insertedRow, schema), {
+                        path: `create_output:${key}`,
+                    });
 
-                config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| Response:', JSON.stringify(results), '| Duration:', Date.now() - start, 'ms');
+                    config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| Response:', JSON.stringify(response), '| Duration:', Date.now() - start, 'ms');
 
-                return results;
+                    return validatedResponse;
+                } finally {
+                    dbPool.releaseConnection(db);
+                }
+
+            },
+            createMany: async (data, options) => {
+                const db = await dbPool.getConnection();
+                try {
+                    const executionId = crypto.randomUUID();
+
+                    const validatedData = Validator([schema], data, {
+                        path: `create_input:${key}`,
+                        allowOperators: true,
+                    });
+                    const validatedParams = Validator([schema], data, {
+                        path: `create_input:${key}`,
+                        allowOperators: true,
+                        removeOperators: true,
+                    });
+
+                    if (config.addTimestamps) {
+                        validatedData.forEach(d => d.createdAt = new Date().toISOString());
+                        validatedData.forEach(d => d.updatedAt = new Date().toISOString());
+                        validatedParams.forEach(d => d.createdAt = new Date().toISOString());
+                        validatedParams.forEach(d => d.updatedAt = new Date().toISOString());
+                    };
+
+                    // Query SQL Statement
+                    let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
+                        if (typeof value === 'object' || value === 'any') {
+                            return `json_extract(${key}.${field}, '$') as ${field}`;
+                        }
+                        return `${key}.${field}`;
+                    }).join(", ")}`;
+
+                    querySql += ` FROM ${key} WHERE _id = ?`;
+                    // Inster SQL Statement
+                    const _insertSql = `INSERT INTO ${key} ${toSqlWrite('insert', validatedData[0])}`;
+                    const arrayParams = validatedParams.map((params) => convertToPositionalParams(_insertSql, params));
+
+                    const start = Date.now();
+                    // const results = [];
+
+                    if (options?.async) {
+                        for (const { sql, params } of arrayParams) {
+                            new Promise((resolve, reject) => {
+                                writeQueue.push({
+                                    dbPath: path,
+                                    sql: sql,
+                                    params: serializeParams(params),
+                                    resolve,
+                                    reject
+                                });
+                            });
+                        }
+                        return
+                    }
+
+                    const responseRaw = await db.batch(arrayParams.map(({ sql, params }) => ({ sql, args: params })))
+                    const response = Promise.all(responseRaw.map(async (responseItem) => {
+                        const { rows } = await db.execute({
+                            sql: querySql,
+                            args: serializeParams([responseItem.lastInsertRowid])
+                        });
+
+                        return deserializeParams(rows[0]);
+                    }));
+
+                    const results = Validator([schema], response, {
+                        path: `create_output:${key}`,
+                    });
+
+                    config.debug && console.log('CRUD Execution Id:', executionId, '| create', '| Response:', JSON.stringify(results), '| Duration:', Date.now() - start, 'ms');
+
+                    return results;
+                } finally {
+                    dbPool.releaseConnection(db);
+                }
             },
             find: async (query, options) => {
-                const executionId = crypto.randomUUID();
+                const db = await dbPool.getConnection();
+                try {
+                    const executionId = crypto.randomUUID();
 
-                // Validate query
-                const validatedQuery = formattedNestedData(Validator(schema, query, {
-                    query: true,
-                    path: `find_input_sql:${key}`,
-                }));
-                const validatedParams = Validator(schema, query, {
-                    query: true,
-                    path: `find_input_params:${key}`,
-                    removeOperators: true,
-                });
+                    // Validate query
+                    const validatedQuery = formattedNestedData(Validator(schema, query, {
+                        path: `find_input_sql:${key}`,
+                        allowOperators: true,
+                    }));
+                    const validatedParams = Validator(schema, query, {
+                        allowOperators: true,
+                        removeOperators: true,
+                        path: `find_input_params:${key}`,
+                    });
 
-                // Query SQL Statement
-                let whereClauses = toSqlQuery(validatedQuery, { table: key });
-                let groupClauses = [];
-                // use json to parse JSON objects from schema (schema type ==='any' or typeof schema type === 'object')
-                let sql = `SELECT ${Object.entries(schema).map(([field, value]) => {
-                    if ((typeof value === 'object' || value === 'any') && !options?.populate?.includes(field)) {
-                        return `json_extract(${key}.${field}, '$') as ${field}`;
+                    // Query SQL Statement
+                    let whereClauses = toSqlQuery(validatedQuery, { table: key });
+                    let groupClauses = [];
+                    // use json to parse JSON objects from schema (schema type ==='any' or typeof schema type === 'object')
+                    let sql = `SELECT ${Object.entries(schema).map(([field, value]) => {
+                        if (options?.populate?.includes(field)) return;
+                        if ((typeof value === 'object' || value === 'any')) {
+                            return `json_extract(${key}.${field}, '$') as ${field}`;
+                        }
+                        return `${key}.${field}`;
+                    }).filter(Boolean).join(", ")}`;
+                    if (options?.populate) {
+                        if (!(typeof options?.populate === 'string' || Array.isArray(options?.populate))) {
+                            throw new Error(`Invalid populate option for 'models.${key}.findOne': Expected a string or an array of strings, but received ${options.populate}`);
+                        }
+                        if (typeof options?.populate === 'string') options.populate = options?.populate.split(',');
+                        const { joins, selectFields, whereClauses: populateWhereClauses, groupClauses: populateGroupClauses } = populate(schema, options.populate, key);
+                        groupClauses = populateGroupClauses;
+                        if (populateWhereClauses.length) {
+                            whereClauses = populateWhereClauses.join(" AND ");
+                        }
+                        sql += `, ${selectFields.join(", ")} FROM ${key} ${joins.join(" ")} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
+                    } else {
+                        sql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
                     }
-                    return `${key}.${field}`;
-                }).join(", ")}`;
-                if (options?.populate) {
-                    const { joins, selectFields, whereClauses: populateWhereClauses, groupClauses: populateGroupClauses } = populate(schema, options.populate, key);
-                    groupClauses = populateGroupClauses;
-                    if (populateWhereClauses.length) {
-                        whereClauses = populateWhereClauses.join(" AND ");
+                    if (options?.sort) {
+                        const sortClause = Object.entries(options.sort).map(([k, v]) => `${k} ${v === 1 ? "ASC" : "DESC"}`).join(", ");
+                        sql += ` ORDER BY ${sortClause}`;
                     }
-                    sql += `, ${selectFields.join(", ")} FROM ${key} ${joins.join(" ")} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
-                } else {
-                    sql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
-                }
-                if (options?.sort) {
-                    const sortClause = Object.entries(options.sort).map(([k, v]) => `${k} ${v === 1 ? "ASC" : "DESC"}`).join(", ");
-                    sql += ` ORDER BY ${sortClause}`;
-                }
-                if (options?.limit) {
-                    sql += ` LIMIT ${options.limit}`;
-                }
-                if (options?.skip) {
-                    sql += ` OFFSET ${options.skip}`;
-                }
-                if (groupClauses?.length) {
-                    sql += ` GROUP BY ${groupClauses.join(", ")}`;
-                }
+                    if (options?.limit) {
+                        sql += ` LIMIT ${options.limit}`;
+                    }
+                    if (options?.skip) {
+                        sql += ` OFFSET ${options.skip}`;
+                    }
+                    if (groupClauses?.length) {
+                        sql += ` GROUP BY ${groupClauses.join(", ")}`;
+                    }
 
-                const { sql: _sql, params } = convertToPositionalParams(sql, validatedParams);
-                sql = _sql;
-                const start = Date.now();
+                    const { sql: _sql, params } = convertToPositionalParams(sql, validatedParams);
+                    sql = _sql;
+                    const start = Date.now();
 
-                config.debug && console.log("CRUD Execution Id:", executionId, "| find", "| SQL:", sql, "| Params:", JSON.stringify(params));
+                    config.debug && console.log("CRUD Execution Id:", executionId, "| find", "| SQL:", sql, "| Params:", JSON.stringify(params));
 
-                // Execute SQL Statement
-                const { rows: responses } = await db.execute({
-                    sql,
-                    args: serializeParams(params)
-                });
+                    // Execute SQL Statement
+                    const { rows: responses } = await db.execute({
+                        sql,
+                        args: serializeParams(params)
+                    });
 
-                // Validate the response
-                const validatedResponse = Validator([schema], responses?.map((i) => deserializeParams(i, schema)), {
-                    path: `find_output:${key}`,
-                });
-                config.debug && console.log("CRUD Execution Id:", executionId, "| find", "| Response:", JSON.stringify(validatedResponse), "| Duration:", Date.now() - start, "ms");
+                    // Validate the response
+                    const validatedResponse = Validator([schema], responses?.map((i) => deserializeParams(i, schema)), {
+                        path: `find_output:${key}`,
+                    });
+                    config.debug && console.log("CRUD Execution Id:", executionId, "| find", "| Response:", JSON.stringify(validatedResponse), "| Duration:", Date.now() - start, "ms");
 
-                return validatedResponse;
+                    return validatedResponse;
+                } finally {
+                    dbPool.releaseConnection(db);
+                }
             },
             findOne: async (query, options) => {
-                const executionId = crypto.randomUUID();
-                // Validate query
-                const validatedQuery = formattedNestedData(Validator(schema, query, {
-                    query: true,
-                    path: `findOne_input_sql:${key}`,
-                }));
-                const validatedParams = Validator(schema, query, {
-                    query: true,
-                    path: `findOne_input_params:${key}`,
-                });
+                const db = await dbPool.getConnection();
+                try {
+                    const executionId = crypto.randomUUID();
+                    // Validate query
+                    const validatedQuery = formattedNestedData(Validator(schema, query, {
+                        allowOperators: true,
+                        path: `findOne_input_sql:${key}`,
+                    }));
+                    const validatedParams = Validator(schema, query, {
+                        allowOperators: true,
+                        removeOperators: true,
+                        path: `findOne_input_params:${key}`,
+                    });
 
-                // Query SQL Statement
-                const whereClauses = toSqlQuery(validatedQuery, { table: key });
-                let sql = `SELECT ${Object.entries(schema).map(([field, value]) => {
-                    if (typeof value === 'object' || value === 'any') {
-                        return `json_extract(${key}.${field}, '$') as ${field}`;
+                    // Query SQL Statement
+                    const whereClauses = toSqlQuery(validatedQuery, { table: key });
+                    let groupClauses = [];
+
+                    let sql = `SELECT ${Object.entries(schema).map(([field, value]) => {
+                        if (options?.populate?.includes(field)) return;
+                        if ((typeof value === 'object' || value === 'any')) {
+                            return `json_extract(${key}.${field}, '$') as ${field}`;
+                        }
+                        return `${key}.${field}`;
+                    }).filter(Boolean).join(", ")}`;
+                    if (options?.populate) {
+                        if (!(typeof options?.populate === 'string' || Array.isArray(options?.populate))) {
+                            throw new Error(`Invalid populate option for 'models.${key}.findOne': Expected a string or an array of strings, but received ${options.populate}`);
+                        }
+                        if (typeof options?.populate === 'string') options.populate = options?.populate.split(',');
+                        const { joins, selectFields, whereClauses: populateWhereClauses, groupClauses: populateGroupClauses } = populate(schema, options.populate, key);
+                        groupClauses = populateGroupClauses;
+                        if (populateWhereClauses.length) {
+                            whereClauses = populateWhereClauses.join(" AND ");
+                        }
+                        sql += `, ${selectFields.join(", ")} FROM ${key} ${joins.join(" ")} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
+                    } else {
+                        sql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
                     }
-                    return `${key}.${field}`;
-                }).join(", ")}`;
-                if (options?.populate) {
-                    const { joins, selectFields } = populate(schema, options.populate);
-                    sql += `, ${selectFields.join(", ")} FROM ${key} ${joins.join(" ")} ${whereClauses ? `WHERE ${whereClauses}` : ""} LIMIT 1`;
-                } else {
-                    sql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
+                    if (options?.sort) {
+                        const sortClause = Object.entries(options.sort).map(([k, v]) => `${k} ${v === 1 ? "ASC" : "DESC"}`).join(", ");
+                        sql += ` ORDER BY ${sortClause}`;
+                    }
+                    if (groupClauses?.length) {
+                        sql += ` GROUP BY ${groupClauses.join(", ")}`;
+                    }
+                    sql += ` LIMIT 1`;
+
+                    const { sql: _sql, params } = convertToPositionalParams(sql, validatedParams);
+                    sql = _sql;
+
+                    const start = Date.now();
+                    config.debug && console.log("CRUD Execution Id:", executionId, "| findOne", "| SQL:", sql, "| Params:", JSON.stringify(params));
+
+                    const { rows: [response] } = await db.execute({
+                        sql,
+                        args: serializeParams(params)
+                    });
+                    // Validate the response
+                    const validatedResponse = Validator(schema, deserializeParams(response, schema), {
+                        path: `findOne_output:${key}`,
+                    });
+                    config.debug && console.log("CRUD Execution Id:", executionId, "| findOne", "| Response:", JSON.stringify(validatedResponse), "| Duration:", Date.now() - start, "ms");
+                    // Return the response
+                    return validatedResponse;
+                } finally {
+                    dbPool.releaseConnection(db);
                 }
-                if (options?.sort) {
-                    const sortClause = Object.entries(options.sort).map(([k, v]) => `${k} ${v === 1 ? "ASC" : "DESC"}`).join(", ");
-                    sql += ` ORDER BY ${sortClause}`;
-                }
-                sql += ` LIMIT 1`;
-
-                const { sql: _sql, params } = convertToPositionalParams(sql, validatedParams);
-                sql = _sql;
-
-                const start = Date.now();
-                config.debug && console.log("CRUD Execution Id:", executionId, "| findOne", "| SQL:", sql, "| Params:", JSON.stringify(params));
-
-                const { rows: [response] } = await db.execute({
-                    sql,
-                    args: serializeParams(params)
-                });
-                // Validate the response
-                const validatedResponse = Validator(schema, deserializeParams(response, schema), {
-                    path: `findOne_output:${key}`,
-                });
-                config.debug && console.log("CRUD Execution Id:", executionId, "| findOne", "| Response:", JSON.stringify(validatedResponse), "| Duration:", Date.now() - start, "ms");
-                // Return the response
-                return validatedResponse;
             },
             update: async (query, data, options) => {
-                const executionId = crypto.randomUUID();
-                // Validate query
-                const validatedQuery = formattedNestedData(Validator(schema, query, {
-                    query: true,
-                    useDotNotation: true,
-                }));
-                const _validatedQueryParams = Validator(schema, query, {
-                    path: `update_inputParams:${key}`,
-                    removeOperators: true,
-                });
-                // Validate data
-                const validatedData = formattedNestedData(Validator(schema, data, {
-                    path: `update_inputData:${key}`,
-                    query: true,
-                }));
-                const validatedDataParams = Validator(schema, data, {
-                    path: `update_inputDataParams:${key}`,
-                    removeOperators: true,
-                    query: true,
-                });
-
-                if (config.addTimestamps) {
-                    validatedData.updatedAt = new Date().toISOString();
-                    validatedDataParams.updatedAt = new Date().toISOString();
-                }
-
-                const _sqlParams = { ..._validatedQueryParams, ...validatedDataParams };
-
-                // Query SQL Statement
-                const whereClauses = toSqlQuery(validatedQuery, { table: key })
-                let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
-                    if (typeof value === 'object' || value === 'any') {
-                        return `json_extract(${key}.${field}, '$') as ${field}`;
-                    }
-                    return `${key}.${field}`;
-                }).join(", ")}`;
-                querySql += ` FROM ${key} WHERE _id = (SELECT _id FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ''} LIMIT 1)`;
-                // Update SQL Statement
-                const setClauses = toSqlWrite('update', validatedData, { table: key, dialect: 'sqlite' });
-                const _updateSql = `UPDATE ${key} ${setClauses} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
-
-                config.addTimestamps && (_sqlParams.updatedAt = new Date().toISOString());
-                const { sql: updateSql, params: sqlParams } = convertToPositionalParams(_updateSql, _sqlParams);
-                const { sql, params: validatedQueryParams } = convertToPositionalParams(querySql, _validatedQueryParams);
-                querySql = sql;
-
-                const start = Date.now();
-                config.debug && console.log('CRUD Execution Id:', executionId, '| update', '| SQL:', updateSql, '| Params:', JSON.stringify(sqlParams));
-
-                if (options?.async) {
-                    return new Promise((resolve, reject) => {
-                        writeQueue.push({
-                            dbPath: path,
-                            sql: updateSql,
-                            params: serializeParams(sqlParams),
-                            resolve,
-                            reject
-                        });
+                const db = await dbPool.getConnection();
+                try {
+                    const executionId = crypto.randomUUID();
+                    // Validate query
+                    const validatedQuery = formattedNestedData(Validator(schema, query, {
+                        allowOperators: true,
+                    }));
+                    const _validatedQueryParams = Validator(schema, query, {
+                        allowOperators: true,
+                        removeOperators: true,
+                        path: `update_inputParams:${key}`,
                     });
+                    // Validate data
+                    const validatedData = formattedNestedData(Validator(schema, data, {
+                        allowOperators: true,
+                        path: `update_inputData:${key}`,
+                    }));
+                    const validatedDataParams = Validator(schema, data, {
+                        allowOperators: true,
+                        removeOperators: true,
+                        path: `update_inputDataParams:${key}`,
+                    });
+                    if (config.addTimestamps) {
+                        validatedData.updatedAt = new Date().toISOString();
+                        validatedDataParams.updatedAt = new Date().toISOString();
+                    }
+
+                    const _sqlParams = { ..._validatedQueryParams, ...validatedDataParams };
+
+                    // Query SQL Statement
+                    const whereClauses = toSqlQuery(validatedQuery, { table: key })
+                    let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
+                        if (typeof value === 'object' || value === 'any') {
+                            return `json_extract(${key}.${field}, '$') as ${field}`;
+                        }
+                        return `${key}.${field}`;
+                    }).join(", ")}`;
+                    querySql += ` FROM ${key} WHERE _id = (SELECT _id FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ''} LIMIT 1)`;
+                    // Update SQL Statement
+                    const setClauses = toSqlWrite('update', validatedData, { table: key, dialect: 'sqlite' });
+                    const _updateSql = `UPDATE ${key} ${setClauses} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
+
+                    config.addTimestamps && (_sqlParams.updatedAt = new Date().toISOString());
+                    const { sql: updateSql, params: sqlParams } = convertToPositionalParams(_updateSql, _sqlParams);
+                    const { sql, params: validatedQueryParams } = convertToPositionalParams(querySql, _validatedQueryParams);
+                    querySql = sql;
+
+                    const start = Date.now();
+                    config.debug && console.log('CRUD Execution Id:', executionId, '| update', '| SQL:', updateSql, '| Params:', JSON.stringify(sqlParams));
+
+                    if (options?.async) {
+                        return new Promise((resolve, reject) => {
+                            writeQueue.push({
+                                dbPath: path,
+                                sql: updateSql,
+                                params: serializeParams(sqlParams),
+                                resolve,
+                                reject
+                            });
+                        });
+                    }
+
+                    await db.execute({
+                        sql: updateSql,
+                        args: serializeParams(sqlParams)
+                    });
+
+                    const { rows: [updatedRow] } = await db.execute({
+                        sql: querySql,
+                        args: serializeParams(validatedQueryParams)
+                    });
+
+                    const response = Validator(schema, deserializeParams(updatedRow, schema), {
+                        path: `update_output:${key}`
+                    });
+
+                    config.debug && console.log('CRUD Execution Id:', executionId, '| update', '| Response:', JSON.stringify(response)), '| Duration:', Date.now() - start, 'ms';
+
+                    return response;
+                } finally {
+                    dbPool.releaseConnection(db);
                 }
-
-                await db.execute({
-                    sql: updateSql,
-                    args: serializeParams(sqlParams)
-                });
-
-                const { rows: [updatedRow] } = await db.execute({
-                    sql: querySql,
-                    args: serializeParams(validatedQueryParams)
-                });
-
-                const response = Validator(schema, deserializeParams(updatedRow, schema), {
-                    path: `update_output:${key}`
-                });
-
-                config.debug && console.log('CRUD Execution Id:', executionId, '| update', '| Response:', JSON.stringify(response)), '| Duration:', Date.now() - start, 'ms';
-
-                return response;
             },
             updateMany: async (query, data, options) => {
-                const executionId = crypto.randomUUID();
+                const db = await dbPool.getConnection();
+                try {
+                    const executionId = crypto.randomUUID();
 
-                // Validate query
-                const validatedQuery = formattedNestedData(Validator(schema, query, {
-                    query: true,
-                    path: `updateMany_inputQuery:${key}`,
-                }));
-                const _validatedQueryParams = Validator(schema, query, {
-                    query: true,
-                    removeOperators: true,
-                });
-                const validatedData = formattedNestedData(Validator(schema, data, {
-                    path: `updateMany_inputData:${key}`,
-                    query: true,
-                }));
-                const validatedDataParams = Validator(schema, data, {
-                    path: `updateMany_inputDataParams:${key}`,
-                    removeOperators: true,
-                    query: true,
-                });
-
-                if (config.addTimestamps) {
-                    validatedData.updatedAt = new Date().toISOString();
-                    validatedDataParams.updatedAt = new Date().toISOString();
-                }
-
-                const _sqlParams = { ...validatedQueryParams, ...validatedDataParams };
-
-                // Query SQL Statement
-                // Where clause
-                const whereClauses = toSqlQuery(validatedQuery, { table: key })
-                let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
-                    if (typeof value === 'object' || value === 'any') {
-                        return `json_extract(${key}.${field}, '$') as ${field}`;
-                    }
-                    return `${key}.${field}`;
-                }).join(", ")}`;
-                querySql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ''}`;
-
-                const setClauses = toSqlWrite(validatedData);
-                const _updateSql = `UPDATE ${key} ${setClauses} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
-
-                config.addTimestamps && (sqlParams.updatedAt = new Date().toISOString());
-
-                const { sql: updateSql, params: sqlParams } = convertToPositionalParams(_updateSql, _sqlParams);
-                const { sql, params: validatedQueryParams } = convertToPositionalParams(querySql, _validatedQueryParams);
-                querySql = sql;
-
-                const start = Date.now();
-                config.debug && console.log("CRUD Execution Id:", executionId, "| updateMany", "| SQL:", updateSql, "| Params:", JSON.stringify(sqlParams));
-                // Execute SQL Statement
-
-                if (options?.async) {
-                    return new Promise((resolve, reject) => {
-                        writeQueue.push({
-                            dbPath: path,
-                            sql: updateSql,
-                            params: serializeParams(sqlParams),
-                            resolve,
-                            reject
-                        });
+                    // Validate query
+                    const validatedQuery = formattedNestedData(Validator(schema, query, {
+                        allowOperators: true,
+                        path: `updateMany_inputQuery:${key}`,
+                    }));
+                    const _validatedQueryParams = Validator(schema, query, {
+                        allowOperators: true,
+                        removeOperators: true,
                     });
+                    const validatedData = formattedNestedData(Validator(schema, data, {
+                        allowOperators: true,
+                        path: `updateMany_inputData:${key}`,
+                    }));
+                    const validatedDataParams = Validator(schema, data, {
+                        allowOperators: true,
+                        removeOperators: true,
+                        path: `updateMany_inputDataParams:${key}`,
+                    });
+
+                    if (config.addTimestamps) {
+                        validatedData.updatedAt = new Date().toISOString();
+                        validatedDataParams.updatedAt = new Date().toISOString();
+                    }
+
+                    const _sqlParams = { ...validatedQueryParams, ...validatedDataParams };
+
+                    // Query SQL Statement
+                    // Where clause
+                    const whereClauses = toSqlQuery(validatedQuery, { table: key })
+                    let querySql = `SELECT ${Object.entries(schema).map(([field, value]) => {
+                        if (typeof value === 'object' || value === 'any') {
+                            return `json_extract(${key}.${field}, '$') as ${field}`;
+                        }
+                        return `${key}.${field}`;
+                    }).join(", ")}`;
+                    querySql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ''}`;
+
+                    const setClauses = toSqlWrite(validatedData);
+                    const _updateSql = `UPDATE ${key} ${setClauses} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
+
+                    config.addTimestamps && (sqlParams.updatedAt = new Date().toISOString());
+
+                    const { sql: updateSql, params: sqlParams } = convertToPositionalParams(_updateSql, _sqlParams);
+                    const { sql, params: validatedQueryParams } = convertToPositionalParams(querySql, _validatedQueryParams);
+                    querySql = sql;
+
+                    const start = Date.now();
+                    config.debug && console.log("CRUD Execution Id:", executionId, "| updateMany", "| SQL:", updateSql, "| Params:", JSON.stringify(sqlParams));
+                    // Execute SQL Statement
+
+                    if (options?.async) {
+                        return new Promise((resolve, reject) => {
+                            writeQueue.push({
+                                dbPath: path,
+                                sql: updateSql,
+                                params: serializeParams(sqlParams),
+                                resolve,
+                                reject
+                            });
+                        });
+                    }
+
+                    await db.execute({
+                        sql: updateSql,
+                        args: serializeParams(sqlParams)
+                    });
+                    const { rows: updatedRows } = await db.execute({
+                        sql: querySql,
+                        args: serializeParams(validatedQueryParams)
+                    });
+
+                    const respose = Validator([schema], updatedRows?.map((i) => deserializeParams(i, schema)), {
+                        path: `updateMany_output:${key}`,
+                    });
+
+                    config.debug && console.log("CRUD Execution Id:", executionId, "| updateMany", "| Response:", JSON.stringify(respose), "| Duration:", Date.now() - start, "ms");
+
+                    // Return the response
+                    return respose;
+                } finally {
+                    dbPool.releaseConnection(db);
                 }
-
-                await db.execute({
-                    sql: updateSql,
-                    args: serializeParams(sqlParams)
-                });
-                const { rows: updatedRows } = await db.execute({
-                    sql: querySql,
-                    args: serializeParams(validatedQueryParams)
-                });
-
-                const respose = Validator([schema], updatedRows?.map((i) => deserializeParams(i, schema)), {
-                    path: `updateMany_output:${key}`,
-                });
-
-                config.debug && console.log("CRUD Execution Id:", executionId, "| updateMany", "| Response:", JSON.stringify(respose), "| Duration:", Date.now() - start, "ms");
-
-                // Return the response
-                return respose;
             },
             delete: async (query, options) => {
-                const executionId = crypto.randomUUID();
-                // Validate query
-                const validatedQuery = Validator(schema, query, {
-                    query: true,
-                    path: `delete_input:${key}`,
-                });
-                const validatedQueryParams = Validator(schema, query, {
-                    query: true,
-                    path: `delete_inputParams:${key}`,
-                    removeOperators: true,
-                });
-
-                // Query SQL Statement
-                const whereClauses = toSqlQuery(validatedQuery, { table: key });
-                const _deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
-                const { sql: deleteSql, params: sqlParams } = convertToPositionalParams(_deleteSql, validatedQueryParams);
-
-                config.debug && console.log('CRUD Execution Id:', executionId, '| delete', '| SQL:', deleteSql, '| Params:', JSON.stringify(validatedQueryParams));
-
-                if (options?.async) {
-                    return new Promise((resolve, reject) => {
-                        writeQueue.push({
-                            dbPath: path,
-                            sql: deleteSql,
-                            params: serializeParams(sqlParams),
-                            resolve,
-                            reject
-                        });
+                const db = await dbPool.getConnection();
+                try {
+                    const executionId = crypto.randomUUID();
+                    // Validate query
+                    const validatedQuery = Validator(schema, query, {
+                        allowOperators: true,
+                        path: `delete_input:${key}`,
                     });
-                }
-
-                const start = Date.now();
-                // Prepare Statemens
-                const deleteStmt = await db.prepare(deleteSql);
-                // Execute SQL Statement
-                deleteStmt.run(serializeParams(sqlParams));
-                // Validate the response
-                const validatedResponse = Validator(schema, { success: true }, {
-                    path: `delete_output:${key}`,
-                });
-
-                // Close the Statement
-                config.finalizePreparedStatements && deleteStmt.finalize();
-
-                config.debug && console.log('CRUD Execution Id:', executionId, '| delete', '| Response:', JSON.stringify(validatedResponse), '| Duration:', Date.now() - start, 'ms');
-                // Return the response
-                return validatedResponse;
-            },
-            deleteMany: async (query, options) => {
-                const executionId = crypto.randomUUID();
-
-                const validatedQuery = Validator(schema, query, {
-                    query: true,
-                    path: `deleteMany_input:${key}`,
-                });
-                const validatedQueryParams = Validator(schema, query, {
-                    query: true,
-                    path: `deleteMany_inputParams:${key}`,
-                    removeOperators: true,
-                });
-
-                const whereClauses = toSqlQuery(validatedQuery, { table: key });
-
-                const _deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
-                const start = Date.now();
-                const { sql: deleteSql, params: sqlParams } = convertToPositionalParams(_deleteSql, validatedQueryParams);
-
-                config.debug && console.log('CRUD Execution Id:', executionId, '| deleteMany', '| SQL:', deleteSql, '| Params:', JSON.stringify(sqlParams));
-
-                if (options?.async) {
-                    return new Promise((resolve, reject) => {
-                        writeQueue.push({
-                            dbPath: path,
-                            sql: deleteSql,
-                            params: serializeParams(sqlParams),
-                            resolve,
-                            reject
-                        });
+                    const validatedQueryParams = Validator(schema, query, {
+                        allowOperators: true,
+                        path: `delete_inputParams:${key}`,
+                        removeOperators: true,
                     });
-                }
 
-                const response = await db.transaction(async () => {
+                    // Query SQL Statement
+                    const whereClauses = toSqlQuery(validatedQuery, { table: key });
+                    const _deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE _id = (SELECT _id FROM ${key} WHERE ${whereClauses} LIMIT 1)` : ""}`;
+                    const { sql: deleteSql, params: sqlParams } = convertToPositionalParams(_deleteSql, validatedQueryParams);
+
+                    config.debug && console.log('CRUD Execution Id:', executionId, '| delete', '| SQL:', deleteSql, '| Params:', JSON.stringify(validatedQueryParams));
+
+                    if (options?.async) {
+                        return new Promise((resolve, reject) => {
+                            writeQueue.push({
+                                dbPath: path,
+                                sql: deleteSql,
+                                params: serializeParams(sqlParams),
+                                resolve,
+                                reject
+                            });
+                        });
+                    }
+
+                    const start = Date.now();
+                    // Prepare Statemens
                     const deleteStmt = await db.prepare(deleteSql);
+                    // Execute SQL Statement
                     deleteStmt.run(serializeParams(sqlParams));
+                    // Validate the response
                     const validatedResponse = Validator(schema, { success: true }, {
                         path: `delete_output:${key}`,
                     });
-                    return validatedResponse;
-                })();
 
-                config.debug && console.log('CRUD Execution Id:', executionId, '| deleteMany', '| Response:', JSON.stringify(response), '| Duration:', Date.now() - start, 'ms');
-                config.finalizePreparedStatements && deleteStmt.finalize();
-                return response;
+                    // Close the Statement
+                    config.finalizePreparedStatements && deleteStmt.finalize();
+
+                    config.debug && console.log('CRUD Execution Id:', executionId, '| delete', '| Response:', JSON.stringify(validatedResponse), '| Duration:', Date.now() - start, 'ms');
+                    // Return the response
+                    return validatedResponse;
+                } finally {
+                    dbPool.releaseConnection(db);
+                }
+            },
+            deleteMany: async (query, options) => {
+                const db = await dbPool.getConnection();
+                try {
+                    const executionId = crypto.randomUUID();
+
+                    const validatedQuery = Validator(schema, query, {
+                        allowOperators: true,
+                        path: `deleteMany_input:${key}`,
+                    });
+                    const validatedQueryParams = Validator(schema, query, {
+                        allowOperators: true,
+                        removeOperators: true,
+                        path: `deleteMany_inputParams:${key}`,
+                    });
+
+                    const whereClauses = toSqlQuery(validatedQuery, { table: key });
+
+                    const _deleteSql = `DELETE FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
+                    const start = Date.now();
+                    const { sql: deleteSql, params: sqlParams } = convertToPositionalParams(_deleteSql, validatedQueryParams);
+
+                    config.debug && console.log('CRUD Execution Id:', executionId, '| deleteMany', '| SQL:', deleteSql, '| Params:', JSON.stringify(sqlParams));
+
+                    if (options?.async) {
+                        return new Promise((resolve, reject) => {
+                            writeQueue.push({
+                                dbPath: path,
+                                sql: deleteSql,
+                                params: serializeParams(sqlParams),
+                                resolve,
+                                reject
+                            });
+                        });
+                    }
+
+                    const response = await db.transaction(async () => {
+                        const deleteStmt = await db.prepare(deleteSql);
+                        deleteStmt.run(serializeParams(sqlParams));
+                        const validatedResponse = Validator(schema, { success: true }, {
+                            path: `delete_output:${key}`,
+                        });
+                        return validatedResponse;
+                    })();
+
+                    config.debug && console.log('CRUD Execution Id:', executionId, '| deleteMany', '| Response:', JSON.stringify(response), '| Duration:', Date.now() - start, 'ms');
+                    config.finalizePreparedStatements && deleteStmt.finalize();
+                    return response;
+                } finally {
+                    dbPool.releaseConnection(db);
+                }
             },
             customQuery: async (queryStatement) => {
-                const stmt = await db.prepare(queryStatement);
-                const response = stmt.all();
-                config.finalizePreparedStatements && stmt.finalize();
-                // Add validation if needed
-                return response;
+                const db = await dbPool.getConnection();
+                try {
+                    const stmt = await db.prepare(queryStatement);
+                    const response = stmt.all();
+                    config.finalizePreparedStatements && stmt.finalize();
+                    // Add validation if needed
+                    return response;
+                } finally {
+                    dbPool.releaseConnection(db);
+                }
             },
         };
     }
-    const start = Date.now();
-    // console.log({sql: commands.join(";\n"), args: []})
-    !config.syncUrl && commands.forEach((command) => {
-        db.execute({ sql: command, args: [] })
+
+    dbPool.getConnection().then(db => {
+        const start = Date.now();
+        !config.syncUrl && commands.forEach((command) => {
+            db.execute({ sql: command, args: [] })
+        })
+        dbPool.releaseConnection(db);
+        console.log('db connected', Date.now() - start, 'ms');
     })
-    // db.execute({ sql: commands.join(";\n"), args: [] })
-    // .then(res => console.log('Table creation time:', Date.now() - start, 'ms'));
 
     connectedDbs.get(path).status = 'connected';
 
