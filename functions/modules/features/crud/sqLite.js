@@ -829,11 +829,14 @@ export default (args) => {
                         });
                     }
 
+                    // // Execute SQL Statement
                     const start = Date.now();
-                    // Prepare Statemens
-                    const deleteStmt = await db.prepare(deleteSql);
-                    // Execute SQL Statement
-                    deleteStmt.run(serializeParams(sqlParams));
+
+                    db.execute({
+                        sql: deleteSql,
+                        args: serializeParams(sqlParams)
+                    });
+
                     // Validate the response
                     const validatedResponse = Validator(schema, { success: true }, {
                         path: `delete_output:${key}`,
@@ -884,16 +887,17 @@ export default (args) => {
                         });
                     }
 
-                    const response = await db.transaction(async () => {
-                        const deleteStmt = await db.prepare(deleteSql);
-                        deleteStmt.run(serializeParams(sqlParams));
-                        const validatedResponse = Validator(schema, { success: true }, {
-                            path: `delete_output:${key}`,
-                        });
-                        return validatedResponse;
-                    })();
+                    // Execute SQL Statement
+                     await db.execute({
+                        sql: deleteSql,
+                        args: serializeParams(sqlParams)
+                    });
 
-                    config.debug && console.log('CRUD Execution Id:', executionId, '| deleteMany', '| Response:', JSON.stringify(response), '| Duration:', Date.now() - start, 'ms');
+                   // Validate the response
+                   const validatedResponse = Validator(schema, { success: true }, {
+                    path: `delete_output:${key}`,
+                });
+                    config.debug && console.log('CRUD Execution Id:', executionId, '| deleteMany', '| Response:', JSON.stringify(validatedResponse), '| Duration:', Date.now() - start, 'ms');
                     config.finalizePreparedStatements && deleteStmt.finalize();
                     return response;
                 } finally {
