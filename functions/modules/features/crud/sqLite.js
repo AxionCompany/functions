@@ -461,7 +461,7 @@ export default (args) => {
                             args: serializeParams([responseItem.lastInsertRowid])
                         });
 
-                        return deserializeParams(rows[0]);
+                        return deserializeParams(rows[0], schema);
                     }));
 
                     const results = Validator([schema], response, {
