@@ -314,7 +314,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
                 type: config.isolateType,
                 reload,
                 permissions: config.permissions,
-                env: isolateMetadata.variables
+                env: { ...isolateMetadata.variables, ...config.variables }
             })
 
             if (config.isolateType === 'worker') {
