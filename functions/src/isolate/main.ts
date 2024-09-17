@@ -36,7 +36,11 @@ export default async (config: any) => {
       // pass dependencies to middlewares
       Object.assign(middlewares, dependencies)
       // execute middleware
-      data = await middlewares(data);
+      data = await middlewares(data, response);
+
+      // if the middleware returns a response, return it
+      if (data._forceResponse) return data._forceResponse;
+      
       // get middleware-defined dependencies;
       dependencies = { ...dependencies, ...middlewares };
 

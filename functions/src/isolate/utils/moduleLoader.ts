@@ -128,11 +128,11 @@ export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir }
     }
   );
 
-  const middlewares = async (req) => {
+  const middlewares = async (req, response) => {
     for (const Middleware of Middlewares) {
       if (Middleware) {
         Object.assign(Middleware, { ...middlewares });
-        const MiddlewareExec = await Middleware({ ...req });
+        const MiddlewareExec = await Middleware({ ...req }, response);
         Object.assign(middlewares, { ...Middleware });
         req = MiddlewareExec;
       }
