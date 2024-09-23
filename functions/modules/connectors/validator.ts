@@ -296,8 +296,6 @@ const Validator = (schemas: Record<string, any>) =>
                                     currentSchema = currentSchema[part];
                                 }
                                 newCurrentPath = i === 0 ? `${currentPath}.${part}` : `${newCurrentPath}.${part}`;
-                            } else {
-                                throw new Error(`Invalid schema at path "${newCurrentPath}": no schema for key "${part}"`);
                             }
                         }
                     }
