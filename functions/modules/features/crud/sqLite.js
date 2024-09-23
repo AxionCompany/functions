@@ -147,10 +147,11 @@ function convertToPositionalParams(sql, params) {
             .replaceAll('_closebracket_', ']');
 
         if (_has(params, paramName)) {
-            if (!(paramName in paramMap)) {
-                positionalParams.push(_get(params, paramName) || null);
-                paramMap[paramName] = positionalParams.length;  // Track the index of each parameter
-            }
+            // if (!(paramName in paramMap)) {
+            //     positionalParams.push(_get(params, paramName) || null);
+            //     paramMap[paramName] = positionalParams.length;  // Track the index of each parameter
+            // }
+            positionalParams.push(_get(params, paramName) || null);
             return '?';
         } else {
             throw new Error(`Parameter ${paramName} not found in params object`);
@@ -485,6 +486,7 @@ export default (args) => {
                         path: `find_input_sql:${key}`,
                         allowOperators: true,
                     }));
+
                     const validatedParams = Validator(schema, query, {
                         allowOperators: true,
                         removeOperators: true,
@@ -529,6 +531,9 @@ export default (args) => {
                     if (groupClauses?.length) {
                         sql += ` GROUP BY ${groupClauses.join(", ")}`;
                     }
+
+                    console.log('SQL:', sql);
+                    console.log('Params:', JSON.stringify(validatedParams));
 
                     const { sql: _sql, params } = convertToPositionalParams(sql, validatedParams);
                     sql = _sql;

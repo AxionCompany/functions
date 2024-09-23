@@ -105,8 +105,8 @@ const operators = {
     $gte: (schema: any) => schema,
     $lt: (schema: any) => schema,
     $lte: (schema: any) => schema,
-    $in: (schema: any) => schema,
-    $nin: (schema: any) => schema,
+    $in: (schema: any) => 'any',
+    $nin: (schema: any) => 'any',
     $exists: (schema: any) => schema,
     $regex: (schema: any) => schema,
 
@@ -151,20 +151,23 @@ const Validator = (schemas: Record<string, any>) =>
     }
 
     const validateParams = (type: any, value: any, options: ValidationOptions = {}): any => {
-    
+
         options = { ...defaultOptions, ...options };
     
-        const allowDotNotation = options?.allowDotNotation ?? true;
-        const rejectExtraProperties = options?.rejectExtraProperties ?? false;
+        const allowDotNotation = options.allowDotNotation ?? true;
+        const rejectExtraProperties = options.rejectExtraProperties ?? false;
+        const allowOperators = options.allowOperators ?? true;
+        const removeOperators = options.removeOperators ?? false;
     
         options.path = (options.model ? `${options.model}` : "") + (options.path || "");
         delete options.model;
     
         const recursiveValidation = (schema: any, val: any, currentPath: string): any => {
             let isRequired = false;
+    
             if (typeof schema === "string") {
                 let localSchema = schema;
-        
+    
                 // Parse modifiers: "!", "?", and "^"
                 if (localSchema.includes("!")) {
                     isRequired = true;
@@ -177,62 +180,65 @@ const Validator = (schemas: Record<string, any>) =>
                     // Skip uniqueness enforcement for now, but remove the symbol
                     localSchema = localSchema.replace("^", "");
                 }
-
-                // TODO: Fix this
+    
+                // Handle 'object' type
                 if (localSchema === 'object') {
-                    localSchema='any'
+                    localSchema = 'any';
                 }
-
+    
                 let validateValue = z.coerce?.[localSchema] || z[localSchema] || customTypes(localSchema, options);
-        
+    
                 if (!validateValue) {
                     throw new Error(`Undefined schema type: ${localSchema} at path: ${currentPath}`);
                 }
-
+    
                 validateValue = validateValue();
-        
+    
                 if (!isRequired) {
                     validateValue = validateValue.optional().nullable();
                 }
-        
+    
                 // If the field is required and missing or undefined, throw an error
                 if (isRequired && (val === undefined || val === null)) {
                     throw new Error(`Field "${currentPath}" is required but missing or null.`);
                 }
-        
+    
                 try {
                     const parsedValue = validateValue.parse(val);
                     return parsedValue;
                 } catch (err) {
-                    throw new Error(`Error in schema validation at path "${currentPath}". | Received ${stringify(val)} | Expected:${stringify(localSchema)} | ${JSON.stringify({
-                        ...err?.issues?.[0],
-                        path: currentPath,
-                        value: val,
-                        type: localSchema,
-                    })}`);
+                    throw new Error(
+                        `Error in schema validation at path "${currentPath}". | Received ${stringify(val)} | Expected:${stringify(localSchema)} | ${JSON.stringify({
+                            ...err?.issues?.[0],
+                            path: currentPath,
+                            value: val,
+                            type: localSchema,
+                        })}`
+                    );
                 }
             }
-        
+    
             // Handle arrays and objects
             else if (schema && typeof schema === 'object') {
                 if (!isRequired && !val) return;
-        
+    
                 let validatedResult: any = Array.isArray(schema) ? [] : {};
-        
-                // **Check for null or undefined values before calling Object.entries**
+    
+                // Check for null or undefined values before calling Object.entries
                 if (val === null || val === undefined) {
                     throw new Error(`Invalid value at path "${currentPath}": expected an object, but received ${val}.`);
                 }
-        
+    
                 if (Array.isArray(schema)) {
                     const arraySchema = schema[0];
-        
+    
                     if (Array.isArray(val)) {
                         return val.map((item, idx) => recursiveValidation(arraySchema, item, `${currentPath}[${idx}]`));
                     } else if (typeof val === 'object') {
+                        // Handle object notation like $[n]
                         Object.entries(val).forEach(([key, v]) => {
                             const match = key.match(/^\$\[(\d+)\]$/); // Match $[n] array notation
-        
+    
                             if (match) {
                                 const index = parseInt(match[1], 10);
                                 const result = recursiveValidation(arraySchema, v, `${currentPath}[$${index}]`);
@@ -245,66 +251,85 @@ const Validator = (schemas: Record<string, any>) =>
                         });
                         return validatedResult;
                     } else {
-                        throw new Error(`Expected array at "${currentPath}", but got non-array value.`);
+                        // If val is a scalar, wrap it in an array for validation
+                        return [recursiveValidation(arraySchema, val, currentPath)];
                     }
                 }
-        
-                Object.entries(val).forEach(([key, v]) => {
-                    // Handle MongoDB-like operators
-                    if (options.allowOperators && operators.hasOwnProperty(key)) {
-                        const operatorCallback = operators[key];
-        
-                        const result = operatorCallback(schema, v, key); // Pass schema and value for validation
-        
-                        if (options.removeOperators) {
-                            validatedResult = { ...validatedResult, ...result };
+    
+                // Process each key in the value
+                Object.entries(val).forEach(([originalKey, v]) => {
+                    let key = originalKey;
+    
+                    // Handle operators in keys if allowed
+                    let pathParts = key.includes(".") ? (allowDotNotation ? key.split(".") : [key]) : [key];
+                    let currentSchema = schema;
+                    let reconstructedKeyParts: string[] = [];
+                    let newCurrentPath = currentPath;
+    
+                    for (let i = 0; i < pathParts.length; i++) {
+                        let part = pathParts[i];
+    
+                        // If removeOperators is true, remove operators from key
+                        if (removeOperators && allowOperators && operators.hasOwnProperty(part)) {
+                            // Skip adding operator to reconstructed key parts
+                            const operatorCallback = operators[part];
+    
+                            // Adjust the schema based on the operator
+                            currentSchema = operatorCallback(currentSchema, v, reconstructedKeyParts.join('.'));
+                            continue;
+                        } else if (allowOperators && operators.hasOwnProperty(part)) {
+                            // Operator found in key path
+                            const operatorCallback = operators[part];
+    
+                            // Adjust the schema based on the operator
+                            currentSchema = operatorCallback(currentSchema, v, reconstructedKeyParts.join('.'));
+    
+                            // Include operator in reconstructed key if not removing operators
+                            reconstructedKeyParts.push(part);
                         } else {
-                            validatedResult[key] = result;
+                            reconstructedKeyParts.push(part);
+    
+                            if (currentSchema && typeof currentSchema === 'object') {
+                                if (Array.isArray(currentSchema)) {
+                                    currentSchema = currentSchema[0];
+                                } else {
+                                    currentSchema = currentSchema[part];
+                                }
+                                newCurrentPath = i === 0 ? `${currentPath}.${part}` : `${newCurrentPath}.${part}`;
+                            } else {
+                                throw new Error(`Invalid schema at path "${newCurrentPath}": no schema for key "${part}"`);
+                            }
                         }
-                        return;
                     }
-        
-                    // Check for dot notation error before checking extra properties
-                    if (!allowDotNotation && key.includes(".")) {
-                        throw new Error(`Dot notation is not allowed at path: ${currentPath}.${key}`);
-                    }
-        
-                    // Handle extra properties based on rejectExtraProperties option
-                    const topKey = key.split(".")[0];
+    
+                    const reconstructedKey = reconstructedKeyParts.join('.');
+    
+                    // Check for extra properties
+                    const topKey = reconstructedKeyParts[0];
                     if (!schema.hasOwnProperty(topKey)) {
                         if (rejectExtraProperties) {
-                            throw new Error(`Extra property "${key}" is not allowed at path: ${currentPath}`);
+                            throw new Error(`Extra property "${reconstructedKey}" is not allowed at path: ${currentPath}`);
                         }
                         return;
                     }
-        
-                    // Handle regular or dotted notation keys
-                    let currentSchema = schema;
-                    let pathParts = key.includes(".") ? (allowDotNotation ? key.split(".") : [key]) : [key];
-                    let newCurrentPath = currentPath;
-        
-                    pathParts.forEach((part, index) => {
-                        if (currentSchema && typeof currentSchema === 'object') {
-                            currentSchema = Array.isArray(currentSchema) ? currentSchema[0] : currentSchema[part];
-                            newCurrentPath = index === 0 ? `${currentPath}.${part}` : `${newCurrentPath}.${part}`;
-                        }
-                    });
-        
+    
+                    // Now validate v against currentSchema
                     const result = recursiveValidation(currentSchema, v, newCurrentPath);
+    
                     if (typeof result !== "undefined") {
-                        validatedResult[key] = result;
+                        validatedResult[reconstructedKey] = result;
                     }
                 });
-        
+    
                 return validatedResult;
             }
-        
+    
             throw new Error(`Unsupported schema type at path: ${currentPath}`);
         };
     
         return recursiveValidation(type, value, options.path);
     };
-    
+
 
 const stringify = (value: any) => {
     if (typeof value === 'object') {

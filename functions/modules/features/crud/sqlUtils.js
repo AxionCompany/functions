@@ -19,14 +19,14 @@ function toSqlQuery(query, config) {
         $exists: "EXISTS",
         $mod: "MOD",
         $regex: "REGEXP",
-        $size: "json_array_length"
+        $size: "json_array_length",
     };
 
     const dialectConfigs = {
         sqlite: {
             jsonExtract: (field) => `json_extract(${field}, '$')`,
-            jsonContains: (field, value) => `EXISTS (SELECT 1 FROM json_each(${field}) WHERE json_each.value = ${value ? value : `?${field}`})`,
-            jsonNotContains: (field, value) => `NOT EXISTS (SELECT 1 FROM json_each(json_extract(${field}, '$')) WHERE json_each.value = ${value ? value : `?${field}`})`,
+            jsonContains: (field, value, table) => `EXISTS (SELECT 1 FROM json_each(${table}.${field}) WHERE json_each.value = ${value ? value : `?${field.replaceAll('.', '_dot_').replaceAll('[', '_openbracket_').replaceAll(']', '_closebracket_')}`})`,
+            jsonNotContains: (field, value, table) => `NOT EXISTS (SELECT 1 FROM json_each(json_extract(${table}.${field}, '$')) WHERE json_each.value = ${value ? value : `?${field.replaceAll('.', '_dot_').replaceAll('[', '_openbracket_').replaceAll(']', '_closebracket_')}`})`,
             operatorsMap: {
                 ...defaultOperatorsMap,
                 $regex: "REGEXP"
@@ -47,10 +47,10 @@ function toSqlQuery(query, config) {
                     switch (operator) {
                         case '$in':
                             if (Array.isArray(value)) {
-                                const inConditions = value.map(v => jsonContains(field)).join(' OR ');
+                                const inConditions = value.map(v => jsonContains(field, undefined, table)).join(' OR ');
                                 sqlConditions.push(`(${inConditions})`);
                             } else {
-                                sqlConditions.push(`${jsonContains(field)}`);
+                                sqlConditions.push(`${jsonContains(field, undefined, table)}`);
                             }
                             break;
                         case '$nin':
@@ -87,7 +87,10 @@ function toSqlQuery(query, config) {
                 }
             }
         } else {
-            sqlConditions.push(`${table}.${field} = ?${(path)}`);
+            // case field is an array in sql, we need to use the jsonContains function
+            sqlConditions.push(`((json_valid(${table}.${field}) AND json_type(${table}.${field}) = 'array' AND  ${jsonContains(field, undefined, table)}) OR ${table}.${field} = ?${(path)})`);
+            // sqlConditions.push(`(json_type(${table}.${field}) = 'array' AND ${jsonContains(field)}) OR ${table}.${field} = ?${(path)}`);
+            // sqlConditions.push(`${table}.${field} = ?${(path)}`);
         }
     }
 
@@ -182,13 +185,13 @@ function toSqlWrite(operation, data, config = { dialect: 'sqlite' }) {
                         return `${jsonSet(field, value)}`;
                     }
                 }
-        
+
                 return `${field} = ?${field}`;
             }).filter(Boolean).join(', ');
-        
+
             sqlQuery = `SET ${updateConditions}`;
             break;
-        }        
+        }
 
         default:
             throw new Error('Unsupported operation');
