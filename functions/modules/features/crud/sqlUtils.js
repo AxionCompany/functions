@@ -47,18 +47,18 @@ function toSqlQuery(query, config) {
                     switch (operator) {
                         case '$in':
                             if (Array.isArray(value)) {
-                                const inConditions = value.map(v => jsonContains(field, v)).join(' OR ');
+                                const inConditions = value.map(v => jsonContains(field)).join(' OR ');
                                 sqlConditions.push(`(${inConditions})`);
                             } else {
-                                sqlConditions.push(`${jsonContains(field, value)}`);
+                                sqlConditions.push(`${jsonContains(field)}`);
                             }
                             break;
                         case '$nin':
                             if (Array.isArray(value)) {
-                                const ninConditions = value.map(v => jsonNotContains(field, v)).join(' AND ');
+                                const ninConditions = value.map(v => jsonNotContains(field)).join(' AND ');
                                 sqlConditions.push(`(${ninConditions})`);
                             } else {
-                                sqlConditions.push(`${jsonNotContains(field, value)}`);
+                                sqlConditions.push(`${jsonNotContains(field)}`);
                             }
                             break;
                         case '$exists':
