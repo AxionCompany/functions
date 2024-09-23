@@ -7,7 +7,7 @@ function toSqlQuery(query, config) {
         $eq: "=",
         $gt: ">",
         $gte: ">=",
-        $in: "IN",
+        $in: "LIKE",
         $lt: "<",
         $lte: "<=",
         $ne: "!=",
@@ -50,7 +50,7 @@ function toSqlQuery(query, config) {
                                 const inConditions = value.map(v => jsonContains(field, v)).join(' OR ');
                                 sqlConditions.push(`(${inConditions})`);
                             } else {
-                                sqlConditions.push(`${path} ${operatorsMap[operator]} ('${value}')`);
+                                sqlConditions.push(`${path} ${jsonContains(field, value)}`);
                             }
                             break;
                         case '$nin':
@@ -58,7 +58,7 @@ function toSqlQuery(query, config) {
                                 const ninConditions = value.map(v => jsonNotContains(field, v)).join(' AND ');
                                 sqlConditions.push(`(${ninConditions})`);
                             } else {
-                                sqlConditions.push(`${path} ${operatorsMap[operator]} ('${value}')`);
+                                sqlConditions.push(`${path} ${jsonNotContains(field, value)}`);
                             }
                             break;
                         case '$exists':
