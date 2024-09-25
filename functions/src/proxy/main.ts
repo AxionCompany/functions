@@ -126,7 +126,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
         const customMapperId = config.mapFilePathToIsolateId ||
             (({ formattedFileUrl, fileUrl }: { fileUrl: string, formattedFileUrl: string }) => {
-                const ext = modules.path.extname(fileUrl);
+                const _url = new URL(fileUrl);
+                const ext = modules.path.extname(_url.pathname);
                 isJSX = ext === '.jsx' || ext === '.tsx';
                 return isJSX ? `jsx|tsx` : 'js|ts';
             })
@@ -153,7 +154,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
             return cachedFileUrl.isolateId;
         } else {
             const isolateId = customMapperId({ fileUrl: _fileUrl.href, formattedFileUrl: filePathUrl.href });
-            const ext = modules.path.extname(_fileUrl.href);
+            const ext = modules.path.extname(_fileUrl.pathname);
             const isJSX = ext === '.jsx' || ext === '.tsx';
             // update cached file urls
             cachedFileUrls.set(filePathUrl.href, { isolateId, urls: [formattedImportUrl], isJSX });
@@ -265,6 +266,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
         // matchPath is the path to match in the URL
         const matchUrl = new URL(importUrl.href);
         matchUrl.pathname = _isolateMetadata?.matchPath;
+        console.log('matchUrl', matchUrl.href)
         isolateId = mapFilePathToIsolateId(matchUrl);
         const ext = modules.path.extname(matchUrl.pathname);
         isJSX = ext === '.jsx' || ext === '.tsx';
@@ -283,14 +285,15 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
     clearTimeout(getIsolate(isolateId)?.timer);
 
-
-
     const shouldUpgrade = !isolateMetadata?.loadedAt || (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
     if ((!['up', 'loading'].includes(isolateMetadata?.status)) || shouldUpgrade) {
         setIsolate(isolateId, { ...isolateMetadata, status: 'loading' });
         try {
             console.log("Spawning isolate", isolateId);
-            const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url)?.origin : null;
+            const metaUrl = new URL(import.meta.url)?.origin !== "null" ? new URL(import.meta.url) : null;
+            metaUrl && (metaUrl.pathname = '');
+            metaUrl && (metaUrl.search = '');
+            metaUrl && (metaUrl.hash = '');
             let reload;
             const reloadUrl = new URL(formattedImportUrl);
             reloadUrl.pathname = '';
@@ -298,7 +301,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
             if (shouldUpgrade) {
                 console.log('should upgrade isolate', isolateId)
-                reload = [reloadUrl.href, metaUrl, url.origin]
+                reload = [reloadUrl.href, metaUrl?.href, url.origin]
                 config.debug && console.log("Upgrading isolate id", isolateId);
             } else {
                 config.debug && console.log("Spawning isolate id", isolateId);
