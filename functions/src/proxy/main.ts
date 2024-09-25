@@ -260,13 +260,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
             );
         }
 
-        if (queryParams.bundle) {
-            return new Response(
-                _isolateMetadata?.content,
-                { status: 200, headers: { 'Content-Type': 'text/javascript', 'Access-Control-Allow-Origin': '*' } }
-            );
-        }
-
         // matchPath is the path to match in the URL
         const matchUrl = new URL(importUrl.href);
         matchUrl.pathname = _isolateMetadata?.matchPath;
@@ -274,6 +267,20 @@ export default ({ config, modules }: any) => async (req: Request) => {
         const ext = modules.path.extname(matchUrl.pathname);
         isJSX = ext === '.jsx' || ext === '.tsx';
 
+        if (queryParams.bundle) {
+            if (isJSX) {
+                return new Response(
+                    _isolateMetadata?.content,
+                    { status: 200, headers: { 'Content-Type': 'text/javascript', 'Access-Control-Allow-Origin': '*' } }
+                );
+            } else {
+                // return not found
+                return new Response(
+                    JSON.stringify({ error: { message: 'Not Found' } }),
+                    { status: 404, headers: { 'Content-Type': 'application/json' } }
+                );
+            }
+        }
         // get updated state of isolate metadata
         isolateMetadata = getIsolate(isolateId) || {};
         // merge paths
