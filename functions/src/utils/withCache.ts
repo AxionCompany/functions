@@ -7,9 +7,7 @@ let warningIssued = false
 const createDirIfNotExists = async (path: string) => {
 
     try {
-        console.log('creating dir', path)
         await Deno.mkdir(path, { recursive: true });
-        console.log('createdDir success', path)
         return true;
     } catch (e) { console.log('Error on createDirIfNotExists', e) }
 }
