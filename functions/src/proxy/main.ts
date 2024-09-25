@@ -126,7 +126,11 @@ export default ({ config, modules }: any) => async (req: Request) => {
     const mapFilePathToIsolateId = ((_fileUrl: URL) => {
 
         const customMapperId = config.mapFilePathToIsolateId ||
-            (({ formattedFileUrl }: { fileUrl: string, formattedFileUrl: string }) => formattedFileUrl)
+            (({ formattedFileUrl, fileUrl }: { fileUrl: string, formattedFileUrl: string }) => {
+                const ext = modules.path.extname(fileUrl);
+                isJSX = ext === '.jsx' || ext === '.tsx';
+                return isJSX ? `jsx|tsx` : 'js|ts';
+            })
 
         // Format File Path
         const filePathUrl = new URL(_fileUrl)
@@ -150,8 +154,10 @@ export default ({ config, modules }: any) => async (req: Request) => {
             return cachedFileUrl.isolateId;
         } else {
             const isolateId = customMapperId({ fileUrl: _fileUrl.href, formattedFileUrl: filePathUrl.href });
+            const ext = modules.path.extname(_fileUrl.href);
+            const isJSX = ext === '.jsx' || ext === '.tsx';
             // update cached file urls
-            cachedFileUrls.set(filePathUrl.href, { isolateId, urls: [formattedImportUrl] });
+            cachedFileUrls.set(filePathUrl.href, { isolateId, urls: [formattedImportUrl], isJSX });
             return isolateId
         }
 
@@ -198,6 +204,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
             isExactMatch = importUrls?.some((p: string) => p === importUrl.href);
             isolateId = cachedFileUrls.get(fileUrl).isolateId;
+            isJSX = cachedFileUrls.get(fileUrl).isJSX;
 
             isolateMetadata = { ...isolatesMetadata.get(isolateId), params: matchParams };
             break;
@@ -260,6 +267,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
         const matchUrl = new URL(importUrl.href);
         matchUrl.pathname = _isolateMetadata?.matchPath;
         isolateId = mapFilePathToIsolateId(matchUrl);
+        const ext = modules.path.extname(matchUrl.pathname);
+        isJSX = ext === '.jsx' || ext === '.tsx';
 
         // get updated state of isolate metadata
         isolateMetadata = getIsolate(isolateId) || {};
@@ -275,8 +284,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
     clearTimeout(getIsolate(isolateId)?.timer);
 
-    const ext = modules.path.extname(isolateMetadata?.path);
-    isJSX = ext === '.jsx' || ext === '.tsx';
+
 
     const shouldUpgrade = !isolateMetadata?.loadedAt || (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
     if ((!['up', 'loading'].includes(isolateMetadata?.status)) || shouldUpgrade) {
@@ -290,6 +298,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
 
             if (shouldUpgrade) {
+                console.log('should upgrade isolate', isolateId)
                 reload = [reloadUrl.href, metaUrl, url.origin]
                 config.debug && console.log("Upgrading isolate id", isolateId);
             } else {
@@ -343,11 +352,13 @@ export default ({ config, modules }: any) => async (req: Request) => {
         }
     }
 
+
     try {
         const port = getPortFromIsolateId(isolateId);
 
         // Increment active requests counter
         const isolate = getIsolate(isolateId);
+        console.log('ISOLATE', isolate)
         setIsolate(isolateId, { ...isolate, activeRequests: (isolate.activeRequests || 0) + 1 });
 
         const moduleResponse = await fetch(new URL(

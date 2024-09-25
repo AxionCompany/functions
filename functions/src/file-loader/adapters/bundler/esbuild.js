@@ -1,4 +1,5 @@
-import { context } from "npm:esbuild";
+import { context } from "npm:esbuild-wasm";
+
 import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader/mod.ts";
 import replaceTemplate from "../../../utils/template.ts";
 

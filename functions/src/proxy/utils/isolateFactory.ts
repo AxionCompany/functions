@@ -81,10 +81,10 @@ function createWebWorkerIsolate({ isolateId, projectId, reload, modules, port, i
 // Isolate factory
 export default (config: any) => {
     if (config.isolateType === 'subprocess') {
-        console.log('starting subprocess isolate');
+        console.log('starting subprocess isolate', config.isolateId);
         return createSubprocessIsolate(config);
     } else {
-        console.log('starting web worker isolate');
+        console.log('starting web worker isolate', config.isolateId);
         return createWebWorkerIsolate(config);
     }
 }

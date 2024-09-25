@@ -214,15 +214,10 @@ export default (args) => {
     const path = config.dbPath || './data/my.db';
 
     if (!connectedDbs.has(path)) {
-        const start = Date.now();
-
         dbPool = new DatabasePool(path, config.dbOptions);
-
-        console.log('Database connection pool created in:', Date.now() - start, 'ms');
         connectedDbs.set(path, { dbPool, config: config.dbOptions });
     } else {
         dbPool = connectedDbs.get(path).dbPool;
-        console.log('Database pool already exists');
     }
 
     const writeQueue = {
@@ -531,9 +526,6 @@ export default (args) => {
                     if (groupClauses?.length) {
                         sql += ` GROUP BY ${groupClauses.join(", ")}`;
                     }
-
-                    console.log('SQL:', sql);
-                    console.log('Params:', JSON.stringify(validatedParams));
 
                     const { sql: _sql, params } = convertToPositionalParams(sql, validatedParams);
                     sql = _sql;
@@ -930,7 +922,6 @@ export default (args) => {
             db.execute({ sql: command, args: [] })
         })
         dbPool.releaseConnection(db);
-        console.log('db connected', Date.now() - start, 'ms');
     })
 
     connectedDbs.get(path).status = 'connected';
