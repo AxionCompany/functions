@@ -221,6 +221,10 @@ export default ({ config, modules }: any) => async (req: Request) => {
         isolateMetadata = getIsolate(isolateId);
     };
 
+    const publicFile = getPublicFile(isolateMetadata, config);
+
+    if (publicFile) return publicFile;
+
     // append lastLoadedAt for updating the module/component
     const loadedAt = isolateMetadata?.loadedAt
     const searchParams = new URLSearchParams({ ...queryParams, loadedAt }).toString();
@@ -266,7 +270,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
         // matchPath is the path to match in the URL
         const matchUrl = new URL(importUrl.href);
         matchUrl.pathname = _isolateMetadata?.matchPath;
-        console.log('matchUrl', matchUrl.href)
         isolateId = mapFilePathToIsolateId(matchUrl);
         const ext = modules.path.extname(matchUrl.pathname);
         isJSX = ext === '.jsx' || ext === '.tsx';
@@ -280,6 +283,10 @@ export default ({ config, modules }: any) => async (req: Request) => {
         // set isolate metadata
         config.debug && console.log('Setting isolate metadata', isolateId)
         setIsolate(isolateId, isolateMetadata);
+
+        const publicFile = getPublicFile(isolateMetadata, config);
+
+        if (publicFile) return publicFile;
 
     }
 
@@ -423,4 +430,23 @@ export default ({ config, modules }: any) => async (req: Request) => {
     }
 };
 
+const getPublicFile = (isolateMetadata: any, config: any) => {
 
+    if (isolateMetadata?.matchPath && config?.publicDir) {
+        const publicDirPath = new URL(config.publicDir, config?.loaderUrl).pathname;
+        const matchPathUrl = new URL(isolateMetadata.matchPath, config?.loaderUrl);
+
+        if (matchPathUrl.pathname.startsWith(publicDirPath)) {
+            return new Response(
+                isolateMetadata.content,
+                {
+                    status: 200,
+                    headers: {
+                        'Content-Type': 'text/plain',
+                        'Access-Control-Allow-Origin': '*'
+                    }
+                }
+            );
+        }
+    }
+}
