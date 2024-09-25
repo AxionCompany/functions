@@ -38,7 +38,6 @@ const resetIsolateTimer = (isolateId: string, timeout: number) => {
 const getAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
     for (let port = startPort; port <= endPort; port++) {
         try {
-            // console.log('Checking port:', port);
             const listener = Deno.listen({ port });
             listener.close();
             return port;
@@ -358,7 +357,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
         // Increment active requests counter
         const isolate = getIsolate(isolateId);
-        console.log('ISOLATE', isolate)
+
         setIsolate(isolateId, { ...isolate, activeRequests: (isolate.activeRequests || 0) + 1 });
 
         const moduleResponse = await fetch(new URL(
