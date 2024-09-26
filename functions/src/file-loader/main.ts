@@ -2,6 +2,7 @@
 import FileLoader from "./adapters/loaders/main.ts";
 import bundler from './adapters/bundler/esbuild.js';
 import transformer from "./adapters/transformers/higherOrderFunction.js";
+import mime from 'npm:mime/lite';
 
 export default ({ config, modules }: any) => {
 
@@ -87,8 +88,17 @@ export default ({ config, modules }: any) => {
       // TO DO: This is probably *not* the best idea, as there's an overhead in Deno Compiler. Think about how to improve it the future. 
       res.headers({ 'content-type': 'text/tsx' })
 
+    } else {
+      // set mime type for public files
+      setMimeType(res, matchPath);
     }
 
     return content;
   };
+}
+
+
+const setMimeType = (res: any, pathname: string) => {
+  const mimeType = mime.getType(pathname);
+  res.headers({ 'content-type': mimeType })
 }
