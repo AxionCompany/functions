@@ -36,7 +36,7 @@ Get started with Axion Functions in a few simple steps:
 
 5. **Start the application**:
    ```sh
-   deno run -A https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts
+   deno run -A https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts
    ```
 
 7. **Test your application**:
@@ -94,8 +94,8 @@ The recommended way of starting the application is by creating a `deno.json` fil
 ```json
 {
     "tasks":  {
-        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts",
-        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=https://raw.githubusercontent.com/AxionCompany/functions/release -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts"
+        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts",
+        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=https://raw.githubusercontent.com/AxionCompany/functions/main -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts"
     }
 }
 ```
@@ -132,8 +132,8 @@ If you prefer to use npm, you can create a package.json file with the following 
 ```json
 {
     "scripts": {
-        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts",
-        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=https://raw.githubusercontent.com/AxionCompany/functions/release -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/release/main.ts"
+        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts",
+        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=https://raw.githubusercontent.com/AxionCompany/functions/main -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts"
     }
 }
 ```
@@ -519,7 +519,7 @@ We provide a builtin we for using them in your project by using the adding a ref
         ...tasks
     },
     "imports": {
-        "axion-modules/":"https://raw.githubusercontent.com/AxionCompany/functions/release/functions/modules/",
+        "axion-modules/":"https://raw.githubusercontent.com/AxionCompany/functions/main/functions/modules/",
         ... other imports
     }
 }
