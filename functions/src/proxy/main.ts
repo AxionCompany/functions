@@ -309,7 +309,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
 
             if (shouldUpgrade) {
-                console.log('should upgrade isolate', isolateId)
                 reload = [reloadUrl.href, metaUrl?.href, url.origin]
                 config.debug && console.log("Upgrading isolate id", isolateId);
             } else {
