@@ -179,6 +179,10 @@ export default ({ config, modules }: any) => async (req: Request) => {
         }
     });
 
+    const publicFile = await getPublicFile(config, importUrl);
+
+    if (publicFile) return publicFile;
+
     const formattedImportUrl = formatImportUrl(importUrl);
 
     let isolateMetadata: any = {};
@@ -220,10 +224,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
         config.debug && console.log('Isolate has finished loading', isolateId);
         isolateMetadata = getIsolate(isolateId);
     };
-
-    const publicFile = getPublicFile(isolateMetadata, config);
-
-    if (publicFile) return publicFile;
 
     // append lastLoadedAt for updating the module/component
     const loadedAt = isolateMetadata?.loadedAt
@@ -290,11 +290,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
         // set isolate metadata
         config.debug && console.log('Setting isolate metadata', isolateId)
         setIsolate(isolateId, isolateMetadata);
-
-        const publicFile = getPublicFile(isolateMetadata, config);
-
-        if (publicFile) return publicFile;
-
     }
 
     clearTimeout(getIsolate(isolateId)?.timer);
@@ -437,23 +432,19 @@ export default ({ config, modules }: any) => async (req: Request) => {
     }
 };
 
-const getPublicFile = (isolateMetadata: any, config: any) => {
+const getPublicFile = async (config: any, importUrl: URL) => {
 
-    if (isolateMetadata?.matchPath && config?.publicDir) {
-        const publicDirPath = new URL(config.publicDir, config?.loaderUrl).pathname;
-        const matchPathUrl = new URL(isolateMetadata.matchPath, config?.loaderUrl);
+    if (importUrl.href && config?.publicDir) {
+        const publicDirPath = new URL(`/${config.publicDir.split('/').filter(Boolean).join('/')}`, importUrl).pathname;
 
-        if (matchPathUrl.pathname.startsWith(publicDirPath)) {
-            return new Response(
-                isolateMetadata.content,
-                {
-                    status: 200,
-                    headers: {
-                        'Content-Type': 'text/plain',
-                        'Access-Control-Allow-Origin': '*'
-                    }
-                }
-            );
+        if (importUrl.pathname.startsWith(publicDirPath)) {
+            const response = await fetch(importUrl);
+            return new Response(await response.blob(), {
+                status: response.status,
+                headers: response.headers
+            });
         }
     }
+
+    return null;
 }
