@@ -9,7 +9,6 @@ export default async (path, { ...options } = {}) => {
     const imports = { ...options?.denoConfig?.imports };
     const importMap = replaceTemplate(JSON.stringify({ imports: { ...imports, ...options?.denoConfig?.imports } }), options)
     const importMapURL = `data:application/json,${importMap}`;
-
     // Define Deno Loader Plugins;
     const [denoResolver, denoLoader] = denoPlugins({ importMapURL });
     const config = {

@@ -59,6 +59,12 @@ server({
         denoConfigUrl.password = password;
         urlWithBasicAuth.password = password;
       };
+
+      axionConfigUrl.search = '';
+      denoConfigUrl.search = '';
+      axionConfigUrl.pathname = '/axion.config.json';
+      denoConfigUrl.pathname = '/deno.json';
+
       let axionConfig = axionConfigs.get(axionConfigUrl.origin);
       let denoConfig = denoConfigs.get(denoConfigUrl.origin);
 
@@ -79,7 +85,7 @@ server({
         }, responseMock);
 
         axionConfig = JSON.parse(axionConfig || '{}')
-        axionConfigs.set(axionConfigUrl.origin, axionConfig);
+        axionConfigs.set(axionConfigUrl.href, axionConfig);
       }
 
       if (!denoConfig) {
@@ -109,7 +115,7 @@ server({
 
         denoConfig.imports = { ...axionDenoConfig.imports, ...denoConfig.imports };
         denoConfig.scopes = { ...axionDenoConfig.scopes, ...denoConfig.scopes };
-        denoConfigs.set(denoConfigUrl.origin, denoConfig);
+        denoConfigs.set(denoConfigUrl.href, denoConfig);
 
       }
 
