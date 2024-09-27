@@ -7,6 +7,8 @@ async function createSubprocessIsolate({ isolateId, projectId, reload, modules, 
 
     const projectPath = `${Deno.cwd()}/data/${projectId}`;
 
+    console.log('RUN OPTIONS for subprocess', projectId, 'isolate id', isolateId,'\n\n', ...runOptions({ reload, ...config.permissions }, { config: { projectId, projectPath, ...config }, modules, variables: env }))
+
     const command = new Deno.Command(Deno.execPath(), {
         env: { DENO_DIR: config.cacheDir || `./cache/.deno` },
         cwd: `./data/${projectId}`,
