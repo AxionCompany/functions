@@ -514,7 +514,7 @@ export default (args) => {
                         sql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
                     }
                     if (options?.sort) {
-                        const sortClause = Object.entries(options.sort).map(([k, v]) => `${k} ${v === 1 ? "ASC" : "DESC"}`).join(", ");
+                        const sortClause = Object.entries(options.sort).map(([k, v]) => `${key}.${k} ${v === 1 ? "ASC" : "DESC"}`).join(", ");
                         sql += ` ORDER BY ${sortClause}`;
                     }
                     if (options?.limit) {
@@ -591,7 +591,7 @@ export default (args) => {
                         sql += ` FROM ${key} ${whereClauses ? `WHERE ${whereClauses}` : ""}`;
                     }
                     if (options?.sort) {
-                        const sortClause = Object.entries(options.sort).map(([k, v]) => `${k} ${v === 1 ? "ASC" : "DESC"}`).join(", ");
+                        const sortClause = Object.entries(options.sort).map(([k, v]) => `${key}.${k} ${v === 1 ? "ASC" : "DESC"}`).join(", ");
                         sql += ` ORDER BY ${sortClause}`;
                     }
                     if (groupClauses?.length) {
