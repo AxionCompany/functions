@@ -21,6 +21,8 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
         ...customPermissions,
     };
 
+    console.log("IMPORT MAP", `data:application/json,${modules.template(JSON.stringify({ imports: config?.denoConfig?.imports, scope: config?.denoConfig?.scope }), variables)}`,);
+
     if (config.isolateType === 'subprocess') {
         permissions = Object
             .entries(permissions)
