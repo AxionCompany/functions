@@ -241,7 +241,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
             redirect: "follow",
             headers: { "content-type": "application/json" },
             method: "POST",
-            body: JSON.stringify({ denoConfig: config?.denoConfig })
+            body: JSON.stringify({ denoConfig: config?.denoConfig, FILE_LOADER_URL: fileLoaderUrl.href })
         });
 
         if (!isolateMetadataRes.ok) {
