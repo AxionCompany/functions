@@ -183,6 +183,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
     fileLoaderUrl.pathname = '';
     fileLoaderUrl.search = '';
 
+    console.log('fileLoaderUrl', fileLoaderUrl.href);
+
     const publicFile = await getPublicFile(config, importUrl);
 
     if (publicFile) return publicFile;
@@ -241,7 +243,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
             redirect: "follow",
             headers: { "content-type": "application/json" },
             method: "POST",
-            body: JSON.stringify({ denoConfig: config?.denoConfig, FILE_LOADER_URL: fileLoaderUrl.href })
+            body: JSON.stringify({ denoConfig: config?.denoConfig, IMPORT_URL: fileLoaderUrl.href })
         });
 
         if (!isolateMetadataRes.ok) {
@@ -337,7 +339,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
                 type: config.isolateType,
                 reload,
                 permissions: config.permissions,
-                env: { ...isolateMetadata.variables, ...config.variables, FILE_LOADER_URL: fileLoaderUrl.href }
+                env: { ...isolateMetadata.variables, ...config.variables, IMPORT_URL: fileLoaderUrl.href }
             })
 
             if (config.isolateType === 'worker') {
