@@ -179,6 +179,10 @@ export default ({ config, modules }: any) => async (req: Request) => {
         }
     });
 
+    const fileLoaderUrl = new URL(importUrl.href);
+    fileLoaderUrl.pathname = '';
+    fileLoaderUrl.search = '';
+
     const publicFile = await getPublicFile(config, importUrl);
 
     if (publicFile) return publicFile;
@@ -333,7 +337,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
                 type: config.isolateType,
                 reload,
                 permissions: config.permissions,
-                env: { ...isolateMetadata.variables, ...config.variables }
+                env: { ...isolateMetadata.variables, ...config.variables, FILE_LOADER_URL: fileLoaderUrl.href }
             })
 
             if (config.isolateType === 'worker') {
