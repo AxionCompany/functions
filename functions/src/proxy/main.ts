@@ -179,7 +179,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
         }
     });
 
-    const fileLoaderUrl = importUrl;
+    const fileLoaderUrl = new URL(importUrl.href);
     fileLoaderUrl.pathname = '';
     fileLoaderUrl.search = '';
 
