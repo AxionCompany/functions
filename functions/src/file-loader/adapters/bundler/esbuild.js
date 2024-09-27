@@ -5,9 +5,12 @@ import replaceTemplate from "../../../utils/template.ts";
 
 export default async (path, { ...options } = {}) => {
 
+    const IMPORT_URL = new URL(path.href);
+    IMPORT_URL.pathname = '';
+    IMPORT_URL.search = '';
     // Define Import Map;
     const imports = { ...options?.denoConfig?.imports };
-    const importMap = replaceTemplate(JSON.stringify({ imports: { ...imports, ...options?.denoConfig?.imports } }), options)
+    const importMap = replaceTemplate(JSON.stringify({ imports: { ...imports, ...options?.denoConfig?.imports } }), { ...options, IMPORT_URL: IMPORT_URL.href })
     const importMapURL = `data:application/json,${importMap}`;
     // Define Deno Loader Plugins;
     const [denoResolver, denoLoader] = denoPlugins({ importMapURL });
