@@ -122,13 +122,16 @@ export default (
         }
 
         // Get Body
-        const body = await req
+        let body
+        const data = await req
           ?.text()
           ?.then((_body: any) => {
+            body = _body;
             try {
-              return JSON.parse(_body);
+              const _data = JSON.parse(_body);
+              return _data;
             } catch (_) {
-              return _body;
+              return { data: _body };
             }
           })
           ?.catch((_: Error) => (null));
@@ -159,11 +162,6 @@ export default (
             pathMatch = key;
             break;
           }
-        }
-
-        let data: any;
-        if (body) {
-          data = typeof body === "string" ? { data: body } : { ...body };
         }
 
         let sendOptions: any
@@ -203,7 +201,7 @@ export default (
         const responseFn = responseCallback(__requestId__, enqueue);
 
         handler(
-          { url, subdomain, pathname, pathParams, method, queryParams, data, formData, headers, __requestId__ },
+          { url, subdomain, pathname, pathParams, method, queryParams, data, body, formData, headers, __requestId__ },
           responseFn,
         ).then(responseFn.send).catch(responseFn.error);
 
