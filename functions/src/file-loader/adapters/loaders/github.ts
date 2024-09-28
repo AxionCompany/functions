@@ -37,7 +37,7 @@ export default ({ config, modules }: any) => {
     const gitInfo = await gitInfoPromise;
 
     // get github repository variables
-    const repoVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/actions/variables`;
+    const repoVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/actions/variables?per_page=30`;
     const repoVariablesPromise = withCache(
       (url: string, options: any) => fetch(url, options).then(async res => res.status === 200 ? res.json() : ''),
       { keys: ['github', repoVariablesUrl], cachettl: config.cachettl, useCache: config.useCache, },
@@ -49,7 +49,7 @@ export default ({ config, modules }: any) => {
     // get github environment variables
     let environmetVariablesPromises;
     if (gitInfo.environment) {
-      const environmentVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/environments/${gitInfo.environment}/variables`;
+      const environmentVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/environments/${gitInfo.environment}/variables?per_page=30`;
       environmetVariablesPromises = withCache(
         (url: string, options: any) => fetch(url, options).then(async res => res.status === 200 ? res.json() : ''),
         { keys: ['github', environmentVariablesUrl], cachettl: config.cachettl, useCache: config.useCache, },
