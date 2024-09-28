@@ -46,7 +46,7 @@ export default async (config: any) => {
       afterRun && Object.assign(afterRun, dependencies) && (globalThis._afterRun = afterRun);
 
       // get the data
-      const { method, params, headers: requestHeaders, __requestId__ } = data;
+      const { method, body, params, headers: requestHeaders, __requestId__ } = data;
 
       // get the config
       moduleExports.config = moduleExports.config || {};
@@ -65,7 +65,7 @@ export default async (config: any) => {
       }
 
       // merge path params
-      const reqData = { headers: requestHeaders, ...params, __requestId__ };
+      const reqData = { headers: requestHeaders, body, ...params, __requestId__ };
 
       // execute the module
       const workerRes = await moduleInstance({ mod, params: reqData, dependencies, url, isJSX, importUrl, functionsDir }, response);
@@ -93,7 +93,7 @@ const moduleInstance: any = async (
   let workerRes: any;
   try {
 
-    const { headers, __requestId__, ..._params } = params;
+    const { headers, __requestId__, body, ..._params } = params;
     params = _params;
 
     if (dependencies?.config?.isFactory) {
@@ -102,7 +102,7 @@ const moduleInstance: any = async (
         ...params,
       }, response);
     } else {
-      Object.assign(mod, { ...dependencies, headers, __requestId__, url });
+      Object.assign(mod, { ...dependencies, body, headers, __requestId__, url });
     }
 
     if (isJSX) {
@@ -117,7 +117,7 @@ const moduleInstance: any = async (
         },
         ({ children }: any) => children
       );
-      const { headers, ..._pageParams } = params;
+      const { headers: _1, ..._pageParams } = params;
       // render the JSX component
       const html = dependencies?.ReactDOMServer.renderToString(
         dependencies.React.createElement(
