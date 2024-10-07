@@ -7,13 +7,15 @@ export default ({ code, url }) => {
 
     // HOF for wrapping as a string
     const withWrapperCode = `
-const withWrapper = (name, fn) => {
-  if (typeof fn !== 'function') {
-    return fn;
+function withWrapper (name, _fn) {
+  if (typeof _fn !== 'function') {
+    return _fn;
   }
-  const mod = (...args) => {
+
+  function mod (...args) {
     const willUseHook = (globalThis._beforeRun || globalThis._afterRun) && mod.__requestId__;
-    Object.assign(fn, mod);
+    const fn=_fn.bind({...this, ...mod});
+    Object.assign(_fn, mod);
 
     const executionId = crypto.randomUUID();
     willUseHook && globalThis._beforeRun && globalThis._beforeRun({
@@ -74,6 +76,7 @@ const withWrapper = (name, fn) => {
     }
     return result
   }
+  mod.bind(this);
   return mod
 };
 `;
