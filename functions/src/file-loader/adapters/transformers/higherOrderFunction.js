@@ -42,7 +42,7 @@ function withWrapper (name, _fn) {
             properties: { ...mod },
             output: resolved
           });
-          Object.assign(mod, fn);
+          Object.assign(mod, _fn);
           return resolved;
         }).catch((error) => {
           const duration = Date.now() - startTime;
@@ -57,11 +57,11 @@ function withWrapper (name, _fn) {
             output: error,
             error: true
           });
-          Object.assign(mod, fn);
+          Object.assign(mod, _fn);
           throw error;
         });
     } else {
-      Object.assign(mod, fn);
+      Object.assign(mod, _fn);
       const duration = Date.now() - startTime;
       willUseHook && globalThis._afterRun && globalThis._afterRun({
         url: "${url.href}",
