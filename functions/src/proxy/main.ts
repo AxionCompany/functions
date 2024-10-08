@@ -300,7 +300,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
     clearTimeout(getIsolate(isolateId)?.timer);
 
-    const shouldUpgrade = !isolateMetadata?.loadedAt || (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
+    const shouldUpgrade = isolateMetadata?.loadedAt && (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
     if ((!['up', 'loading'].includes(isolateMetadata?.status)) || shouldUpgrade) {
         setIsolate(isolateId, { ...isolateMetadata, status: 'loading' });
         try {
