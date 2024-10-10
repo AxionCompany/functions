@@ -121,7 +121,7 @@ export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir }
       env,
       ...dependencies,
       LayoutModules,
-      indexHtml: indexHtmlFiles?.slice(-1)?.[0],
+      indexHtml: indexHtmlFiles?.slice(-1)?.[0] || dependencies?.indexHtml,
       layoutUrls: bundledLayouts?.map(file => file.path?.replaceAll(`${functionsDir}/`, '')),
       bundledLayouts: bundledLayouts?.map(file => file.content),
       bundledModule: bundledModule?.content

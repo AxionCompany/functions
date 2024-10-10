@@ -43,15 +43,16 @@ export default ({ config, modules }: any) => {
 
       const bundleUrl = url
       bundleUrl.pathname = matchPath;
+      // const { bundle: _, ...queryParamsWithoutBundle } = queryParams;
+      bundleUrl.search = ''//new URLSearchParams(queryParamsWithoutBundle).toString();
+      const bustCache = data?.bustCache;
 
-      const { bundle: _, ...queryParamsWithoutBundle } = queryParams;
-      bundleUrl.search = new URLSearchParams(queryParamsWithoutBundle).toString();
-      const bundleContent = await bundler(
+      const bundleContent = await modules.withCache(
+        bundler,
+        { useCache: config.useCache, bustCache, keys: [bundleUrl.href], cachettl: 1000 * 60 * 60 * 24 },
         bundleUrl,
         { shared: shared?.split(','), ...variables, ...data, ...params, environment: config.environment }
-      ).catch((err: any) => {
-        console.log(`Error trying to bundle ${bundleUrl.href}: ${err.toString()}`);
-      });
+      );
 
       if (bundleContent) {
         return { content: bundleContent, params, path, matchPath };;

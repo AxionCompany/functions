@@ -183,8 +183,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
     fileLoaderUrl.pathname = '';
     fileLoaderUrl.search = '';
 
-    console.log('fileLoaderUrl', fileLoaderUrl.href);
-
     const publicFile = await getPublicFile(config, importUrl);
 
     if (publicFile) return publicFile;
@@ -236,14 +234,19 @@ export default ({ config, modules }: any) => async (req: Request) => {
     const searchParams = new URLSearchParams({ ...queryParams, loadedAt }).toString();
     importUrl.search = searchParams
 
+    let bustCache = isolateMetadata?.loadedAt && (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
     if (!isolateMetadata || queryParams.bundle || !isExactMatch) {
         config.debug && console.log('Isolate not found. Importing metadata', importUrl.href);
-
+        
         const isolateMetadataRes = await fetch(importUrl.href, {
             redirect: "follow",
             headers: { "content-type": "application/json" },
             method: "POST",
-            body: JSON.stringify({ denoConfig: config?.denoConfig, IMPORT_URL: fileLoaderUrl.href })
+            body: JSON.stringify({ 
+                denoConfig: config?.denoConfig, 
+                IMPORT_URL: fileLoaderUrl.href,
+                bustCache
+            })
         });
 
         if (!isolateMetadataRes.ok) {
@@ -300,8 +303,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
     clearTimeout(getIsolate(isolateId)?.timer);
 
-    const shouldUpgrade = isolateMetadata?.loadedAt && (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
-    if ((!['up', 'loading'].includes(isolateMetadata?.status)) || shouldUpgrade) {
+    bustCache = isolateMetadata?.loadedAt && (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
+    if ((!['up', 'loading'].includes(isolateMetadata?.status)) || bustCache) {
         setIsolate(isolateId, { ...isolateMetadata, status: 'loading' });
         try {
             console.log("Spawning isolate", isolateId);
@@ -314,7 +317,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
             reloadUrl.pathname = '';
 
 
-            if (shouldUpgrade) {
+            if (bustCache) {
                 reload = [reloadUrl.href, metaUrl?.href, url.origin]
                 config.debug && console.log("Upgrading isolate id", isolateId);
             } else {
@@ -338,6 +341,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
                 denoConfig: config.denoConfig,
                 type: config.isolateType,
                 reload,
+                bustCache,
                 permissions: config.permissions,
                 env: { ...isolateMetadata.variables, ...config.variables, IMPORT_URL: fileLoaderUrl.href }
             })

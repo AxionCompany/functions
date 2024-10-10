@@ -9,11 +9,11 @@ const tryParseJSON = (str: any) => {
 };
 
 export default async (config: any) => {
-  let { loader, functionsDir, dependencies: remoteDependencies, url, importUrl, env, isJSX } = config || {};
+  let { loader, functionsDir, dependencies: remoteDependencies, url, importUrl, env, isJSX, bustCache } = config || {};
   if (!loader) loader = moduleLoader;
   // load the module
   const { mod: defaultModule, GET, POST, PUT, DELETE, matchedPath, middlewares, beforeRun, afterRun, dependencies, ...moduleExports } = await loader(
-    { importUrl, url, env, dependencies: remoteDependencies, isJSX, functionsDir },
+    { importUrl, url, env, dependencies: remoteDependencies, isJSX, functionsDir, bustCache },
   );
 
   const execute = async (
