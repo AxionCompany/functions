@@ -10,9 +10,6 @@ export default async (path, { ...options } = {}) => {
     IMPORT_URL.search = '';
 
     const uuid = crypto.randomUUID();
-    console.log('BUNDLER LOGS...', uuid)
-    console.log('IMPORT_URL', uuid, IMPORT_URL.href);
-    console.log('BUNDLE_URL', uuid, path.href);
     path.search = new URLSearchParams({ v: crypto.randomUUID() }).toString();
 
     // Define Import Map;
@@ -25,7 +22,6 @@ export default async (path, { ...options } = {}) => {
         plugins: [
             denoResolver,
             denoLoader,
-            // refreshServer
         ],
         bundle: true,
         format: "esm",
@@ -54,21 +50,3 @@ export default async (path, { ...options } = {}) => {
     return result?.outputFiles?.[0]?.text;
 };
 
-
-// const refreshServer = {
-//     name: "refresh-server",
-//     setup(build) {
-//         build.onEnd((result) => {
-//             if (build.initialOptions.incremental) {
-//                 console.log(`refresh-server: Clearing Cache for ${build.initialOptions.entryPoints.join(", ")}...`);
-//                 // Remove all items from the cache (this will force node to reload all of the built artifacts)
-//                 Object.keys(require.cache).forEach(function (key) {
-//                     const resolvedPath = require.resolve(key);
-//                     if (resolvedPath.includes(build.initialOptions.outdir)) {
-//                         delete require.cache[key];
-//                     }
-//                 });
-//             }
-//         });
-//     },
-// };
