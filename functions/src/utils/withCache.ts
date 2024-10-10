@@ -59,13 +59,13 @@ const Cache = async (projectId: string, prefix = '') => {
         set(kv, ['cache', ...keys], new TextEncoder().encode(strData), { expireIn: options?.cachettl });
     }
 
-    return async (cb: Function, config: { useCache: boolean | undefined, keys: string[], cachettl: number | undefined }, ...params: any[]) => {
+    return async (cb: Function, config: { bustCache: boolean | undefined, useCache: boolean | undefined, keys: string[], cachettl: number | undefined }, ...params: any[]) => {
 
         config.useCache = config.useCache !== false;
         config.cachettl = config.cachettl || 1000 * 60 * 10; // 10 minutes
 
         try {
-            if (config.useCache) {
+            if (config.useCache && !config.bustCache) {
                 const cachedData = await getCache(config.keys);
                 if (cachedData) return cachedData;
             }

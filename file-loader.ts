@@ -137,6 +137,7 @@ server({
             dirEntrypoint: env.DIR_ENTRYPOINT || "index",
             debug,
             useCache,
+            bustCacheAfter: env.BUST_CACHE_AFTER,
             cachettl: Number(env.CACHE_TTL) || 1000 * 60 * 10,
             loaderType: provider || env.DEFAULT_LOADER_TYPE || 'local', //(gitInfo?.owner && gitInfo?.repo) ? 'github' : (env.DEFAULT_LOADER_TYPE || "local"),
             owner: org || env.GIT_OWNER,

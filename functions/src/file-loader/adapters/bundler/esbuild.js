@@ -8,6 +8,13 @@ export default async (path, { ...options } = {}) => {
     const IMPORT_URL = new URL(path.href);
     IMPORT_URL.pathname = '';
     IMPORT_URL.search = '';
+
+    const uuid = crypto.randomUUID();
+    console.log('BUNDLER LOGS...', uuid)
+    console.log('IMPORT_URL', uuid, IMPORT_URL.href);
+    console.log('BUNDLE_URL', uuid, path.href);
+    path.search = new URLSearchParams({ v: crypto.randomUUID() }).toString();
+
     // Define Import Map;
     const imports = { ...options?.denoConfig?.imports };
     const importMap = replaceTemplate(JSON.stringify({ imports: { ...imports, ...options?.denoConfig?.imports } }), { ...options, IMPORT_URL: IMPORT_URL.href })
@@ -18,7 +25,7 @@ export default async (path, { ...options } = {}) => {
         plugins: [
             denoResolver,
             denoLoader,
-            refreshServer
+            // refreshServer
         ],
         bundle: true,
         format: "esm",
@@ -48,20 +55,20 @@ export default async (path, { ...options } = {}) => {
 };
 
 
-const refreshServer = {
-    name: "refresh-server",
-    setup(build) {
-        build.onEnd((result) => {
-            if (build.initialOptions.incremental) {
-                console.log(`refresh-server: Clearing Cache for ${build.initialOptions.entryPoints.join(", ")}...`);
-                // Remove all items from the cache (this will force node to reload all of the built artifacts)
-                Object.keys(require.cache).forEach(function (key) {
-                    const resolvedPath = require.resolve(key);
-                    if (resolvedPath.includes(build.initialOptions.outdir)) {
-                        delete require.cache[key];
-                    }
-                });
-            }
-        });
-    },
-};
+// const refreshServer = {
+//     name: "refresh-server",
+//     setup(build) {
+//         build.onEnd((result) => {
+//             if (build.initialOptions.incremental) {
+//                 console.log(`refresh-server: Clearing Cache for ${build.initialOptions.entryPoints.join(", ")}...`);
+//                 // Remove all items from the cache (this will force node to reload all of the built artifacts)
+//                 Object.keys(require.cache).forEach(function (key) {
+//                     const resolvedPath = require.resolve(key);
+//                     if (resolvedPath.includes(build.initialOptions.outdir)) {
+//                         delete require.cache[key];
+//                     }
+//                 });
+//             }
+//         });
+//     },
+// };
