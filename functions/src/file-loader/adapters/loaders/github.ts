@@ -48,6 +48,7 @@ export default ({ config, modules }: any) => {
     const repoVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/actions/variables?per_page=30`;
     const repoVariablesPromise = withCache(
       (url: string, options: any) => fetch(url, options).then(async res => {
+        console.log('Fetching repo variables', url);
         if (res.status === 200) {
           return res.json()
         } else {
@@ -67,6 +68,7 @@ export default ({ config, modules }: any) => {
       const environmentVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/environments/${gitInfo.environment}/variables?per_page=30`;
       environmetVariablesPromises = withCache(
         (url: string, options: any) => fetch(url, options).then(async res => {
+          console.log('Fetching environment variables', url);
           if (res.status === 200) {
             return res.json()
           } else {
@@ -97,6 +99,7 @@ export default ({ config, modules }: any) => {
 
     const responsePromise = withCache(
       (url: string, options: any) => fetch(url, options).then(async res => {
+        console.log('Fetching file', url);
         if (res.status === 200) {
           return res.json()
         } else {
@@ -128,6 +131,7 @@ export default ({ config, modules }: any) => {
 
     const response = await withCache(
       (url: string, options: any) => fetch(url, options).then(async res => {
+        console.log('Fetching directory', url);
         if (res.status === 200) {
           return res.json()
         } else {
