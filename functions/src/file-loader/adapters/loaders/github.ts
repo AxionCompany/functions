@@ -2,8 +2,6 @@ export default ({ config, modules }: any) => {
 
   const withCache = modules.withCache;
 
-  console.log('config', config)
-
   const GITHUB_API_URL = "https://api.github.com";
 
   const headers: any = {}
@@ -22,8 +20,6 @@ export default ({ config, modules }: any) => {
       url,
       { headers }
     );
-
-    console.log('branchData', branchData)
 
     const branchUrl = branchData?._links?.self;
     const exactRepo = branchUrl?.split('/').slice(-3, -2)?.[0];
