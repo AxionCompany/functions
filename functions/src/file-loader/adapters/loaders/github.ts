@@ -17,10 +17,8 @@ export default ({ config, modules }: any) => {
       (url: string, options: any) => fetch(url, options).then(async res => {
         if (res.status === 200) {
           const response = await res.json();
-          console.log({ response });
           return response;
         } else {
-          console.log(url, await res.json());
           return {}
         }
       }),
@@ -29,7 +27,6 @@ export default ({ config, modules }: any) => {
       { headers }
     );
 
-    console.log({ url, branchData });
 
     const branchUrl = branchData?._links?.self;
     const exactRepo = branchUrl?.split('/').slice(-3, -2)?.[0];
