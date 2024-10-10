@@ -13,6 +13,8 @@ export default ({ config, modules }: any) => {
     const { bundle: shouldBundle, shared, ...searchParams } = queryParams;
     // check if headers type is application/json
     const contentTypeHeaders = headers["content-type"];
+    const bustCache = data?.bustCache;
+    config.bustCache = bustCache;
 
     const isImport =
       !(contentTypeHeaders && contentTypeHeaders?.includes("application/json"));
@@ -45,7 +47,6 @@ export default ({ config, modules }: any) => {
       bundleUrl.pathname = matchPath;
       // const { bundle: _, ...queryParamsWithoutBundle } = queryParams;
       bundleUrl.search = ''//new URLSearchParams(queryParamsWithoutBundle).toString();
-      const bustCache = data?.bustCache;
 
       const bundleContent = await modules.withCache(
         bundler,
