@@ -9,13 +9,20 @@ export default ({ config, modules }: any) => {
     headers.Authorization = `token ${config.apiKey}`;
   };
 
+
   const getExactRepoInfo = async (owner: string, repo: string, branch: string = 'main', environment: string = 'production') => {
 
     const url = `${GITHUB_API_URL}/repos/${owner}/${repo}/branches/${branch}`;
 
-    
     const branchData = await withCache(
-      (url: string, options: any) => fetch(url, options).then(async res => res.status === 200 ? res.json() : (console.log(url, await res.json()) && '')),
+      (url: string, options: any) => fetch(url, options).then(async res => {
+        if (res.status === 200) {
+          return res.json()
+        } else {
+          console.log(url, await res.json());
+          return {}
+        }
+      }),
       { keys: ['github', url], cachettl: config.cachettl, useCache: config.useCache, },
       url,
       { headers }
@@ -40,8 +47,15 @@ export default ({ config, modules }: any) => {
     // get github repository variables
     const repoVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/actions/variables?per_page=30`;
     const repoVariablesPromise = withCache(
-      (url: string, options: any) => fetch(url, options).then(async res => res.status === 200 ? res.json() : (console.log(url, await res.json()) && '')),
-      { keys: ['github', repoVariablesUrl], cachettl: config.cachettl, useCache: config.useCache, },
+      (url: string, options: any) => fetch(url, options).then(async res => {
+        if (res.status === 200) {
+          return res.json()
+        } else {
+          console.log(url, await res.json());
+          return []
+        }
+      }),
+      { keys: ['github', repoVariablesUrl], bustCache: config.bustCache, cachettl: config.cachettl, useCache: config.useCache, },
       repoVariablesUrl,
       { headers }
     );
@@ -52,8 +66,15 @@ export default ({ config, modules }: any) => {
     if (gitInfo.environment) {
       const environmentVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/environments/${gitInfo.environment}/variables?per_page=30`;
       environmetVariablesPromises = withCache(
-        (url: string, options: any) => fetch(url, options).then(async res => res.status === 200 ? res.json() : (console.log(url, await res.json()) && '')),
-        { keys: ['github', environmentVariablesUrl], cachettl: config.cachettl, useCache: config.useCache, },
+        (url: string, options: any) => fetch(url, options).then(async res => {
+          if (res.status === 200) {
+            return res.json()
+          } else {
+            console.log(url, await res.json());
+            return []
+          }
+        }),
+        { keys: ['github', environmentVariablesUrl], bustCache: config.bustCache, cachettl: config.cachettl, useCache: config.useCache, },
         environmentVariablesUrl,
         { headers }
       );
@@ -75,8 +96,19 @@ export default ({ config, modules }: any) => {
     const url = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`;
 
     const responsePromise = withCache(
-      (url: string, options: any) => fetch(url, options).then(async res => res.status === 200 ? res.json() : (console.log(url, await res.json()) && '')),
-      { keys: ['github', url], cachettl: config.cachettl, useCache: config.useCache, },
+      (url: string, options: any) => fetch(url, options).then(async res => {
+        if (res.status === 200) {
+          return res.json()
+        } else {
+          console.log(url, await res.json());
+          return {
+            content: {
+              error: 'File not found'
+            }
+          }
+        }
+      }),
+      { keys: ['github', url], bustCache: config.bustCache, cachettl: config.cachettl, useCache: config.useCache, },
       url,
       { headers }
     )
@@ -95,8 +127,15 @@ export default ({ config, modules }: any) => {
     const url = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`;
 
     const response = await withCache(
-      (url: string, options: any) => fetch(url, options).then(async res => res.status === 200 ? res.json() : (console.log(url, await res.json()) && '')),
-      { keys: ['github', url], cachettl: config.cachettl, useCache: config.useCache, },
+      (url: string, options: any) => fetch(url, options).then(async res => {
+        if (res.status === 200) {
+          return res.json()
+        } else {
+          console.log(url, await res.json());
+          return []
+        }
+      }),
+      { keys: ['github', url], bustCache: config.bustCache, cachettl: config.cachettl, useCache: config.useCache, },
       url,
       { headers }
     )
