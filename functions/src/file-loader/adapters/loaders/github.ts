@@ -13,20 +13,23 @@ export default ({ config, modules }: any) => {
   const getExactRepoInfo = async (owner: string, repo: string, branch: string = 'main', environment: string = 'production') => {
 
     const url = `${GITHUB_API_URL}/repos/${owner}/${repo}/branches/${branch}`;
-
     const branchData = await withCache(
       (url: string, options: any) => fetch(url, options).then(async res => {
         if (res.status === 200) {
-          return res.json()
+          const response = await res.json();
+          console.log({ response });
+          return response;
         } else {
           console.log(url, await res.json());
           return {}
         }
       }),
-      { keys: ['github', url], cachettl: config.cachettl, useCache: config.useCache, },
+      { keys: ['github', url], bustCache: config.bustCache, cachettl: config.cachettl, useCache: config.useCache, },
       url,
       { headers }
     );
+
+    console.log({ url, branchData });
 
     const branchUrl = branchData?._links?.self;
     const exactRepo = branchUrl?.split('/').slice(-3, -2)?.[0];
