@@ -9,7 +9,6 @@ export default ({ config, modules }: any) => {
     headers.Authorization = `token ${config.apiKey}`;
   };
 
-
   const getExactRepoInfo = async (owner: string, repo: string, branch: string = 'main', environment: string = 'production') => {
 
     const url = `${GITHUB_API_URL}/repos/${owner}/${repo}/branches/${branch}`;
@@ -99,7 +98,6 @@ export default ({ config, modules }: any) => {
 
     const responsePromise = withCache(
       (url: string, options: any) => fetch(url, options).then(async res => {
-        console.log('Fetching file', url);
         if (res.status === 200) {
           return res.json()
         } else {

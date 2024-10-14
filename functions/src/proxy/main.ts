@@ -106,8 +106,7 @@ export const cleanupIsolates = (): void => {
 
 export default ({ config, modules }: any) => async (req: Request) => {
 
-    if (!config?.isolateType) config.isolateType = config.env.ISOLATE_TYPE || 'subprocess';
-
+    // DEPENDENCIES FN
     const formatImportUrl = config.formatImportUrl || ((importUrl: URL) => {
         const pathname = importUrl.pathname;
         const ext = modules.path.extname(pathname);
@@ -123,7 +122,6 @@ export default ({ config, modules }: any) => async (req: Request) => {
     });
 
     const mapFilePathToIsolateId = ((_fileUrl: URL) => {
-
         const customMapperId = config.mapFilePathToIsolateId ||
             (({ formattedFileUrl, fileUrl }: { fileUrl: string, formattedFileUrl: string }) => {
                 const _url = new URL(fileUrl);
@@ -133,7 +131,8 @@ export default ({ config, modules }: any) => async (req: Request) => {
             })
 
         // Format File Path
-        const filePathUrl = new URL(_fileUrl)
+        const filePathUrl = new URL(_fileUrl);
+        filePathUrl.host = url.host;
         // remove search params from the URL
         filePathUrl.search = '';
 
@@ -160,12 +159,11 @@ export default ({ config, modules }: any) => async (req: Request) => {
             cachedFileUrls.set(filePathUrl.href, { isolateId, urls: [formattedImportUrl], isJSX });
             return isolateId
         }
-
     })
 
+    if (!config?.isolateType) config.isolateType = config.env.ISOLATE_TYPE || 'subprocess';
     const url = new URL(req.url);
-    const queryParams = Object.fromEntries(url.searchParams.entries());
-
+    const queryParams = Object.fromEntries(url.searchParams.entries());  
     const importUrl = new URL(modules.path.join(config.loaderUrl, config.functionsDir))
     importUrl.pathname = modules.path.join(importUrl.pathname, url.pathname).split('/').filter(Boolean).join('/');
     importUrl.search = url.search;
@@ -237,13 +235,13 @@ export default ({ config, modules }: any) => async (req: Request) => {
     let bustCache = isolateMetadata?.loadedAt && (isolateMetadata?.loadedAt <= config?.shouldUpgradeAfter);
     if (!isolateMetadata || queryParams.bundle || !isExactMatch) {
         config.debug && console.log('Isolate not found. Importing metadata', importUrl.href);
-        
+
         const isolateMetadataRes = await fetch(importUrl.href, {
             redirect: "follow",
             headers: { "content-type": "application/json" },
             method: "POST",
-            body: JSON.stringify({ 
-                denoConfig: config?.denoConfig, 
+            body: JSON.stringify({
+                denoConfig: config?.denoConfig,
                 IMPORT_URL: fileLoaderUrl.href,
                 bustCache
             })
