@@ -68,13 +68,18 @@ export default async (config: any) => {
       const reqData = { headers: requestHeaders, body, ...params, __requestId__ };
 
       // execute the module
-      const workerRes = await moduleInstance({ mod, params: reqData, dependencies, url, isJSX, importUrl, functionsDir }, response);
+      const workerRes = await moduleInstance({ mod, params: reqData, dependencies, url, isJSX, importUrl, functionsDir, bustCache }, response);
+
+
+      // disable bustCache after the first request
+      bustCache = false
 
       // try parsing the response as JSON
       const chunk = tryParseJSON(workerRes);
 
       // return the response
       return chunk;
+
 
     } catch (err) {
 
@@ -85,8 +90,8 @@ export default async (config: any) => {
 };
 
 const moduleInstance: any = async (
-  { mod, params, dependencies, url, importUrl, isJSX, functionsDir }
-    : { mod: Function, params: any, dependencies: any, url: string, importUrl: string, isJSX: boolean; functionsDir: string },
+  { mod, params, dependencies, url, importUrl, isJSX, functionsDir, bustCache }
+    : { mod: Function, params: any, dependencies: any, url: string, importUrl: string, isJSX: boolean; functionsDir: string, bustCache: boolean },
   response: any,
 ) => {
 
@@ -149,7 +154,7 @@ const moduleInstance: any = async (
         // async build css with all elements and dependent components
         completeCss = dependencies.withCache(
           dependencies.processCss,
-          { keys: ['css', importUrl], expireIn: 1000 * 60 },
+          { keys: ['css', importUrl], useCache: true, bustCache, cachettl: 1000 * 60 * 60 * 24 },
           dependencies.postCssConfig, compiledHtml, importUrl
         )
       }

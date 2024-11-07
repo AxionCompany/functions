@@ -1,4 +1,3 @@
-
 import { toSqlQuery, toSqlWrite } from "./sqlUtils.js";
 import { Validator as SchemaValidator, getDotNotationObject } from "../../connectors/validator.ts";
 // import Database from 'npm:libsql@0.4.0-pre.10/promise'; // Using the promise api. 
@@ -7,7 +6,7 @@ import { createClient } from "npm:@libsql/client/node";
 import _get from 'npm:lodash.get';
 import _has from 'npm:lodash.has';
 
-const DB_POOL_SIZE = 5; // Adjust this value based on your needs
+const DB_POOL_SIZE = 1;
 
 class DatabasePool {
     constructor(url, options) {
@@ -169,42 +168,80 @@ const writeQueues = new Map();
 const maxRetries = 3;
 
 const processQueue = async () => {
-
-    for (const [dbPath, { queue }] of writeQueues) {
-
-        if (queue.length === 0 || !connectedDbs.has(dbPath)) return;
+    for (const [dbPath, queueData] of writeQueues) {
+        // Skip if queue is empty, db not connected, or already processing
+        if (queueData.queue.length === 0 || !connectedDbs.has(dbPath) || queueData.isProcessing) {
+            continue;
+        }
 
         const dbPool = connectedDbs.get(dbPath).dbPool;
         const db = await dbPool.getConnection();
-        try {
 
-            const batch = queue.map(({ sql, params, id, resolve, reject }) => ({ sql, args: params, id, resolve, reject }));
+        let batch;
+
+        try {
+            // Set processing flag
+            queueData.isProcessing = true;
+
+            batch = queueData.queue.map(({ sql, params, id, resolve, reject }) =>
+                ({ sql, args: params, id, resolve, reject }));
+
             batch.forEach(b => {
                 b.args = b.args.map(arg => arg === undefined ? 'nulo' : arg);
-            })
+            });
+
+
+            const start = Date.now();
+            
+
             const results = await db.batch(batch.map(({ sql, args }) => ({ sql, args }))).catch((e) => {
-                console.log('ERROR:', e);
+                console.log('ERROR IN JOB QUEUE:', e, 'BATCH:', JSON.stringify(batch.map(({ sql, args }) => ({ sql, args })), null, 2));
+                return null;
             });
 
-            results?.forEach((result, i) => {
-                const { id, resolve, reject } = batch[i];
-                if (!result || result.error) {
-                    console.log('ERROR:', result.error);
-                }
-                resolve(result);
+            console.log('EXECUTING BATCH:', JSON.stringify(batch.map(({ sql, args }) => ({ sql, args })), null, 2), '| Duration:', Date.now() - start, 'ms');
 
-                const updatedQueue = writeQueues.get(dbPath).queue;
-                updatedQueue.splice(updatedQueue.findIndex((item) => item.id === id), 1);
-            });
+            if (results) {
+                results.forEach((result, i) => {
+                    const { id, resolve, reject } = batch[i];
+                    if (!result || result.error) {
+                        console.log('ERROR:', result.error);
+                        reject(result.error);
+                    } else {
+                        resolve(result);
+                    }
+
+                    const updatedQueue = writeQueues.get(dbPath).queue;
+                    updatedQueue.splice(updatedQueue.findIndex((item) => item.id === id), 1);
+                });
+            }
         }
-        catch (e) { console.log('ERROR IN PROCESS QUEUE:', e) }
+        catch (e) {
+            console.log('ERROR IN PROCESS QUEUE:', e, 'DATA:', JSON.stringify(batch, null, 2));
+        }
         finally {
+            // Reset processing flag and release connection
+            queueData.isProcessing = false;
             dbPool.releaseConnection(db);
         }
     }
 };
 
-setInterval(processQueue, 1000);
+// Initialize queue with isProcessing flag
+const writeQueue = {
+    push: (data) => {
+        if (!writeQueues.has(path)) {
+            writeQueues.set(path, {
+                isProcessing: false,
+                queue: []
+            });
+        }
+        const { queue } = writeQueues.get(path);
+        queue.push({ id: crypto.randomUUID(), ...data });
+    }
+};
+
+setInterval(processQueue, 500);
 
 export default (args) => {
     let dbPool;
@@ -257,6 +294,7 @@ export default (args) => {
             // Add more type mappings 
         })?.filter(Boolean)?.join(", ");
 
+        console.log('CREATE TABLE', tableName, columns)
         return `CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`;
     };
 
@@ -885,15 +923,15 @@ export default (args) => {
                     }
 
                     // Execute SQL Statement
-                     await db.execute({
+                    await db.execute({
                         sql: deleteSql,
                         args: serializeParams(sqlParams)
                     });
 
-                   // Validate the response
-                   const validatedResponse = Validator(schema, { success: true }, {
-                    path: `delete_output:${key}`,
-                });
+                    // Validate the response
+                    const validatedResponse = Validator(schema, { success: true }, {
+                        path: `delete_output:${key}`,
+                    });
                     config.debug && console.log('CRUD Execution Id:', executionId, '| deleteMany', '| Response:', JSON.stringify(validatedResponse), '| Duration:', Date.now() - start, 'ms');
                     config.finalizePreparedStatements && deleteStmt.finalize();
                     return response;
@@ -901,14 +939,18 @@ export default (args) => {
                     dbPool.releaseConnection(db);
                 }
             },
-            customQuery: async (queryStatement) => {
+            customQuery: async (sql) => {
                 const db = await dbPool.getConnection();
                 try {
-                    const stmt = await db.prepare(queryStatement);
-                    const response = stmt.all();
-                    config.finalizePreparedStatements && stmt.finalize();
-                    // Add validation if needed
-                    return response;
+                    const {
+                        rows,
+                        columns,
+                        rowsAffected,
+                        lastInsertRowid
+                    } = await db.execute({
+                        sql,
+                    });
+                    return { rows, columns, rowsAffected, lastInsertRowid };
                 } finally {
                     dbPool.releaseConnection(db);
                 }

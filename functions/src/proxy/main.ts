@@ -132,6 +132,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
         // Format File Path
         const filePathUrl = new URL(_fileUrl);
+        // set host to the original url host
         filePathUrl.host = url.host;
         // remove search params from the URL
         filePathUrl.search = '';
