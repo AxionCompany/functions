@@ -1,6 +1,6 @@
 import getAllFiles from "./getAllFiles.ts";
 
-export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir }: any) => {
+export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir, bustCache }: any) => {
 
   // Load target module
   importUrl = new URL(importUrl);
@@ -30,7 +30,7 @@ export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir }
 
   const bundleUrl = new URL(importUrl);
   bundleUrl.searchParams.append('bundle', true);
-
+  if (bustCache) bundleUrl.searchParams.append('bustCache', bustCache);
 
   if (isJSX) {
     // Get module bundle 
