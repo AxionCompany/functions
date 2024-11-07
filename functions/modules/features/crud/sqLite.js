@@ -192,14 +192,14 @@ const processQueue = async () => {
 
 
             const start = Date.now();
-            
+
 
             const results = await db.batch(batch.map(({ sql, args }) => ({ sql, args }))).catch((e) => {
                 console.log('ERROR IN JOB QUEUE:', e, 'BATCH:', JSON.stringify(batch.map(({ sql, args }) => ({ sql, args })), null, 2));
                 return null;
             });
 
-            console.log('EXECUTING BATCH:', JSON.stringify(batch.map(({ sql, args }) => ({ sql, args })), null, 2), '| Duration:', Date.now() - start, 'ms');
+            console.log('EXECUTING BATCH:', 'Size:', JSON.stringify(batch.map(({ sql, args }) => ({ sql, args })), null, 2).length, '| Duration:', Date.now() - start, 'ms');
 
             if (results) {
                 results.forEach((result, i) => {
