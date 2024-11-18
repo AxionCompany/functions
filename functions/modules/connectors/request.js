@@ -1,5 +1,5 @@
 
-import { get, remove, set } from "https://deno.land/x/kv_toolbox/blob.ts";
+import { get, remove, set } from "jsr:@kitsonk/kv-toolbox@0.22.0/blob";
 
 const kv = await Deno.openKv();
 
