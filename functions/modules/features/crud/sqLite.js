@@ -199,7 +199,7 @@ const processQueue = async () => {
                 return null;
             });
 
-            console.log('EXECUTING BATCH:', 'Size:', JSON.stringify(batch.map(({ sql, args }) => ({ sql, args })), null, 2).length, '| Duration:', Date.now() - start, 'ms');
+            // console.log('EXECUTING BATCH:', 'Size:', JSON.stringify(batch.map(({ sql, args }) => ({ sql, args })), null, 2).length, '| Duration:', Date.now() - start, 'ms');
 
             if (results) {
                 results.forEach((result, i) => {
