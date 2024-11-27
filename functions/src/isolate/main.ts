@@ -42,8 +42,8 @@ export default async (config: any) => {
       Object.assign(dependencies, { ...middlewares });
 
       // pass dependencies to beforeRun and afterRun hooks, and set them as globalThis
-      beforeRun && Object.assign(beforeRun, dependencies) && (globalThis._beforeRun = beforeRun);
-      afterRun && Object.assign(afterRun, dependencies) && (globalThis._afterRun = afterRun);
+      beforeRun && (globalThis._beforeRun = (beforeRun.bind({ ...dependencies })));
+      afterRun && (globalThis._afterRun = (afterRun.bind({ ...dependencies })));
 
       // get the data
       const { method, body, params, headers: requestHeaders, __requestId__ } = data;
