@@ -132,7 +132,7 @@ export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir, 
     for (const Middleware of Middlewares) {
       if (Middleware) {
         Object.assign(Middleware, { ...middlewares });
-        const MiddlewareExec = await Middleware({ ...req }, response);
+        const MiddlewareExec = await Middleware.bind({ ...middlewares })({ ...req }, response);
         Object.assign(middlewares, { ...Middleware });
         req = MiddlewareExec;
       }

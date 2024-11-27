@@ -13,7 +13,7 @@ function withWrapper (name, _fn) {
   }
 
   function mod (...args) {
-    const willUseHook = (globalThis._beforeRun || globalThis._afterRun) && mod.__requestId__;
+    const willUseHook = (globalThis._beforeRun || globalThis._afterRun) && this?.__requestId__;
     const fn=_fn.bind({...this, ...mod});
     Object.assign(_fn, mod);
 
@@ -21,7 +21,7 @@ function withWrapper (name, _fn) {
     willUseHook && globalThis._beforeRun && globalThis._beforeRun({
       url: "${url.href}",
       name,
-      requestId: mod.__requestId__,
+      requestId: this?.__requestId__,
       executionId,
       properties: { ...mod },
       input: args
@@ -35,7 +35,7 @@ function withWrapper (name, _fn) {
           willUseHook && globalThis._afterRun && globalThis._afterRun({
             url: "${url.href}",
             name,
-            requestId: mod.__requestId__,
+            requestId: this?.__requestId__,
             executionId,
             duration,
             status: 'completed',
@@ -49,7 +49,7 @@ function withWrapper (name, _fn) {
           willUseHook && globalThis._afterRun && globalThis._afterRun({
             url: "${url.href}",
             name,
-            requestId: mod.__requestId__,
+            requestId: this?.__requestId__,
             executionId,
             duration,
             status: 'failed',
@@ -66,7 +66,7 @@ function withWrapper (name, _fn) {
       willUseHook && globalThis._afterRun && globalThis._afterRun({
         url: "${url.href}",
         name,
-        requestId: mod.__requestId__,
+        requestId: this?.__requestId__,
         executionId,
         duration,
         status: 'completed',
