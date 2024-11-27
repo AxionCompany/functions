@@ -101,17 +101,20 @@ const moduleInstance: any = async (
     const { headers, __requestId__, body, ..._params } = params;
     params = _params;
 
+    let _mod;
+
     if (dependencies?.config?.isFactory) {
-      mod = await mod({
+      _mod = await mod({
         ...dependencies,
         ...params,
       }, response);
     } else {
-      Object.assign(mod, { ...dependencies, body, headers, __requestId__, url });
+      _mod = mod.bind({ ...dependencies, body, headers, __requestId__, url })
+      Object.assign(_mod, { ...dependencies, body, headers, __requestId__, url });
     }
 
     if (isJSX) {
-      Object.assign(mod, { response });
+      Object.assign(_mod, { response });
       // set html content type headers
       response.headers({ "content-type": "text/html; charset=utf-8" });
       // generate layouts
@@ -128,7 +131,7 @@ const moduleInstance: any = async (
         dependencies.React.createElement(
           Layout,
           _pageParams,
-          dependencies.React.createElement(mod, _pageParams)
+          dependencies.React.createElement(_mod, _pageParams)
         )
       );
       // parse the html
@@ -211,7 +214,7 @@ const moduleInstance: any = async (
     }
     else {
       // execute the module
-      workerRes = await mod({
+      workerRes = await _mod({
         ...params,
       }, response);
     }
