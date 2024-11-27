@@ -36,7 +36,7 @@ export default async (path, { ...options } = {}) => {
     if (options?.shared?.some(s => s === 'none')) {
         config.external = [];
     } else {
-        config.external = ['react', 'react-dom', ...(options.shared || [])]
+        config.external = ['react', 'react-dom/client', ...(options.shared || [])]
     }
 
     config.entryPoints = [path.href];

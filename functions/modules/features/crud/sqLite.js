@@ -294,7 +294,6 @@ export default (args) => {
             // Add more type mappings 
         })?.filter(Boolean)?.join(", ");
 
-        console.log('CREATE TABLE', tableName, columns)
         return `CREATE TABLE IF NOT EXISTS ${tableName} (${columns})`;
     };
 

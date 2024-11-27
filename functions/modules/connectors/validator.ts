@@ -5,18 +5,6 @@ type CustomTypeGenerator = () => ZodType<any, any>;
 
 const customTypes = function (type: string, options: ValidationOptions = {}): CustomTypeGenerator | undefined {
     const types: Record<string, CustomTypeGenerator> = {
-        "objectId": () =>
-            z.any().transform((value) => {
-                if (Array.isArray(value)) {
-                    return value.map(item => item instanceof ObjectId ? item : new ObjectId(String(item)));
-                } else {
-                    return value instanceof ObjectId ? value : new ObjectId(String(value));
-                }
-            }),
-        "blob": () =>
-            z.any().transform((value) => {
-                return value instanceof Blob ? value : new Blob([new TextEncoder().encode(String(value))]);
-            }),
         "(.*)->(.*)": () => {
             return z.any().transform((value) => {
                 const [localType, relationType] = type.split('->');
@@ -34,6 +22,18 @@ const customTypes = function (type: string, options: ValidationOptions = {}): Cu
 
             })
         },
+        "objectId": () =>
+            z.any().transform((value) => {
+                if (Array.isArray(value)) {
+                    return value.map(item => item instanceof ObjectId ? item : new ObjectId(String(item)));
+                } else {
+                    return value instanceof ObjectId ? value : new ObjectId(String(value));
+                }
+            }),
+        "blob": () =>
+            z.any().transform((value) => {
+                return value instanceof Blob ? value : new Blob([new TextEncoder().encode(String(value))]);
+            }),
     };
     for (const key in types) {
         if (type.match(new RegExp(key))) {

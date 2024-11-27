@@ -1,4 +1,3 @@
-
 import { Validator as SchemaValidator } from "../../connectors/validator.ts";
 
 export default ({ config, db, schemas, Validator }) => {
@@ -6,9 +5,9 @@ export default ({ config, db, schemas, Validator }) => {
 
   Validator = Validator || SchemaValidator(schemas)
 
-  const createCollections = async (schema, db) => {
+  const createCollections = async (schema, collectionName, db) => {
     db = await db;
-    const collection = db.collection(key);
+    const collection = db(collectionName);
 
     for (const field in schema) {
       const type = schema[field];
@@ -60,7 +59,7 @@ export default ({ config, db, schemas, Validator }) => {
     const schema = schemas[key];
 
     // create the collection
-    createCollections(schema, db);
+    createCollections(schema, key,  db);
 
     models[key] = {
       create: async (data, options) => {
@@ -89,6 +88,7 @@ export default ({ config, db, schemas, Validator }) => {
         db = await db;
         const validatedData = Validator([schema], data, {
           path: `createMany_input:${key}`,
+          clean: false
         });
         const now = new Date();
         const dataWithTimestamps = validatedData.map(item => ({
@@ -261,7 +261,7 @@ export default ({ config, db, schemas, Validator }) => {
         }
         const operators = getOperators(data);
 
-        const response = await db(key).updateOne(validatedQuery, {
+        const response = await db(key).findOneAndUpdate(validatedQuery, {
           $set: {
             ...validatedData,
             updatedAt: new Date(),
@@ -318,6 +318,21 @@ export default ({ config, db, schemas, Validator }) => {
         );
         const validatedResponse = Validator(schema, response, {
           path: `delete_output:${key}`,
+        });
+        return validatedResponse;
+      },
+      deleteMany: async (query, options) => {
+        db = await db;
+        const validatedQuery = Validator(schema, query, {
+          query: true,
+          path: `deleteMany_input:${key}`,
+        });
+        const response = await db(key).deleteMany(
+          validatedQuery,
+          options,
+        );
+        const validatedResponse = Validator(schema, response, {
+          path: `deleteMany_output:${key}`,
         });
         return validatedResponse;
       },
