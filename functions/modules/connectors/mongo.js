@@ -7,25 +7,33 @@ export default async ({ config }) => {
       connectTimeoutMS: 30000,
       socketTimeoutMS: 45000,
       retryWrites: true,
-      // minPoolSize: 100,
-      // maxPoolSize:200,
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      maxPoolSize: 50,
+      serverSelectionTimeoutMS: 30000,
     });
 
     // Function to handle connection with retry logic
-    const connectWithRetry = async () => {
-      console.log('creating new connection')
+    const connectWithRetry = async (retries = 5) => {
+      console.log('Creating new connection');
       try {
         await client.connect();
         console.log("Connected successfully to MongoDB server");
+        
+        // Add connection monitoring
+        client.on('close', () => {
+          console.log('MongoDB connection closed');
+          delete clients[config.url];
+        });
+        
       } catch (error) {
-        if (error instanceof MongoNetworkError) {
-          console.error("Failed to connect to MongoDB server, retrying...", error);
-          setTimeout(connectWithRetry, 5000); // Retry after 5 seconds
+        if (error instanceof MongoNetworkError && retries > 0) {
+          console.error(`Failed to connect to MongoDB server, retrying... (${retries} attempts left)`, error);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          return connectWithRetry(retries - 1);
         } else {
-          console.error("An unexpected error occurred", error);
-          throw error; // Rethrow if error is not a network error
+          console.error("Failed to connect to MongoDB server after all retries", error);
+          throw error;
         }
       }
     };
