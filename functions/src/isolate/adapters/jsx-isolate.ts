@@ -7,33 +7,64 @@ import ReactDOMServer from "npm:react-dom/server";
 import React from "npm:react";
 import { DOMParser } from "npm:linkedom";
 import Cache from "../../utils/withCache.ts";
+import { connect } from "https://deno.land/x/nats@v1.16.0/src/mod.ts";
 
 let port: number;
 let config: any;
-
+let transportType: 'http' | 'nats' | 'worker';
 
 const moduleExecutors = new Map<string, any>();
 let cachePathPrefix = '';
 
-const [portString, configString]: string[] = Deno?.args || [];
-if (portString && configString) {
+// Handle different initialization methods based on transport type
+if (Deno?.args?.length) {
+    const [portString, configString]: string[] = Deno.args;
     port = parseInt(portString) || 3000;
     config = JSON.parse(configString || '{}');
+    transportType = 'http';
     Deno.cwd = () => config.projectPath;
 } else {
     self.onmessage = function (event: any) {
         const { port: _port, ..._config } = event.data;
         port = _port;
         config = _config;
+        transportType = 'worker';
         cachePathPrefix = config.projectPath;
         Deno.cwd = () => config.projectPath;
     };
 }
 
-// await for port and config
+// NATS subscription setup
+if (config?.natsUrl) {
+    transportType = 'nats';
+    const nc = await connect({ servers: config.natsUrl });
+    const sub = nc.subscribe(`isolate.${config.isolateId}`);
+    (async () => {
+        for await (const msg of sub) {
+            const data = JSON.parse(new TextDecoder().decode(msg.data));
+            try {
+                const response = await handleRequest(data);
+                msg.respond(new TextEncoder().encode(JSON.stringify({
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries()),
+                    body: await response.text()
+                })));
+            } catch (error) {
+                msg.respond(new TextEncoder().encode(JSON.stringify({
+                    status: 500,
+                    statusText: 'Internal Server Error',
+                    body: error.message
+                })));
+            }
+        }
+    })();
+}
+
+// await for configuration
 while (true) {
-    if (port && config) break;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if ((port && config) || transportType === 'nats') break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
 }
 
 const isServer = true;
@@ -41,67 +72,88 @@ globalThis.React = React;
 globalThis.isServer = isServer;
 globalThis.isolateType = 'jsx';
 
-
 const withCache = (await Cache(config.projectId, cachePathPrefix));
 
-
-const indexHtml = ` 
-<!DOCTYPE html>
-<html>
-  <head></head>
-  <body></body>
-</html>
-`;
-
-// const moduleExecutors = new Map<string, any>();
-
-
-const handlerConfig = {
-    handlers: {
-        "/(.*)+": async (data: any, response: any) => {
-
-            try {
-                // If the request is a health check, return "ok"         
-                const pathname = new URL(data.url).pathname;
-                if (pathname === "/__healthcheck__") {
-                    return "ok";
-                }
-
-                // If the request is not a health check, execute the module
-                let moduleExecutor;
-                const queryParams = Object.fromEntries(new URL(data.url).searchParams.entries());
-                const importUrl = atob(queryParams.__importUrl__);
-                const url = atob(queryParams.__proxyUrl__);
-                const isJSX = queryParams.__isJSX__ === 'true';
-                data.url = url;
-                if (moduleExecutors.has(importUrl)) {
-                    moduleExecutor = moduleExecutors.get(importUrl);
-                } else {
-                    moduleExecutor = await ModuleExecution({
-                        ...config,
-                        isJSX,
-                        importUrl,
-                        url,
-                        dependencies: {
-                            ReactDOMServer,
-                            React,
-                            processCss,
-                            DOMParser,
-                            htmlScripts,
-                            indexHtml,
-                            withCache,
-                        },
-                    });
-                    moduleExecutors.set(importUrl, moduleExecutor);
-                }
-                const chunk = await moduleExecutor(data, response);
-                return chunk;
-            } catch (err) {
-                return response.error(err);
-            }
+async function handleRequest(data: any) {
+    try {
+        if (data.pathname === "/__healthcheck__") {
+            return new Response("ok");
         }
+
+        let moduleExecutor;
+        const queryParams = Object.fromEntries(new URLSearchParams(data.search).entries());
+        const importUrl = atob(queryParams.__importUrl__);
+        const url = atob(queryParams.__proxyUrl__);
+        const isJSX = queryParams.__isJSX__ === 'true';
+        data.url = url;
+
+        if (!isJSX) {
+            throw new Error(`Isolate of type "${globalThis.isolateType}" is only compatible with JSX modules`);
+        }
+
+        if (moduleExecutors.has(importUrl)) {
+            moduleExecutor = moduleExecutors.get(importUrl);
+        } else {
+            moduleExecutor = await ModuleExecution({
+                ...config,
+                isJSX,
+                importUrl,
+                url,
+                dependencies: {
+                    ReactDOMServer,
+                    React,
+                    processCss,
+                    DOMParser,
+                    htmlScripts,
+                    indexHtml: ` 
+                        <!DOCTYPE html>
+                        <html>
+                          <head></head>
+                          <body></body>
+                        </html>
+                    `,
+                    withCache,
+                },
+            });
+            moduleExecutors.set(importUrl, moduleExecutor);
+        }
+
+        return await moduleExecutor(data);
+    } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
-};
+}
 
+// Only start HTTP server if using HTTP transport
+if (transportType === 'http') {
+    const handlerConfig = {
+        handlers: {
+            "/(.*)+": handleRequest
+        }
+    };
 
-server({ port, requestHandler: RequestHandler(handlerConfig), config });
+    server({ port, requestHandler: RequestHandler(handlerConfig), config });
+} else if (transportType === 'worker') {
+    // Worker message handling
+    self.onmessage = async function(event: MessageEvent) {
+        try {
+            const response = await handleRequest(event.data);
+            const responseData = {
+                status: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries()),
+                body: await response.text()
+            };
+            self.postMessage(responseData);
+        } catch (error) {
+            self.postMessage({
+                status: 500,
+                statusText: 'Internal Server Error',
+                body: error.message
+            });
+        }
+    };
+}
