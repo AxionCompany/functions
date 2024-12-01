@@ -1,18 +1,20 @@
 import isolateFactory from "./utils/isolateFactory.ts";
+import { getCache } from './cache/index.ts';
+import { getTransport } from './isolate-transport/index.ts';
 
-const cachedFileUrls = new Map<string, any>();
-const isolatesMetadata = new Map<string, any>();
+const transport = getTransport();
+const cache = getCache();
 
 const getIsolate = (isolateId: string) => {
-    return isolatesMetadata.get(isolateId);
+    return cache.getIsolate(isolateId);
 }
 
 const getCachedFileUrls = () => {
-    return Array.from(cachedFileUrls.keys());
+    return cache.getFileUrls();
 }
 
 const setIsolate = (isolateId: string, isolateMetadata: any) => {
-    return isolatesMetadata.set(isolateId, isolateMetadata);
+    cache.setIsolate(isolateId, isolateMetadata);
 }
 
 // Function to kill the isolate
@@ -25,8 +27,8 @@ const resetIsolateTimer = (isolateId: string, timeout: number) => {
 
     if (getIsolate(isolateId)?.timer) clearTimeout(getIsolate(isolateId)?.timer);
 
-    isolatesMetadata.set(isolateId, {
-        ...isolatesMetadata.get(isolateId),
+    cache.setIsolate(isolateId, {
+        ...cache.getIsolate(isolateId),
         timer: setTimeout(() => {
             clearTimeout(getIsolate(isolateId)?.timer);
             console.log(`Isolate idle for 5 seconds. Terminating isolate with ID:`, isolateId, getIsolate(isolateId)?.timer);
@@ -65,7 +67,7 @@ const waitForServer = async (url: string, timeout: number = 1000 * 60): Promise<
 };
 
 const getPortFromIsolateId = (isolateId: string): number => {
-    return parseInt(isolatesMetadata.get(isolateId).port);
+    return parseInt(cache.getIsolate(isolateId).port);
 }
 
 const cleanupIsolate = async (isolateId: string): Promise<void> => {
@@ -89,7 +91,7 @@ const cleanupIsolate = async (isolateId: string): Promise<void> => {
                 }
                 delete isolateMetadata.pid;
             }
-            isolatesMetadata.set(isolateId, { ...isolateMetadata, status: 'down', activeRequests: 0 });
+            cache.setIsolate(isolateId, { ...isolateMetadata, status: 'down', activeRequests: 0 });
         } catch (err) {
             console.error("Error terminating isolate", err);
         }
@@ -99,7 +101,7 @@ const cleanupIsolate = async (isolateId: string): Promise<void> => {
 
 export const cleanupIsolates = (): void => {
     console.log("Cleaning up isolates");
-    for (const isolateId of isolatesMetadata.keys()) {
+    for (const isolateId of cache.getFileUrls()) {
         cleanupIsolate(isolateId);
     }
 }
@@ -148,16 +150,16 @@ export default ({ config, modules }: any) => async (req: Request) => {
         const dirEntrypointIndex = filePathUrl.pathname?.lastIndexOf(`/${config?.dirEntrypoint}`)
         filePathUrl.pathname = dirEntrypointIndex > -1 ? filePathUrl.pathname.slice(0, dirEntrypointIndex) : filePathUrl.pathname;
 
-        const cachedFileUrl = cachedFileUrls.get(filePathUrl.href)
+        const cachedFileUrl = cache.getCachedFile(filePathUrl.href)
         if (cachedFileUrl) {
-            cachedFileUrls.set(filePathUrl.href, { ...cachedFileUrl, urls: [...new Set([...cachedFileUrl.urls, formattedImportUrl])] });
+            cache.setCachedFile(filePathUrl.href, { ...cachedFileUrl, urls: [...new Set([...cachedFileUrl.urls, formattedImportUrl])] });
             return cachedFileUrl.isolateId;
         } else {
             const isolateId = customMapperId({ fileUrl: _fileUrl.href, formattedFileUrl: filePathUrl.href });
             const ext = modules.path.extname(_fileUrl.pathname);
             const isJSX = ext === '.jsx' || ext === '.tsx';
             // update cached file urls
-            cachedFileUrls.set(filePathUrl.href, { isolateId, urls: [formattedImportUrl], isJSX });
+            cache.setCachedFile(filePathUrl.href, { isolateId, urls: [formattedImportUrl], isJSX });
             return isolateId
         }
     })
@@ -205,15 +207,15 @@ export default ({ config, modules }: any) => async (req: Request) => {
         config.debug && console.log('matching', username, pathname, hostname, 'with', formattedImportUrl)
         const matched = pattern.exec(formattedImportUrl);
         if (matched) {
-            config.debug && console.log('matched', fileUrl, cachedFileUrls.get(fileUrl))
-            const importUrls = cachedFileUrls.get(fileUrl)?.urls;
+            config.debug && console.log('matched', fileUrl, cache.getCachedFile(fileUrl))
+            const importUrls = cache.getCachedFile(fileUrl)?.urls;
             const matchParams = matched?.pathname?.groups;
 
             isExactMatch = importUrls?.some((p: string) => p === importUrl.href);
-            isolateId = cachedFileUrls.get(fileUrl).isolateId;
-            isJSX = cachedFileUrls.get(fileUrl).isJSX;
+            isolateId = cache.getCachedFile(fileUrl).isolateId;
+            isJSX = cache.getCachedFile(fileUrl).isJSX;
 
-            isolateMetadata = { ...isolatesMetadata.get(isolateId), params: matchParams };
+            isolateMetadata = { ...cache.getIsolate(isolateId), params: matchParams };
             break;
         }
     }
@@ -373,28 +375,27 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
 
     try {
-        const port = getPortFromIsolateId(isolateId);
-
-        // Increment active requests counter
         const isolate = getIsolate(isolateId);
+        const address = isolate.address;
 
         setIsolate(isolateId, { ...isolate, activeRequests: (isolate.activeRequests || 0) + 1 });
 
-        const moduleResponse = await fetch(new URL(
-            `${url.pathname}?${new URLSearchParams({
-                ...queryParams,
-                ...isolateMetadata.params,
-                "__importUrl__": btoa(importUrl.href),
-                "__isJSX__": isJSX,
-                "__proxyUrl__": btoa(url.href),
-            })}`,
-            `http://localhost:${port}`
-        ), {
-            method: req.method,
-            redirect: "manual",
-            headers: req.headers,
-            body: req.body
-        });
+        const moduleResponse = await transport.send(
+            address,
+            {
+                pathname: url.pathname,
+                search: new URLSearchParams({
+                    ...queryParams,
+                    ...isolateMetadata.params,
+                    "__importUrl__": btoa(importUrl.href),
+                    "__isJSX__": isJSX,
+                    "__proxyUrl__": btoa(url.href),
+                }).toString(),
+                method: req.method,
+                headers: req.headers,
+                body: req.body
+            }
+        );
 
         // Using pipeThrough to process the stream and kill the isolate after the last chunk is sent
         const transformStream = new TransformStream({
