@@ -60,8 +60,11 @@ interface ValidationOptions {
     schemaKey?: string;
     model?: string;
     path?: string;
-    removeOperators?: boolean,
-    schemas?: Record<string, any>
+    removeOperators?: boolean;
+    schemas?: Record<string, any>;
+    allowDotNotation?: boolean;
+    rejectExtraProperties?: boolean;
+    allowOperators?: boolean;
 }
 
 const mongoOperators: Record<string, (type: any) => any> = {
@@ -74,25 +77,28 @@ const mongoOperators: Record<string, (type: any) => any> = {
     "$addToSet": (type) => Array.isArray(type) ? type[0] : type
 };
 
-const operators = {
+type OperatorFunction = (schema: any, value: any, field?: string) => any;
+const operators: Record<string, OperatorFunction> = {
     // MongoDB Write Operators
     $set: (schema: any, value: any) => schema,
     $unset: () => null,
     $inc: (schema: any) => schema,
     $mul: (schema: any) => schema,
-    $push: (schema: any, value: any, field: string) => {
+    $push: (schema: any, value: any, field?: string) => {
+        if (!field) return schema;
         if (!Array.isArray(schema[field])) {
             throw new Error(`$push requires an array schema for field "${field}"`);
         }
-        return schema[field][0]; // Return the schema for the array items
+        return schema[field][0];
     },
     $pop: (schema: any) => schema,
     $pull: (schema: any) => schema,
-    $addToSet: (schema: any, value: any, field: string) => {
+    $addToSet: (schema: any, value: any, field?: string) => {
+        if (!field) return schema;
         if (!Array.isArray(schema[field])) {
             throw new Error(`$addToSet requires an array schema for field "${field}"`);
         }
-        return schema[field][0]; // Return schema for array items
+        return schema[field][0];
     },
     $rename: (schema: any, value: any) => schema,
     $min: (schema: any) => schema,
@@ -115,7 +121,7 @@ const operators = {
         if (!Array.isArray(value)) {
             throw new Error(`$or requires an array of conditions`);
         }
-        return schema; // Return schema for further validation
+        return schema;
     },
     $and: (schema: any, value: any) => {
         if (!Array.isArray(value)) {
@@ -132,6 +138,8 @@ const operators = {
     $not: (schema: any, value: any) => schema // Handle $not condition
 };
 
+// Create a type for Zod methods
+type ZodPrimitiveTypes = 'string' | 'number' | 'boolean' | 'date' | 'bigint' | 'symbol' | 'undefined' | 'null' | 'void' | 'any' | 'unknown' | 'never';
 
 /**
  * Validates and transforms data according to the provided schema.
@@ -145,34 +153,32 @@ const operators = {
 const Validator = (schemas: Record<string, any>) =>
     (type: any, value: any, options: ValidationOptions = {}) => {
         options = { ...defaultOptions, ...options };
-        return options.useDotNotation
-            ? getDotNotationObject(validateParams(type, value, { ...options, schemas }))
-            : validateParams(type, value, { ...options, schemas });
+        const result = validateParams(type, value, { ...options, schemas });
+        return options.useDotNotation ? getDotNotationObject(result) : result;
     }
 
     const validateParams = (type: any, value: any, options: ValidationOptions = {}): any => {
-
         options = { ...defaultOptions, ...options };
-    
-        const allowDotNotation = options.allowDotNotation ?? true;
-        const rejectExtraProperties = options.rejectExtraProperties ?? false;
-        const allowOperators = options.allowOperators ?? true;
-        const removeOperators = options.removeOperators ?? false;
-    
-        options.path = (options.model ? `${options.model}` : "") + (options.path || "");
-        delete options.model;
-    
+
         const recursiveValidation = (schema: any, val: any, currentPath: string): any => {
-            let isRequired = false;
-    
+            // Handle null/undefined values for required fields first
+            if (val === undefined || val === null) {
+                if (typeof schema === "string" && schema.includes("!")) {
+                    throw new Error(`Field "${currentPath}" is required but missing or null.`);
+                }
+                return val;
+            }
+
+            // Handle string schema types
             if (typeof schema === "string") {
                 let localSchema = schema;
-    
-                // Parse modifiers: "!", "?", and "^"
-                if (localSchema.includes("!")) {
-                    isRequired = true;
+                const isRequired = localSchema.includes("!");
+                
+                if (isRequired) {
                     localSchema = localSchema.replace("!", "");
                 }
+                
+                // Parse modifiers: "!", "?", and "^"
                 if (localSchema.includes("?")) {
                     localSchema = localSchema.replace("?", "");
                 }
@@ -180,29 +186,41 @@ const Validator = (schemas: Record<string, any>) =>
                     // Skip uniqueness enforcement for now, but remove the symbol
                     localSchema = localSchema.replace("^", "");
                 }
-    
+
                 // Handle 'object' type
                 if (localSchema === 'object') {
                     localSchema = 'any';
                 }
-    
-                let validateValue = z.coerce?.[localSchema] || z[localSchema] || customTypes(localSchema, options);
-    
-                if (!validateValue) {
-                    throw new Error(`Undefined schema type: ${localSchema} at path: ${currentPath}`);
+
+                let validateValue: ZodType;
+
+                if (localSchema === 'string') {
+                    validateValue = z.string();
+                } else if (localSchema === 'number') {
+                    validateValue = z.number();
+                } else if (localSchema === 'boolean') {
+                    validateValue = z.boolean();
+                } else if (localSchema === 'date') {
+                    validateValue = z.date();
+                } else if (localSchema === 'any') {
+                    validateValue = z.any();
+                } else {
+                    const customValidator = customTypes(localSchema, options);
+                    if (!customValidator) {
+                        throw new Error(`Undefined schema type: ${localSchema} at path: ${currentPath}`);
+                    }
+                    validateValue = customValidator();
                 }
-    
-                validateValue = validateValue();
-    
+
                 if (!isRequired) {
                     validateValue = validateValue.optional().nullable();
                 }
-    
+
                 // If the field is required and missing or undefined, throw an error
                 if (isRequired && (val === undefined || val === null)) {
                     throw new Error(`Field "${currentPath}" is required but missing or null.`);
                 }
-    
+
                 try {
                     const parsedValue = validateValue.parse(val);
                     return parsedValue;
@@ -217,115 +235,108 @@ const Validator = (schemas: Record<string, any>) =>
                     );
                 }
             }
-    
             // Handle arrays and objects
             else if (schema && typeof schema === 'object') {
-                if (!isRequired && !val) return;
-    
-                let validatedResult: any = Array.isArray(schema) ? [] : {};
-    
-                // Check for null or undefined values before calling Object.entries
-                if (val === null || val === undefined) {
-                    throw new Error(`Invalid value at path "${currentPath}": expected an object, but received ${val}.`);
-                }
-    
+                // Handle arrays
                 if (Array.isArray(schema)) {
-                    const arraySchema = schema[0];
-    
-                    if (Array.isArray(val)) {
-                        return val.map((item, idx) => recursiveValidation(arraySchema, item, `${currentPath}[${idx}]`));
-                    } else if (typeof val === 'object') {
-                        // Handle object notation like $[n]
-                        Object.entries(val).forEach(([key, v]) => {
-                            const match = key.match(/^\$\[(\d+)\]$/); // Match $[n] array notation
-    
-                            if (match) {
-                                const index = parseInt(match[1], 10);
-                                const result = recursiveValidation(arraySchema, v, `${currentPath}[$${index}]`);
-                                if (typeof result !== "undefined") {
+                    if (!Array.isArray(val)) {
+                        throw new Error(`Expected array at path "${currentPath}", but got ${typeof val}`);
+                    }
+                    return val.map((item, idx) => 
+                        recursiveValidation(schema[0], item, `${currentPath}[${idx}]`)
+                    );
+                }
+
+                let validatedResult: any = {};
+
+                // Special handling for logical operators
+                const isLogicalOperator = (key: string) => ['$or', '$and', '$nor'].includes(key);
+                const hasLogicalOperator = Object.keys(val).some(isLogicalOperator);
+
+                if (hasLogicalOperator) {
+                    // Handle logical operators
+                    Object.entries(val).forEach(([key, v]) => {
+                        if (isLogicalOperator(key)) {
+                            if (!Array.isArray(v)) {
+                                throw new Error(`${key} requires an array of conditions`);
+                            }
+                            // Keep all conditions for logical operators
+                            validatedResult[key] = v.map((condition: any) => {
+                                if (typeof condition !== 'object') {
+                                    return condition;
+                                }
+                                // For nested logical operators
+                                if (Object.keys(condition).some(isLogicalOperator)) {
+                                    return recursiveValidation(schema, condition, `${currentPath}.${key}`);
+                                }
+                                // For regular conditions
+                                const validatedCondition: any = {};
+                                Object.entries(condition).forEach(([fieldKey, fieldValue]) => {
+                                    if (schema[fieldKey]) {
+                                        try {
+                                            const validated = recursiveValidation(
+                                                schema[fieldKey],
+                                                fieldValue,
+                                                `${currentPath}.${key}.${fieldKey}`
+                                            );
+                                            if (validated !== undefined) {
+                                                validatedCondition[fieldKey] = validated;
+                                            }
+                                        } catch (error) {
+                                            // Ignore validation errors for logical operators
+                                        }
+                                    } else {
+                                        // Keep invalid fields in logical operators
+                                        validatedCondition[fieldKey] = fieldValue;
+                                    }
+                                });
+                                return validatedCondition;
+                            });
+                        } else if (schema[key]) {
+                            // Handle non-operator fields
+                            try {
+                                const result = recursiveValidation(schema[key], v, `${currentPath}.${key}`);
+                                if (result !== undefined) {
                                     validatedResult[key] = result;
                                 }
-                            } else {
-                                throw new Error(`Expected array at "${currentPath}", but got non-array key: ${key}`);
+                            } catch (error) {
+                                // Ignore validation errors for regular fields in logical operator context
                             }
-                        });
-                        return validatedResult;
-                    } else {
-                        // If val is a scalar, wrap it in an array for validation
-                        return [recursiveValidation(arraySchema, val, currentPath)];
-                    }
-                }
-    
-                // Process each key in the value
-                Object.entries(val).forEach(([originalKey, v]) => {
-                    let key = originalKey;
-    
-                    // Handle operators in keys if allowed
-                    let pathParts = key.includes(".") ? (allowDotNotation ? key.split(".") : [key]) : [key];
-                    let currentSchema = schema;
-                    let reconstructedKeyParts: string[] = [];
-                    let newCurrentPath = currentPath;
-    
-                    for (let i = 0; i < pathParts.length; i++) {
-                        let part = pathParts[i];
-    
-                        // If removeOperators is true, remove operators from key
-                        if (removeOperators && allowOperators && operators.hasOwnProperty(part)) {
-                            // Skip adding operator to reconstructed key parts
-                            const operatorCallback = operators[part];
-    
-                            // Adjust the schema based on the operator
-                            currentSchema = operatorCallback(currentSchema, v, reconstructedKeyParts.join('.'));
-                            continue;
-                        } else if (allowOperators && operators.hasOwnProperty(part)) {
-                            // Operator found in key path
-                            const operatorCallback = operators[part];
-    
-                            // Adjust the schema based on the operator
-                            currentSchema = operatorCallback(currentSchema, v, reconstructedKeyParts.join('.'));
-    
-                            // Include operator in reconstructed key if not removing operators
-                            reconstructedKeyParts.push(part);
-                        } else {
-                            reconstructedKeyParts.push(part);
-    
-                            if (currentSchema && typeof currentSchema === 'object') {
-                                if (Array.isArray(currentSchema)) {
-                                    currentSchema = currentSchema[0];
-                                } else {
-                                    currentSchema = currentSchema[part];
+                        }
+                    });
+                } else {
+                    // Handle regular fields and non-logical operators
+                    Object.entries(val).forEach(([key, v]) => {
+                        if (key in operators && !isLogicalOperator(key)) {
+                            // Handle MongoDB operators
+                            validatedResult[key] = v;
+                        } else if (!key.includes('.')) {
+                            // Handle regular fields
+                            if (schema[key]) {
+                                try {
+                                    const result = recursiveValidation(schema[key], v, `${currentPath}.${key}`);
+                                    if (result !== undefined) {
+                                        validatedResult[key] = result;
+                                    }
+                                } catch (error) {
+                                    if (error.message.includes('required')) {
+                                        throw error;
+                                    }
                                 }
-                                newCurrentPath = i === 0 ? `${currentPath}.${part}` : `${newCurrentPath}.${part}`;
+                            } else if (options.rejectExtraProperties) {
+                                throw new Error(`Extra property "${key}" is not allowed at path: ${currentPath}`);
                             }
                         }
-                    }
-    
-                    const reconstructedKey = reconstructedKeyParts.join('.');
-    
-                    // Check for extra properties
-                    const topKey = reconstructedKeyParts[0];
-                    if (!schema.hasOwnProperty(topKey)) {
-                        if (rejectExtraProperties) {
-                            throw new Error(`Extra property "${reconstructedKey}" is not allowed at path: ${currentPath}`);
-                        }
-                        return;
-                    }
-    
-                    // Now validate v against currentSchema
-                    const result = recursiveValidation(currentSchema, v, newCurrentPath);
-    
-                    if (typeof result !== "undefined") {
-                        validatedResult[reconstructedKey] = result;
-                    }
-                });
-    
+                    });
+                }
+
                 return validatedResult;
             }
-    
-            throw new Error(`Unsupported schema type at path: ${currentPath}`);
+
+            return val;
         };
-    
-        return recursiveValidation(type, value, options.path);
+
+        return recursiveValidation(type, value, options.path || "");
     };
 
 
@@ -385,17 +396,21 @@ function expandAndMergeDotNotation(obj: Record<string, any>, { useBrackets = fal
  * @param parentPath - The parent path for nested keys.
  * @returns The object with dot notation keys.
  */
-function getDotNotationObject(obj: Record<string, any>, parentPath: string = "") {
+function getDotNotationObject(obj: Record<string, any>, parentPath: string = ""): Record<string, any> {
     const result: Record<string, any> = {};
 
-    const isObject = (val: any) => typeof val === "object" && val !== null && !(val instanceof Date) && !(val instanceof ObjectId);
+    const isObject = (val: any) => 
+        typeof val === "object" && 
+        val !== null && 
+        !(val instanceof Date) && 
+        !(val instanceof ObjectId) &&
+        !Array.isArray(val);
 
     const traverse = (currentObject: any, currentPath: string) => {
-        if (Array.isArray(currentObject)) {
-            currentObject.forEach((item, index) => traverse(item, `${currentPath}[${index}]`));
-        } else if (isObject(currentObject)) {
+        if (isObject(currentObject)) {
             for (const key in currentObject) {
-                traverse(currentObject[key], `${currentPath}${currentPath ? "." : ""}${key}`);
+                const newPath = currentPath ? `${currentPath}.${key}` : key;
+                traverse(currentObject[key], newPath);
             }
         } else {
             result[currentPath] = currentObject;

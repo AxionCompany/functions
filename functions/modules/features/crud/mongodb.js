@@ -137,6 +137,7 @@ export default ({ config, db, schemas, Validator }) => {
         const validatedQuery = Validator(schema, query, {
           query: true,
           path: `find_input:${key}`,
+          allowOperators: true,
         });
       
         let skipStage;
