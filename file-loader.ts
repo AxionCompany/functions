@@ -79,7 +79,7 @@ server({
         debug && console.log('axion.config.json not found in cache for', axionConfigUrl.origin, 'fetching from server...')
         axionConfig = await fileLoader({
           queryParams: {},
-          headers: { 'content-type': 'text/plain' },
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
           pathname: axionConfigUrl.pathname,
           url: axionConfigUrl,
         }, responseMock);
@@ -92,14 +92,14 @@ server({
         debug && console.log('deno.json not found in cache for', denoConfigUrl.origin, 'fetching from server...')
         denoConfig = await fileLoader({
           queryParams: {},
-          headers: { 'content-type': 'text/plain' },
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
           pathname: '/deno.json',
           url: denoConfigUrl,
         }, responseMock);
         denoConfig = JSON.parse(denoConfig || '{}')
         const nodeConfig = await fileLoader({
           queryParams: {},
-          headers: { 'content-type': 'text/plain' },
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
           pathname: '/package.json',
           url: new URL('/package.json', denoConfigUrl),
         }, responseMock);

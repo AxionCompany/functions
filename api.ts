@@ -62,8 +62,7 @@ let shouldUpgradeAfter: number = 0;
       try {
         _adapters = await adapters(_adapters);
       } catch (err) {
-        JSON.stringify({ error: { message: err.message, status: (err.status || 500) } }), { status: err.status || 500 }
-        return new Response(JSON.stringify({ error: { message: err.message, status: (err.status || 500) } }), { status: err.status || 500, headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: { message: err.message, status: (err.status || 500) } }), { status: err.status || 500, headers: { 'content-type': 'application/json; charset=utf-8' } });
       }
       const { loaderConfig, shouldUpgradeAfter: _shouldUpgradeAfter, ...adaptersData } = _adapters || {};
       shouldUpgradeAfter = _shouldUpgradeAfter || shouldUpgradeAfter;

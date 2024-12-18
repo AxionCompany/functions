@@ -88,7 +88,7 @@ export default ({ config, modules }: any) => {
       // ISSUE: Some projects may have .js or .ts files that actually contain .jsx or .tsx code.
       // CURRENT SOLUTION: Set a fixed content type for stating that the file is .tsx type (should work for parsing .js, .ts, .jsx, .tsx files as well). 
       // TO DO: This is probably *not* the best idea, as there's an overhead in Deno Compiler. Think about how to improve it the future. 
-      res.headers({ 'content-type': 'text/tsx' })
+      res.headers({ 'content-type': 'text/tsx; charset=utf-8' })
 
     } else {
       // set mime type for public files
