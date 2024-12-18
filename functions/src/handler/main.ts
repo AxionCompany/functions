@@ -38,7 +38,6 @@ export default (
 
     function enqueue(data: DataChunk) {
 
-
       data = processData(data);
 
       const encodedChunk = new TextEncoder().encode(data.chunk);
@@ -173,7 +172,7 @@ export default (
             ...options,
             headers: {
               "access-control-allow-origin": "*",
-              "content-type": "text/plain",
+              "content-type": "text/plain;charset=utf-8",
               "x-content-type-options": "nosniff",
               ...options?.headers,
             },
@@ -189,7 +188,7 @@ export default (
 
             options.headers = {
               ...options?.headers,
-              "content-type": "application/json",
+              "content-type": "application/json; charset=utf-8",
             };
           }
 
@@ -219,7 +218,7 @@ export default (
             "Access-Control-Allow-Headers":
               "authorization, x-client-info, apikey, content-type",
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
-            "content-type": "application/json"
+            "content-type": "application/json; charset=utf-8"
           }
         }
 
