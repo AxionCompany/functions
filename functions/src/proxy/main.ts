@@ -252,7 +252,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
             config.debug && console.log('Error importing metadata', importUrl.href, isolateMetadataRes.statusText)
             return new Response(
                 JSON.stringify({ error: { message: isolateMetadataRes.statusText } }),
-                { status: isolateMetadataRes.status || 500, headers: { 'Content-Type': 'application/json' } }
+                { status: isolateMetadataRes.status || 500, headers: { 'content-type': 'application/json' } }
             );
         }
 
@@ -264,7 +264,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
             config.debug && console.log('Error importing metadata', importUrl.href, isolateMetadata)
             return new Response(
                 JSON.stringify({ error: { message: 'Bad Request' } }),
-                { status: 500, headers: { 'Content-Type': 'application/json' } }
+                { status: 500, headers: { 'content-type': 'application/json' } }
             );
         }
 
@@ -279,13 +279,13 @@ export default ({ config, modules }: any) => async (req: Request) => {
             if (isJSX) {
                 return new Response(
                     _isolateMetadata?.content,
-                    { status: 200, headers: { 'Content-Type': 'text/javascript', 'Access-Control-Allow-Origin': '*' } }
+                    { status: 200, headers: { 'content-type': 'text/javascript', 'Access-Control-Allow-Origin': '*' } }
                 );
             } else {
                 // return not found
                 return new Response(
                     JSON.stringify({ error: { message: 'Not Found' } }),
-                    { status: 404, headers: { 'Content-Type': 'application/json' } }
+                    { status: 404, headers: { 'content-type': 'application/json' } }
                 );
             }
         }
@@ -367,7 +367,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
 
         } catch (error) {
             console.error(`Failed to spawn isolate: ${isolateId}`, error);
-            return new Response(JSON.stringify({ error: { message: 'Bad Request. Failed to initialize Isolate' } }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ error: { message: 'Bad Request. Failed to initialize Isolate' } }), { status: 500, headers: { 'content-type': 'application/json' } });
         }
     }
 
@@ -436,7 +436,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
     } catch (error) {
         console.error("Error communicating with isolate server", error);
         cleanupIsolate(isolateId);
-        return new Response(JSON.stringify(error), { status: 500, statusText: 'Bad Request', headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify(error), { status: 500, statusText: 'Bad Request', headers: { 'content-type': 'application/json' } });
     }
 };
 
