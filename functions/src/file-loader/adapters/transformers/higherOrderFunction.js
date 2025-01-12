@@ -23,7 +23,7 @@ function withWrapper (name, _fn) {
       name,
       requestId: this?.__requestId__,
       executionId,
-      properties: { ...mod },
+      properties: { ...mod, ...this },
       input: args
     });
     const startTime = Date.now();
@@ -39,7 +39,7 @@ function withWrapper (name, _fn) {
             executionId,
             duration,
             status: 'completed',
-            properties: { ...mod },
+            properties: { ...mod, ...this },
             output: resolved
           });
           Object.assign(mod, _fn);
@@ -53,7 +53,7 @@ function withWrapper (name, _fn) {
             executionId,
             duration,
             status: 'failed',
-            properties: { ...mod },
+            properties: { ...mod, ...this },
             output: error,
             error: true
           });
@@ -70,7 +70,7 @@ function withWrapper (name, _fn) {
         executionId,
         duration,
         status: 'completed',
-        properties: { ...mod },
+        properties: { ...mod, ...this },
         output: result
       });
     }

@@ -173,7 +173,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
         if (part.startsWith('_')) { // prevent access to private paths (within files / directories starting with '_')
             return new Response(
                 JSON.stringify({ status: 401, message: `Error trying to access private path '${part}' in '${importUrl.href}'.` }),
-                { status: 401, headers: { 'Content-Type': 'application/json' } }
+                { status: 401, headers: { 'content-type': 'application/json; charset=utf-8' } }
             );
         }
     });
