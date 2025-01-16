@@ -25,10 +25,10 @@ const responseCallback = (__requestId__: string, cb: Function) => {
         status: 500,
         statusText: "Internal Server Error",
         headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Headers":
+          "access-control-allow-origin": "*",
+          "access-control-allow-headers":
             "authorization, x-client-info, apikey, content-type",
-          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
+          "access-control-allow-methods": "GET, POST, PUT, DELETE",
           "content-type": "application/json"
         }
       }

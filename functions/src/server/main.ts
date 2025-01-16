@@ -9,10 +9,10 @@ export default (
         // to do: improve this
         return new Response("OK", {
           headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers":
+            "access-control-allow-origin": "*",
+            "access-control-allow-headers":
               "authorization, x-client-info, apikey, content-type",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
+            "access-control-allow-methods": "GET, POST, PUT, DELETE",
           },
           "status": 200,
           "statusText": "OK",
