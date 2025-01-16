@@ -279,7 +279,7 @@ export default ({ config, modules }: any) => async (req: Request) => {
             if (isJSX) {
                 return new Response(
                     _isolateMetadata?.content,
-                    { status: 200, headers: { 'content-type': 'text/javascript', 'Access-Control-Allow-Origin': '*' } }
+                    { status: 200, headers: { 'content-type': 'text/javascript', 'access-control-allow-origin': '*' } }
                 );
             } else {
                 // return not found
