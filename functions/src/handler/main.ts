@@ -171,7 +171,6 @@ export default (
             statusText: options?.statusText || "OK",
             ...options,
             headers: {
-              "access-control-allow-origin": "*",
               "content-type": "text/plain;charset=utf-8",
               "x-content-type-options": "nosniff",
               ...options?.headers,
@@ -214,10 +213,6 @@ export default (
           status: 500,
           statusText: "Internal Server Error",
           headers: {
-            "access-control-allow-origin": "*",
-            "access-control-allow-headers":
-              "authorization, x-client-info, apikey, content-type",
-            "access-control-allow-methods": "GET, POST, PUT, DELETE",
             "content-type": "application/json; charset=utf-8"
           }
         }
