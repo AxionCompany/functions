@@ -5,11 +5,13 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
         ? ['.']
         : [`${config.projectPath}`,`${config.projectPath}/../node_modules`, `${config.projectPath}/../../node_modules` ]
 
+
     let permissions: any = {
         "deny-run": true,
         "allow-env": false,
         "allow-write": readWritePermissions,
         "allow-read": readWritePermissions,
+        "allow-import":true,
         "allow-ffi": true,
         "allow-net": true,
         "unstable-sloppy-imports": true,

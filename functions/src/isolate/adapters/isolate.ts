@@ -4,6 +4,9 @@ import server from "../../server/main.ts";
 import RequestHandler from "../../handler/main.ts";
 import ModuleExecution from "../main.ts";
 import Cache from "../../utils/withCache.ts";
+// import { context } from "npm:@opentelemetry/api@1"
+
+// globalThis.context = context;
 
 let port: number;
 let config: any;
