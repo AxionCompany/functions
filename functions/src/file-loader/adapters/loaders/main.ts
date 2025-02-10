@@ -2,6 +2,7 @@ import { SEPARATOR, basename, extname, join } from "https://deno.land/std/path/m
 
 export default ({ config, modules }: any) => {
 
+
     const loaderFunctionsPromise = import(`./${config.loaderType}.ts`).then(m => m.default({ config, modules }));
 
     return async function findFile(
@@ -29,7 +30,7 @@ export default ({ config, modules }: any) => {
 
         const maybeReturn = [];
         config.debug && console.log('Checking path', currentPath, 'for', segment, 'in', segments, 'remaining')
-        const dirFiles = await readDir(currentPath);
+        const dirFiles = await readDir(currentPath) || [];
         let addSegment;
         for (const entry of dirFiles) {
             config.debug && console.log('Checking entry', entry.name, 'for', segment, 'in', currentPath, 'with', segments, 'remaining')

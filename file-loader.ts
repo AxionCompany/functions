@@ -29,6 +29,7 @@ server({
     let useCache;
     const authorizationEncoded = req.headers.get('authorization')?.slice(6);
     let [username, password] = authorizationEncoded ? atob(authorizationEncoded).split(':') : [];
+    console.log(username, password);
     debug && console.log('Received request in File Loader from', req.url, username, password);
 
     try {
@@ -39,6 +40,7 @@ server({
 
 
     const [provider, org, repo, branch, environment] = username?.split('--') || [];
+    console.log(provider, org, repo, branch, environment);
     if (!provider) {
       username = 'local';
     }

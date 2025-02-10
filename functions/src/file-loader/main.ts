@@ -1,7 +1,7 @@
 
 import FileLoader from "./adapters/loaders/main.ts";
 import bundler from './adapters/bundler/esbuild.js';
-import transformer from "./adapters/transformers/higherOrderFunction.js";
+// import transformer from "./adapters/transformers/higherOrderFunction.js";
 import mime from 'npm:mime/lite';
 
 export default ({ config, modules }: any) => {

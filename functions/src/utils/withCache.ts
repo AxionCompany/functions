@@ -22,6 +22,7 @@ const Cache = async (projectId: string, prefix = '') => {
         kv = connections.get(projectId);
     } else {
         if (!(typeof Deno.openKv === 'function')) {
+            console.log('Deno Kv not available in namespace... Bypassing cache usage. If you want to enable cache, run with --unstable-kv in Deno versions prior to 2.0.')
             if (!warningIssued) {
                 console.warn('Deno Kv not available in namespace... Bypassing cache usage. If you want to enable cache, run with --unstable-kv in Deno versions prior to 2.0.')
                 warningIssued = true;
@@ -65,18 +66,20 @@ const Cache = async (projectId: string, prefix = '') => {
         config.useCache = config.useCache !== false;
         config.cachettl = config.cachettl || 1000 * 60 * 10; // 10 minutes
 
+
         try {
             if (config.useCache && !config.bustCache) {
+                console.log('USING CACHE', config.keys)
                 const cachedData = await getCache(config.keys);
                 if (typeof cachedData !== 'undefined' && cachedData !== null) return cachedData;
             }
             const data = await cb(...params);
-            if (config.useCache) {
+            if (config.useCache && !data.error) {
                 setCache(config.keys, data, config);
             }
             return data;
         } catch (e) {
-            console.log('ERROR', e)
+            console.log('ERROR ON WITH CACHE', e)
         }
     }
 }

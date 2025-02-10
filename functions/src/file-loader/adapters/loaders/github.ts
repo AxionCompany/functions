@@ -1,5 +1,7 @@
 export default ({ config, modules }: any) => {
 
+  console.log('CONFIG AQUI', config)
+
   const withCache = modules.withCache;
 
   const GITHUB_API_URL = "https://api.github.com";
@@ -12,12 +14,18 @@ export default ({ config, modules }: any) => {
   const getExactRepoInfo = async (owner: string, repo: string, branch: string = 'main', environment: string = 'production') => {
 
     const url = `${GITHUB_API_URL}/repos/${owner}/${repo}/branches/${branch}`;
+    console.log('URL AQUI', url)
     const branchData = await withCache(
       (url: string, options: any) => fetch(url, options).then(async res => {
         if (res.status === 200) {
           const response = await res.json();
           return response;
-        } else {
+        }
+        else if (res.status === 403) {
+          console.log('FORBIDDEN ERROR', await res.text())
+          throw { error: 'Forbidden' }
+        }
+        else {
           return {}
         }
       }),
@@ -26,6 +34,11 @@ export default ({ config, modules }: any) => {
       { headers }
     );
 
+    console.log('BRANCH DATA AQUI', branchData)
+
+    if (!branchData) {
+      throw { error: 'Repo / Branch not found' }
+    }
 
     const branchUrl = branchData?._links?.self;
     const exactRepo = branchUrl?.split('/').slice(-3, -2)?.[0];
@@ -33,6 +46,8 @@ export default ({ config, modules }: any) => {
     const exactOwner = branchUrl?.split('/')?.slice(-4, -3)?.[0];
     return { owner: exactOwner, repo: exactRepo, branch: exactBranch, environment };
   };
+
+  console.log('CONFIG AQUI', config)
 
   const gitInfoPromise: any = getExactRepoInfo(config.owner, config.repo, config.branch, config.environment)
     .then((data: any) => {
@@ -50,6 +65,8 @@ export default ({ config, modules }: any) => {
         console.log('Fetching repo variables', url);
         if (res.status === 200) {
           return res.json()
+        } else if (res.status === 403) {
+          throw { error: 'Forbidden' }
         } else {
           console.log(url, await res.json());
           return []
@@ -70,6 +87,8 @@ export default ({ config, modules }: any) => {
           console.log('Fetching environment variables', url);
           if (res.status === 200) {
             return res.json()
+          } else if (res.status === 403) {
+            throw { error: 'Forbidden' }
           } else {
             console.log(url, await res.json());
             return []
@@ -82,6 +101,7 @@ export default ({ config, modules }: any) => {
     }
 
     const [repoVariables, environmentVariables] = await Promise.all([repoVariablesPromise, environmetVariablesPromises]);
+
 
     return [...(repoVariables?.variables || []), ...(environmentVariables?.variables || [])]?.reduce((acc: any, item: any) => {
       acc[item.name] = item.value;
@@ -100,6 +120,8 @@ export default ({ config, modules }: any) => {
       (url: string, options: any) => fetch(url, options).then(async res => {
         if (res.status === 200) {
           return res.json()
+        } else if (res.status === 403) {
+          throw { error: 'Forbidden' }
         } else {
           console.log(url, await res.json());
           return {
@@ -132,6 +154,8 @@ export default ({ config, modules }: any) => {
         console.log('Fetching directory', url);
         if (res.status === 200) {
           return res.json()
+        } else if (res.status === 403) {
+          throw { error: 'Forbidden' }
         } else {
           console.log(url, await res.json());
           return []
