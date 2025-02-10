@@ -1,5 +1,5 @@
 // import { get, set, } from "https://deno.land/x/kv_toolbox/blob.ts";
-import { get, set } from "jsr:@kitsonk/kv-toolbox@0.27.0/blob";
+import { get, set } from "jsr:@kitsonk/kv-toolbox@0.27.0/blob.ts";
 
 
 const connections = new Map<string, any>();
