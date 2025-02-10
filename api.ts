@@ -144,6 +144,7 @@ async function watchFiles(env: any) {
       )) continue
 
       shouldUpgradeAfter = new Date().getTime();
+      console.log('Files modified:', files, 'upgrading code version...')
       event.paths.forEach(path => {
         // self?.postMessage && self?.postMessage({ message: `Files modified: ${files}` });
       })

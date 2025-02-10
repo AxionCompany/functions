@@ -1,163 +1,253 @@
+// moduleLoader.ts
 import getAllFiles from "./getAllFiles.ts";
 
-export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir, bustCache }: any) => {
+interface ModuleLoaderParams {
+  url: string;
+  env: any;
+  importUrl: string;
+  dependencies: any;
+  isJSX?: boolean;
+  functionsDir: string;
+  bustCache?: boolean;
+}
 
-  // Load target module
-  importUrl = new URL(importUrl);
+export interface FileData {
+  matchPath: string;
+  path?: string;
+  content?: string;
+}
 
-  const importPromises = [];
+export type ModuleFunction = (args: any, response?: any) => Promise<any>;
+export type MiddlewareFunction = (req: any, response: any) => Promise<any>;
+export type HookFunction = (...args: any[]) => any;
 
-  // Get shared module bundles
-  importPromises.push(getAllFiles({
-    url: importUrl,
-    name: 'shared',
-    extensions: ['js', 'ts'],
-  }));
+export interface ModuleLoaderResult {
+  mod: ModuleFunction;
+  GET?: ModuleFunction;
+  POST?: ModuleFunction;
+  PUT?: ModuleFunction;
+  DELETE?: ModuleFunction;
+  matchedPath?: string;
+  dependencies: any;
+  middlewares: MiddlewareFunction;
+  beforeRun?: HookFunction;
+  afterRun?: HookFunction;
+  config?: any;
+}
 
-  // Get middleware modules
-  importPromises.push(getAllFiles({
-    url: importUrl,
-    name: 'middleware',
-    extensions: ['js', 'ts']
-  }));
+/**
+ * Helper to build a new URL with appended query parameters.
+ */
+function buildUrlWithParams(baseUrl: URL, params: Record<string, string | boolean>): URL {
+  const newUrl = new URL(baseUrl.toString());
+  Object.entries(params).forEach(([key, value]) => {
+    newUrl.searchParams.append(key, value.toString());
+  });
+  return newUrl;
+}
 
-  // Get intereptor modules
-  importPromises.push(getAllFiles({
-    url: importUrl,
-    name: 'interceptor',
-    extensions: ['js', 'ts']
-  }));
+/**
+ * Dynamically imports a list of files and returns their default exports.
+ */
+async function dynamicImportModules(
+  files: FileData[],
+  moduleType: string,
+  importUrl: string,
+  baseSearch: string
+): Promise<any[]> {
+  return Promise.all(
+    files.map((file) => {
+      const fileUrl = new URL(`/${file?.matchPath}`, importUrl);
+      fileUrl.search = baseSearch;
+      return import(fileUrl.href)
+        .then((mod) => mod.default)
+        .catch((err) => {
+          const errorMessage = `Error Importing ${moduleType} Module \`${file?.matchPath}\`: ${err.toString()}`;
+          console.error(errorMessage);
+          throw { message: errorMessage, status: 401 };
+        });
+    })
+  );
+}
 
-  const bundleUrl = new URL(importUrl);
-  bundleUrl.searchParams.append('bundle', true);
-  if (bustCache) bundleUrl.searchParams.append('bustCache', bustCache);
+/**
+ * Main module loader.
+ */
+export default async function moduleLoader({
+  url,
+  env,
+  importUrl,
+  dependencies,
+  isJSX,
+  functionsDir,
+  bustCache,
+}: ModuleLoaderParams): Promise<ModuleLoaderResult> {
+  // Convert importUrl to URL instance for consistency.
 
-  if (isJSX) {
-    // Get module bundle 
-    importPromises.push(fetch(bundleUrl.href).then(res => res.json()).catch(err => console.log(err.toString)));
-    // get index.html files
-    importPromises.push(getAllFiles({ url: importUrl, name: 'index', extensions: ['html'], returnProp: 'content' }));
-    // Get Layout Bundles
-    importPromises.push(getAllFiles({ url: bundleUrl, name: 'layout', extensions: ['jsx', 'tsx'] }));
+  const importUrlObj = new URL(importUrl);
+
+  const importPromises: Promise<any>[] = [];
+
+  // Get shared module bundles.
+  importPromises.push(
+    getAllFiles({
+      url: importUrl,
+      name: "shared",
+      extensions: ["js", "ts"],
+    })
+  );
+
+  // Get middleware modules.
+  importPromises.push(
+    getAllFiles({
+      url: importUrl,
+      name: "middleware",
+      extensions: ["js", "ts"],
+    })
+  );
+
+  // Get interceptor modules.
+  importPromises.push(
+    getAllFiles({
+      url: importUrl,
+      name: "interceptor",
+      extensions: ["js", "ts"],
+    })
+  );
+
+  // Prepare URL for bundled module.
+  const bundleUrlObj = new URL(importUrl);
+  bundleUrlObj.searchParams.append("bundle", "true");
+  if (bustCache) {
+    bundleUrlObj.searchParams.append("bustCache", bustCache.toString());
   }
 
-  // Await all import promises
-  const [sharedModulesData, middlewaresData, interceptorData, bundledModule, indexHtmlFiles, bundledLayouts] = await Promise.all(importPromises);
-  const loadPromises = [];
-
-  // Load shared modules
-  loadPromises.push(Promise.all(
-    sharedModulesData.map((file) => {
-      const _url = new URL(`/${file?.matchPath}`, importUrl)
-      _url.search = importUrl.search
-      return import(_url.href)
-        .then((mod) => mod.default)
-        .catch(err => {
-          console.log(`Error Importing Shared Module \`${file?.matchPath}\`: ${err.toString()}`);
-          throw { message: `Error Importing Shared Module \`${file?.matchPath}\`: ${err.toString()}`, status: 401 };
+  if (isJSX) {
+    // Get module bundle.
+    importPromises.push(
+      fetch(bundleUrlObj.href)
+        .then((res) => res.json())
+        .catch((err) => {
+          console.error(err.toString());
+          return null;
         })
-    })
-  ));
+    );
+    // Get index.html files.
+    importPromises.push(
+      getAllFiles({
+        url: importUrl,
+        name: "index",
+        extensions: ["html"],
+        returnProp: "content",
+      })
+    );
+    // Get Layout Bundles.
+    importPromises.push(
+      getAllFiles({
+        url: bundleUrlObj.toString(),
+        name: "layout",
+        extensions: ["jsx", "tsx"],
+      })
+    );
+  }
 
-  // Load middleware modules  
-  loadPromises.push(Promise.all(
-    middlewaresData.map((file) => {
-      const _url = new URL(`/${file?.matchPath}`, importUrl)
-      _url.search = importUrl.search
-      return import(_url.href)
-        .then((mod) => mod.default)
-        .catch(err => {
-          console.log(`Error Importing Middleware Module \`${file?.matchPath}\`: ${err.toString()}`);
-          throw { message: `Error Importing Middleware Module \`${file?.matchPath}\`: ${err.toString()}`, status: 401 };
-        })
-    })
-  ));
+  const [
+    sharedModulesData,
+    middlewaresData,
+    interceptorData,
+    bundledModule,
+    indexHtmlFiles,
+    bundledLayouts,
+  ] = await Promise.all(importPromises);
 
-  // Get interceptor URL
-  const interceptorUrl = interceptorData.slice(-1)?.[0]?.matchPath
-  // Load interceptor modules
-  if (!interceptorUrl) {
+  const loadPromises: Promise<any>[] = [];
+
+  // Load shared modules.
+  loadPromises.push(dynamicImportModules(sharedModulesData, "Shared", importUrl, importUrlObj.search));
+
+  // Load middleware modules.
+  loadPromises.push(dynamicImportModules(middlewaresData, "Middleware", importUrl, importUrlObj.search));
+
+  // Load interceptor module.
+  if (!interceptorData || interceptorData.length === 0) {
     loadPromises.push(Promise.resolve({}));
   } else {
-    const _url = new URL(`/${interceptorUrl}`, importUrl)
-    _url.search = importUrl.search
+    const interceptorFile = interceptorData.slice(-1)[0];
+    const interceptorUrl = new URL(`/${interceptorFile.matchPath}`, importUrl);
+    interceptorUrl.search = importUrlObj.search;
     loadPromises.push(
-      import(_url.href)
+      import(interceptorUrl.href)
         .then((mod) => mod)
-        .catch(err => {
-          console.log(`Error Importing Interceptor Module \`${interceptorUrl}\`: ${err.toString()}`);
-          throw { message: `Error Importing Interceptor Module \`${interceptorUrl}\`: ${err.toString()}`, status: 401 };
-        }));
+        .catch((err) => {
+          const errorMessage = `Error Importing Interceptor Module \`${interceptorFile.matchPath}\`: ${err.toString()}`;
+          console.error(errorMessage);
+          throw { message: errorMessage, status: 401 };
+        })
+    );
   }
 
-
-  if (isJSX) {
-    // Load layout modules
-    loadPromises.push(Promise.all(
-      bundledLayouts.map((file) => {
-        const _url = new URL(`/${file?.matchPath}`, importUrl)
-        _url.search = importUrl.search
-        return import(_url.href)
-          .then((mod) => mod.default)
-          .catch(err => {
-            console.log(`Error Importing Layout Module \`${file?.matchPath}\`: ${err.toString()}`);
-            throw { message: `Error Importing Layout Module \`${file?.matchPath}\`: ${err.toString()}`, status: 401 };
-          })
-      })
-    ));
+  // Load layout modules if JSX is enabled.
+  if (isJSX && bundledLayouts) {
+    loadPromises.push(dynamicImportModules(bundledLayouts, "Layout", importUrl, importUrlObj.search));
   }
 
   const [SharedModules, Middlewares, InterceptorModule, LayoutModules] = await Promise.all(loadPromises);
 
-  // Instantiate shared modules
-  dependencies = SharedModules.reduce(
-    (acc, Dependencies, index) => {
-      if (!Dependencies) return acc
-      return Dependencies({ ...acc })
-    },
-    // Initial dependencies
-    {
-      url,
-      env,
-      ...dependencies,
-      LayoutModules,
-      indexHtml: indexHtmlFiles?.slice(-1)?.[0] || dependencies?.indexHtml,
-      layoutUrls: bundledLayouts?.map(file => file.path?.replaceAll(`${functionsDir}/`, '')),
-      bundledLayouts: bundledLayouts?.map(file => file.content),
-      bundledModule: bundledModule?.content
-    }
-  );
+  // Instantiate shared modules to compose dependencies.
+  let instantiatedDependencies = {
+    url,
+    env,
+    ...dependencies,
+    LayoutModules,
+    indexHtml: indexHtmlFiles?.slice(-1)[0] || dependencies?.indexHtml,
+    layoutUrls: bundledLayouts?.map((file: FileData) =>
+      file.path ? file.path.replace(new RegExp(`^${functionsDir}/`), "") : ""
+    ),
+    bundledLayouts: bundledLayouts?.map((file: FileData) => file.content),
+    bundledModule: bundledModule?.content,
+  };
 
-  const middlewares = async (req, response) => {
+  // Process shared modules sequentially
+  for (const sharedModule of SharedModules) {
+    if (!sharedModule) continue;
+    try {
+      instantiatedDependencies = await sharedModule({ ...instantiatedDependencies });
+    } catch (err) {
+      console.error(`Error instantiating shared module: ${err.toString()}`);
+    }
+  }
+
+  // Compose the middleware executor function.
+  async function middlewareExecutor(req, response): Promise<MiddlewareFunction> {
+    let currentReq = req;
     for (const Middleware of Middlewares) {
       if (Middleware) {
-        Object.assign(Middleware, { ...middlewares });
-        const MiddlewareExec = await Middleware.bind({ ...middlewares })({ ...req }, response);
-        Object.assign(middlewares, { ...Middleware });
-        req = MiddlewareExec;
+        // Object.assign(Middleware, { ...middlewareExecutor });
+        const middlewareResult = await Middleware.bind(this)(currentReq, response);
+        // Object.assign(middlewareExecutor, { ...Middleware });
+        currentReq = middlewareResult;
       }
     }
-    return req;
+    return currentReq;
   };
 
   const { beforeRun, afterRun } = InterceptorModule || {};
 
   try {
-    // Load target module
-    const ESModule = await import(importUrl).then(mod => mod).catch(err => {
-      throw {
-        message: `Error Importing Module \`${importUrl}\`: ${err.toString()}`.replaceAll(new URL(importUrl).origin, ''),
-        status: 401
-      };
-    });
+    // Dynamically import the target module.
+    const targetModule = await import(importUrl)
+      .then((mod) => mod)
+      .catch((err) => {
+        const errorMessage = `Error Importing Module \`${importUrl}\`: ${err.toString()}`.replace(new URL(importUrl).origin, "");
+        throw { message: errorMessage, status: 401 };
+      });
 
-    // Check if module is not found
-    if (typeof ESModule === "string") throw { message: "Module Not Found", status: 404 };
+    if (typeof targetModule === "string") {
+      throw { message: "Module Not Found", status: 404 };
+    }
 
-    // Destructure module methods and exported properties
-    const { default: mod, GET, POST, PUT, DELETE, _matchPath: matchedPath, config } = ESModule;
+    const { default: mod, GET, POST, PUT, DELETE, _matchPath: matchedPath, config } = targetModule;
 
-    // Check if module is not a function. If not, return error
     if (
       typeof mod !== "function" &&
       typeof GET !== "function" &&
@@ -165,10 +255,13 @@ export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir, 
       typeof PUT !== "function" &&
       typeof DELETE !== "function"
     ) {
-      throw { message: 'Expected ESModule to export one of the following functions: ["default", "GET", "POST", "PUT", "DELETE"]. Found none.', status: 404 };
+      throw {
+        message:
+          'Expected ESModule to export one of the following functions: ["default", "GET", "POST", "PUT", "DELETE"]. Found none.',
+        status: 404,
+      };
     }
 
-    // Return module and its dependencies
     return {
       mod,
       GET,
@@ -176,14 +269,14 @@ export default async ({ url, env, importUrl, dependencies, isJSX, functionsDir, 
       PUT,
       DELETE,
       matchedPath,
-      dependencies,
-      middlewares,
+      dependencies: instantiatedDependencies,
+      middlewares: middlewareExecutor,
       beforeRun,
       afterRun,
-      config
+      config,
     };
   } catch (err) {
-    console.log(err);
+    console.error(err);
     throw err;
   }
-};
+}

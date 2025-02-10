@@ -78,11 +78,11 @@ export default ({ config, modules }: any) => {
       // if (params) { // add export for params in content
       //   content += `\n\nexport const _pathParams = ${JSON.stringify(params)};`;
       // }
-      content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\', '/')}"`;
+      // content += `\n\nexport const _matchPath="${matchPath?.replaceAll('\\', '/')}"`;
       // transform the content
-      if (['js', 'ts'].includes(pathname.split('.').pop())) {
-        content = transformer({ code: content, url });
-      }
+      // if (['js', 'ts'].includes(pathname.split('.').pop())) {
+      //   content = transformer({ code: content, url });
+      // }
 
       // ISSUE: Some projects may have .js or .ts files that actually contain .jsx or .tsx code.
       // CURRENT SOLUTION: Set a fixed content type for stating that the file is .tsx type (should work for parsing .js, .ts, .jsx, .tsx files as well). 
