@@ -1,7 +1,5 @@
 export default ({ config, modules }: any) => {
 
-  console.log('CONFIG AQUI', config)
-
   const withCache = modules.withCache;
 
   const GITHUB_API_URL = "https://api.github.com";
@@ -14,7 +12,6 @@ export default ({ config, modules }: any) => {
   const getExactRepoInfo = async (owner: string, repo: string, branch: string = 'main', environment: string = 'production') => {
 
     const url = `${GITHUB_API_URL}/repos/${owner}/${repo}/branches/${branch}`;
-    console.log('URL AQUI', url)
     const branchData = await withCache(
       (url: string, options: any) => fetch(url, options).then(async res => {
         if (res.status === 200) {
@@ -22,7 +19,6 @@ export default ({ config, modules }: any) => {
           return response;
         }
         else if (res.status === 403) {
-          console.log('FORBIDDEN ERROR', await res.text())
           throw { error: 'Forbidden' }
         }
         else {
@@ -34,8 +30,6 @@ export default ({ config, modules }: any) => {
       { headers }
     );
 
-    console.log('BRANCH DATA AQUI', branchData)
-
     if (!branchData) {
       throw { error: 'Repo / Branch not found' }
     }
@@ -46,8 +40,6 @@ export default ({ config, modules }: any) => {
     const exactOwner = branchUrl?.split('/')?.slice(-4, -3)?.[0];
     return { owner: exactOwner, repo: exactRepo, branch: exactBranch, environment };
   };
-
-  console.log('CONFIG AQUI', config)
 
   const gitInfoPromise: any = getExactRepoInfo(config.owner, config.repo, config.branch, config.environment)
     .then((data: any) => {
@@ -62,13 +54,11 @@ export default ({ config, modules }: any) => {
     const repoVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/actions/variables?per_page=30`;
     const repoVariablesPromise = withCache(
       (url: string, options: any) => fetch(url, options).then(async res => {
-        console.log('Fetching repo variables', url);
         if (res.status === 200) {
           return res.json()
         } else if (res.status === 403) {
           throw { error: 'Forbidden' }
         } else {
-          console.log(url, await res.json());
           return []
         }
       }),
@@ -84,13 +74,11 @@ export default ({ config, modules }: any) => {
       const environmentVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/environments/${gitInfo.environment}/variables?per_page=30`;
       environmetVariablesPromises = withCache(
         (url: string, options: any) => fetch(url, options).then(async res => {
-          console.log('Fetching environment variables', url);
           if (res.status === 200) {
             return res.json()
           } else if (res.status === 403) {
             throw { error: 'Forbidden' }
           } else {
-            console.log(url, await res.json());
             return []
           }
         }),
@@ -122,7 +110,6 @@ export default ({ config, modules }: any) => {
         } else if (res.status === 403) {
           throw { error: 'Forbidden' }
         } else {
-          console.log(url, await res.json());
           return {
             content: {
               error: 'File not found'
@@ -150,13 +137,11 @@ export default ({ config, modules }: any) => {
 
     const response = await withCache(
       (url: string, options: any) => fetch(url, options).then(async res => {
-        console.log('Fetching directory', url);
         if (res.status === 200) {
           return res.json()
         } else if (res.status === 403) {
           throw { error: 'Forbidden' }
         } else {
-          console.log(url, await res.json());
           return []
         }
       }),

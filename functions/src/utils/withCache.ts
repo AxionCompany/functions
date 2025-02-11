@@ -69,7 +69,6 @@ const Cache = async (projectId: string, prefix = '') => {
 
         try {
             if (config.useCache && !config.bustCache) {
-                console.log('USING CACHE', config.keys)
                 const cachedData = await getCache(config.keys);
                 if (typeof cachedData !== 'undefined' && cachedData !== null) return cachedData;
             }
