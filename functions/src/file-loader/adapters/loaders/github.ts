@@ -102,7 +102,6 @@ export default ({ config, modules }: any) => {
 
     const [repoVariables, environmentVariables] = await Promise.all([repoVariablesPromise, environmetVariablesPromises]);
 
-
     return [...(repoVariables?.variables || []), ...(environmentVariables?.variables || [])]?.reduce((acc: any, item: any) => {
       acc[item.name] = item.value;
       return acc;

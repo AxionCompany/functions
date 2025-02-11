@@ -74,7 +74,7 @@ const Cache = async (projectId: string, prefix = '') => {
                 if (typeof cachedData !== 'undefined' && cachedData !== null) return cachedData;
             }
             const data = await cb(...params);
-            if (config.useCache && !data.error) {
+            if (config.useCache) {
                 setCache(config.keys, data, config);
             }
             return data;
