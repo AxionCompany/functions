@@ -3,15 +3,15 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
 
     const readWritePermissions = config.isolateType === 'subProcess'
         ? ['.']
-        : [`${config.projectPath}`,`${config.projectPath}/../node_modules`, `${config.projectPath}/../../node_modules` ]
+        : [`${config.projectPath}`, `${config.projectPath}/../node_modules`, `${config.projectPath}/../../node_modules`]
 
 
     let permissions: any = {
-        "deny-run": true,
+        "deny-run": customPermissions?.['allow-run'] ? false : true,
         "allow-env": false,
         "allow-write": readWritePermissions,
         "allow-read": readWritePermissions,
-        "allow-import":true,
+        "allow-import": true,
         "allow-ffi": true,
         "allow-net": true,
         "unstable-sloppy-imports": true,
@@ -22,6 +22,7 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
         "import-map": `data:application/json,${modules.template(JSON.stringify({ imports: config?.denoConfig?.imports, scope: config?.denoConfig?.scope }), variables)}`,
         ...customPermissions,
     };
+
 
     if (config.isolateType === 'subprocess') {
         permissions = Object
@@ -50,7 +51,6 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
                 return acc
             }, {})
     }
-
     console.log('PERMISSIONS', permissions)
 
     return permissions;
