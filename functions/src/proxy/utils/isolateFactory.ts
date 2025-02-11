@@ -7,8 +7,11 @@ async function createSubprocessIsolate({ isolateId, projectId, reload, modules, 
 
     const projectPath = `${Deno.cwd()}/data/${projectId}`;
 
+    const importURL = new URL(env.IMPORT_URL)
+    const { username, password, hostname, port:fileLoaderPort } = importURL
+    console.log('DENO AUTH TOKENS', `${username}:${password}@${hostname}:${fileLoaderPort}`)
     const command = new Deno.Command(Deno.execPath(), {
-        env: { DENO_DIR: config.cacheDir || `./cache/.deno` },
+        env: { DENO_DIR: config.cacheDir || `./cache/.deno`, DENO_AUTH_TOKENS: `${username}:${password}@${hostname}:${fileLoaderPort}` },
         cwd: `./data/${projectId}`,
         args: [
             'run',
