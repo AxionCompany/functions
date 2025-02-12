@@ -51,7 +51,6 @@ const runOptions = (customPermissions: object = {}, { config, variables, modules
                 return acc
             }, {})
     }
-    console.log('PERMISSIONS', permissions)
 
     return permissions;
 }

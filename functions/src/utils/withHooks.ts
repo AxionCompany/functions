@@ -53,13 +53,12 @@ export function withHooks<T, A extends any[]>(
     fn: (...args: A) => T,
     options?: HookOptions<T, A>
 ): (...args: A) => T | Promise<T> {
-
     const { __requestId__ } = this;
-    // Validate the main function
+
+    // Keep original validations
     if (typeof fn !== 'function') {
         throw new TypeError('The first argument "fn" must be a function.');
     }
-    // Validate hooks if provided
     if (options?.before && typeof options.before !== 'function') {
         throw new TypeError('The "before" hook must be a function if provided.');
     }
@@ -72,96 +71,86 @@ export function withHooks<T, A extends any[]>(
         const name = fn.name.split('bound ').filter(Boolean)[0] || 'anonymous';
         const executionId = crypto.randomUUID();
         const startTime = Date.now();
-        const requestId = __requestId__;
+        
+        // Only run hooks if they exist and we have a requestId
+        const willUseHooks = (options?.before || options?.after) && __requestId__;
 
-        /**
-         * Helper to execute the after hook, if provided.
-         * @param result - The result from the main function.
-         * @param status - The status of the execution.
-         * @returns The original result or a Promise resolving to that result.
-         */
-        function callAfterHook(result: T, status: 'completed' | 'error' = 'completed'): T | Promise<T> {
+        // Run before hook if applicable
+        if (willUseHooks && options?.before) {
             try {
-                const timestamp = Date.now();
-                const duration = timestamp - startTime;
-
-                const maybeAfter = options?.after?.call(self, {
-                    output: result,
+                const beforeResult = options.before.call(self, {
                     input: args,
                     name,
-                    timestamp,
+                    timestamp: startTime,
                     executionId,
-                    requestId,
-                    status,
-                    duration,
-                    properties: {...(this || {}), ...((result as any)?.__tags__ || {})}
+                    requestId: __requestId__,
+                    status: 'started',
+                    properties: self || { empty: true }
                 });
-                if (isPromise(maybeAfter)) {
-                    return maybeAfter.then(() => result).catch((err: any) => {
-                        console.error('Error in after hook:', err);
+
+                if (isPromise(beforeResult)) {
+                    return beforeResult.then(() => executeMain()).catch(err => {
+                        console.error('Error in before hook:', err);
                         throw err;
                     });
-                } else {
-                    return result;
+                }
+            } catch (err) {
+                console.error('Error in before hook:', err);
+                throw err;
+            }
+        }
+
+        return executeMain();
+
+        function executeMain(): T | Promise<T> {
+            let result: T;
+            try {
+                result = fn.apply(self, args);
+            } catch (err) {
+                handleAfterHook(err as T, 'error');
+                throw err;
+            }
+
+            if (isPromise(result)) {
+                return result
+                    .then(resolved => handleAfterHook(resolved, 'completed'))
+                    .catch(err => {
+                        handleAfterHook(err, 'error');
+                        throw err;
+                    });
+            }
+
+            return handleAfterHook(result, 'completed');
+        }
+
+        function handleAfterHook(output: T, status: 'completed' | 'error'): T | Promise<T> {
+            if (!willUseHooks || !options?.after) {
+                return output;
+            }
+
+            try {
+                const duration = Date.now() - startTime;
+                const afterResult = options.after.call(self, {
+                    output,
+                    input: args,
+                    name,
+                    timestamp: Date.now(),
+                    executionId,
+                    requestId: __requestId__,
+                    status,
+                    duration,
+                    properties: { ...(self || {}), ...((output as any)?.__tags__ || {}) }
+                });
+
+                if (isPromise(afterResult)) {
+                    return afterResult.then(() => output);
                 }
             } catch (err) {
                 console.error('Error in after hook:', err);
                 throw err;
             }
-        }
 
-        /**
-         * Executes the main function and then the after hook.
-         * @returns The result from the main function (possibly wrapped in a Promise).
-         */
-        function callMain(): T | Promise<T> {
-            let result: T;
-            try {
-                result = fn.apply(self, args);
-            } catch (err) {
-                console.error('Error in main function:', err);
-                return callAfterHook(err as T, 'error');
-            }
-            if (isPromise(result)) {
-                // The main function is asynchronous.
-                return result
-                    .then((resolved: T) => callAfterHook(resolved, 'completed'))
-                    .catch((err: any) => {
-                        console.error('Error in main function promise:', err);
-                        return callAfterHook(err, 'error');
-                    });
-            } else {
-                // The main function is synchronous.
-                return callAfterHook(result, 'completed');
-            }
-        }
-
-        try {
-            // Execute the before hook if provided.
-            const maybeBefore = options?.before?.call(self, {
-                input: args,
-                name,
-                timestamp: startTime,
-                executionId,
-                requestId,
-                status: 'started',
-                properties: this || {"empty": true}
-            });
-            if (isPromise(maybeBefore)) {
-                // If the before hook is asynchronous, chain the call to the main function.
-                return maybeBefore
-                    .then(() => callMain())
-                    .catch((err: any) => {
-                        console.error('Error in before hook:', err);
-                        throw err;
-                    });
-            } else {
-                // Otherwise, continue synchronously.
-                return callMain();
-            }
-        } catch (err) {
-            console.error('Error in before hook:', err);
-            throw err;
+            return output;
         }
     };
 }
