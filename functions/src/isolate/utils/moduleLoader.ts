@@ -59,7 +59,6 @@ async function dynamicImportModules(
     files.map((file) => {
       const fileUrl = new URL(`/${file?.matchPath}`, importUrl);
       fileUrl.search = baseSearch;
-      console.log('FILE URL', fileUrl.href)
       return import(fileUrl.href)
         .then((mod) => mod.default)
         .catch((err) => {
@@ -176,7 +175,6 @@ export default async function moduleLoader({
     const interceptorFile = interceptorData.slice(-1)[0];
     const interceptorUrl = new URL(`/${interceptorFile.matchPath}`, importUrl);
     interceptorUrl.search = importUrlObj.search;
-    console.log('INTERCEPTOR URL', interceptorUrl.href)
     loadPromises.push(
       import(interceptorUrl.href)
         .then((mod) => mod)
