@@ -261,7 +261,7 @@ export default ({ config, db, schemas, Validator }) => {
         }
         const operators = getOperators(data);
 
-        const response = await db(key).findOneAndUpdate(validatedQuery, {
+        const response = await db(key).findOneAndUpdate({ ...validatedQuery, ...query._unsafe }, {
           $set: {
             ...validatedData,
             updatedAt: new Date(),
@@ -293,7 +293,7 @@ export default ({ config, db, schemas, Validator }) => {
         }
         const operators = getOperators(data);
 
-        const response = await db(key).updateMany(validatedQuery, {
+        const response = await db(key).updateMany({ ...validatedQuery, ...query._unsafe }, {
           $set: {
             ...validatedData,
             updatedAt: new Date(),
