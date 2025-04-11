@@ -1,7 +1,7 @@
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Configuration
-const endpoint = (i) => `http://localhost:9002/examples/bench`;
+const endpoint = (i) => `http://localhost:8000/examples/api/health`;
 const concurrentRequests = 100;
 const totalRequests = 100;
 let requestCount = 0;
