@@ -938,7 +938,7 @@ export default (args) => {
                     dbPool.releaseConnection(db);
                 }
             },
-            customQuery: async (sql) => {
+            customQuery: async (sql, params) => {
                 const db = await dbPool.getConnection();
                 try {
                     const {
@@ -948,6 +948,7 @@ export default (args) => {
                         lastInsertRowid
                     } = await db.execute({
                         sql,
+                        args:params
                     });
                     return { rows, columns, rowsAffected, lastInsertRowid };
                 } finally {
