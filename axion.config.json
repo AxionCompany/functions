@@ -1,4 +1,4 @@
 {
-    "dirEntrypoint": "main",
+    "dirEntrypoint": "index",
     "functionsDir": "functions"
 }

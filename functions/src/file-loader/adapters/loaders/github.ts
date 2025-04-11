@@ -1,166 +1,387 @@
-export default ({ config, modules }: any) => {
+/**
+ * GitHub File Loader Adapter
+ * 
+ * This module provides functionality for loading files from GitHub repositories.
+ * It implements the file loader interface with readTextFile and readDir functions,
+ * and handles GitHub API authentication, caching, and error handling.
+ */
 
-  const withCache = modules.withCache;
+import { logDebug, logError } from "../../../utils/logger.ts";
+import { DirectoryEntry, FileContent, FileLoaderAdapter } from "./main.ts";
 
+/**
+ * GitHub repository information
+ */
+export interface GitHubRepoInfo {
+  /** Repository owner (username or organization) */
+  owner: string;
+  /** Repository name */
+  repo: string;
+  /** Branch name */
+  branch: string;
+  /** Environment name for variables */
+  environment: string;
+}
+
+/**
+ * GitHub API response for a variable
+ */
+interface GitHubVariable {
+  /** Variable name */
+  name: string;
+  /** Variable value */
+  value: string;
+}
+
+/**
+ * GitHub loader configuration
+ */
+export interface GitHubLoaderConfig {
+  /** Repository owner */
+  owner: string;
+  /** Repository name */
+  repo: string;
+  /** Branch name (defaults to 'main') */
+  branch?: string;
+  /** Environment name (defaults to 'production') */
+  environment?: string;
+  /** GitHub API key for authentication */
+  apiKey?: string;
+  /** Whether to use cache */
+  useCache?: boolean;
+  /** Whether to bust cache */
+  bustCache?: boolean;
+  /** Cache time-to-live in milliseconds */
+  cachettl?: number;
+  /** Debug mode flag */
+  debug?: boolean;
+  /** Any additional properties */
+  [key: string]: any;
+}
+
+/**
+ * GitHub loader modules
+ */
+export interface GitHubLoaderModules {
+  /** Cache module for API requests */
+  withCache: <T>(
+    fn: (url: string, options: RequestInit) => Promise<T>,
+    options: {
+      keys: string[];
+      bustCache?: boolean;
+      cachettl?: number;
+      useCache?: boolean;
+    },
+    url: string,
+    requestOptions: RequestInit
+  ) => Promise<T>;
+  /** Any additional modules */
+  [key: string]: any;
+}
+
+/**
+ * Creates a GitHub file loader with the given configuration and modules
+ * 
+ * @param options - Configuration and modules for the GitHub loader
+ * @returns A file loader adapter for GitHub repositories
+ */
+export default function createGitHubLoader({
+  config,
+  modules
+}: {
+  config: GitHubLoaderConfig;
+  modules: GitHubLoaderModules;
+}): FileLoaderAdapter {
+  logDebug("Creating GitHub file loader adapter");
+
+  const cacheModule = modules.withCache;
   const GITHUB_API_URL = "https://api.github.com";
 
-  const headers: any = {}
+  // Set up request headers with authentication if provided
+  const requestHeaders: HeadersInit = {};
   if (config.apiKey) {
-    headers.Authorization = `token ${config.apiKey}`;
-  };
+    requestHeaders.Authorization = `token ${config.apiKey}`;
+  }
 
-  const getExactRepoInfo = async (owner: string, repo: string, branch: string = 'main', environment: string = 'production') => {
+  /**
+   * Gets exact repository information from GitHub API
+   * 
+   * @param ownerName - Repository owner
+   * @param repoName - Repository name
+   * @param branchName - Branch name (defaults to 'main')
+   * @param environmentName - Environment name (defaults to 'production')
+   * @returns Repository information with exact names
+   */
+  const getExactRepoInfo = async (
+    ownerName: string,
+    repoName: string,
+    branchName: string = 'main',
+    environmentName: string = 'production'
+  ): Promise<GitHubRepoInfo> => {
+    const branchUrl = `${GITHUB_API_URL}/repos/${ownerName}/${repoName}/branches/${branchName}`;
 
-    const url = `${GITHUB_API_URL}/repos/${owner}/${repo}/branches/${branch}`;
-    const branchData = await withCache(
-      (url: string, options: any) => fetch(url, options).then(async res => {
-        if (res.status === 200) {
-          const response = await res.json();
-          return response;
-        }
-        else if (res.status === 403) {
-          throw { error: 'Forbidden' }
-        }
-        else {
-          return {}
-        }
-      }),
-      { keys: ['github', url], bustCache: config.bustCache, cachettl: config.cachettl, useCache: config.useCache, },
-      url,
-      { headers }
-    );
+    try {
+      const branchData = await cacheModule(
+        async (url: string, options: RequestInit) => {
+          const response = await fetch(url, options);
 
-    if (!branchData) {
-      throw { error: 'Repo / Branch not found' }
-    }
-
-    const branchUrl = branchData?._links?.self;
-    const exactRepo = branchUrl?.split('/').slice(-3, -2)?.[0];
-    const exactBranch = branchData?.name;
-    const exactOwner = branchUrl?.split('/')?.slice(-4, -3)?.[0];
-    return { owner: exactOwner, repo: exactRepo, branch: exactBranch, environment };
-  };
-
-  const gitInfoPromise: any = getExactRepoInfo(config.owner, config.repo, config.branch, config.environment)
-    .then((data: any) => {
-      return data
-    })
-    .catch((err: any) => console.log(err));
-
-  const getVariables = async () => {
-    const gitInfo = await gitInfoPromise;
-
-    // get github repository variables
-    const repoVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/actions/variables?per_page=30`;
-    const repoVariablesPromise = withCache(
-      (url: string, options: any) => fetch(url, options).then(async res => {
-        if (res.status === 200) {
-          return res.json()
-        } else if (res.status === 403) {
-          throw { error: 'Forbidden' }
-        } else {
-          return []
-        }
-      }),
-      { keys: ['github', repoVariablesUrl], bustCache: config.bustCache, cachettl: config.cachettl, useCache: config.useCache, },
-      repoVariablesUrl,
-      { headers }
-    );
-
-
-    // get github environment variables
-    let environmetVariablesPromises;
-    if (gitInfo.environment) {
-      const environmentVariablesUrl = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/environments/${gitInfo.environment}/variables?per_page=30`;
-      environmetVariablesPromises = withCache(
-        (url: string, options: any) => fetch(url, options).then(async res => {
-          if (res.status === 200) {
-            return res.json()
-          } else if (res.status === 403) {
-            throw { error: 'Forbidden' }
+          if (response.status === 200) {
+            return await response.json();
+          } else if (response.status === 403) {
+            throw new Error('GitHub API access forbidden. Check your API key.');
           } else {
-            return []
+            logError(`GitHub API error: ${response.status} ${response.statusText}`);
+            return {};
           }
-        }),
-        { keys: ['github', environmentVariablesUrl], bustCache: config.bustCache, cachettl: config.cachettl, useCache: config.useCache, },
-        environmentVariablesUrl,
-        { headers }
+        },
+        {
+          keys: ['github', branchUrl],
+          bustCache: config.bustCache,
+          cachettl: config.cachettl,
+          useCache: config.useCache
+        },
+        branchUrl,
+        { headers: requestHeaders }
       );
+
+      if (!branchData) {
+        throw new Error('Repository or branch not found');
+      }
+
+      const repoUrlParts = branchData?._links?.self?.split('/') || [];
+      const exactRepo = repoUrlParts.slice(-3, -2)?.[0];
+      const exactBranch = branchData?.name;
+      const exactOwner = repoUrlParts.slice(-4, -3)?.[0];
+
+      return {
+        owner: exactOwner,
+        repo: exactRepo,
+        branch: exactBranch,
+        environment: environmentName
+      };
+    } catch (error) {
+      logError("Error getting repository information:", error instanceof Error ? error.message : String(error));
+      throw error;
     }
-
-    const [repoVariables, environmentVariables] = await Promise.all([repoVariablesPromise, environmetVariablesPromises]);
-
-    return [...(repoVariables?.variables || []), ...(environmentVariables?.variables || [])]?.reduce((acc: any, item: any) => {
-      acc[item.name] = item.value;
-      return acc;
-    }, {}) || {};
   };
 
-  const variablesPromise: any = gitInfoPromise.then(getVariables);
+  // Initialize repository info promise
+  const repoInfoPromise: Promise<GitHubRepoInfo> = getExactRepoInfo(
+    config.owner,
+    config.repo,
+    config.branch,
+    config.environment
+  ).catch((error) => {
+    logError("Failed to get repository information:", error instanceof Error ? error.message : String(error));
+    throw error;
+  });
 
-  const readTextFile = async (path: string) => {
-    const gitInfo = await gitInfoPromise;
+  /**
+   * Gets environment variables from GitHub repository and environment
+   * 
+   * @returns Object containing all variables
+   */
+  const getVariables = async (): Promise<Record<string, string>> => {
+    try {
+      const repoInfo = await repoInfoPromise;
 
-    const url = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`;
+      // Get repository variables
+      const repoVariablesUrl = `${GITHUB_API_URL}/repos/${repoInfo.owner}/${repoInfo.repo}/actions/variables?per_page=30`;
+      const repoVariablesPromise = cacheModule(
+        async (url: string, options: RequestInit) => {
+          const response = await fetch(url, options);
 
-    const responsePromise = withCache(
-      (url: string, options: any) => fetch(url, options).then(async res => {
-        if (res.status === 200) {
-          return res.json()
-        } else if (res.status === 403) {
-          throw { error: 'Forbidden' }
-        } else {
-          return {
-            content: {
-              error: 'File not found'
-            }
+          if (response.status === 200) {
+            return await response.json();
+          } else if (response.status === 403) {
+            throw new Error('GitHub API access forbidden. Check your API key.');
+          } else {
+            logError(`GitHub API error: ${response.status} ${response.statusText}`);
+            return { variables: [] };
           }
-        }
-      }),
-      { keys: ['github', url], bustCache: config.bustCache, cachettl: config.cachettl, useCache: config.useCache, },
-      url,
-      { headers }
-    )
+        },
+        {
+          keys: ['github', repoVariablesUrl],
+          bustCache: config.bustCache,
+          cachettl: config.cachettl,
+          useCache: config.useCache
+        },
+        repoVariablesUrl,
+        { headers: requestHeaders }
+      );
 
-    const [response, variables] = await Promise.all([responsePromise, variablesPromise]);
+      // Get environment variables if environment is specified
+      let environmentVariablesPromise: Promise<{ variables: GitHubVariable[] }> = Promise.resolve({ variables: [] });
 
-    const content = atob(response.content);
+      if (repoInfo.environment) {
+        const environmentVariablesUrl = `${GITHUB_API_URL}/repos/${repoInfo.owner}/${repoInfo.repo}/environments/${repoInfo.environment}/variables?per_page=30`;
+        environmentVariablesPromise = cacheModule(
+          async (url: string, options: RequestInit) => {
+            const response = await fetch(url, options);
 
-    return { content, variables: { ENV: config.environment, ...variables } };
+            if (response.status === 200) {
+              return await response.json();
+            } else if (response.status === 403) {
+              throw new Error('GitHub API access forbidden. Check your API key.');
+            } else {
+              logError(`GitHub API error: ${response.status} ${response.statusText}`);
+              return { variables: [] };
+            }
+          },
+          {
+            keys: ['github', environmentVariablesUrl],
+            bustCache: config.bustCache,
+            cachettl: config.cachettl,
+            useCache: config.useCache
+          },
+          environmentVariablesUrl,
+          { headers: requestHeaders }
+        );
+      }
 
+      // Wait for both variable requests to complete
+      const [repoVariables, environmentVariables] = await Promise.all([
+        repoVariablesPromise,
+        environmentVariablesPromise
+      ]);
+
+      // Combine variables into a single object
+      const allVariables: Record<string, string> = {};
+
+      // Add repository variables
+      for (const variable of repoVariables?.variables || []) {
+        allVariables[variable.name] = variable.value;
+      }
+
+      // Add environment variables
+      for (const variable of environmentVariables?.variables || []) {
+        allVariables[variable.name] = variable.value;
+      }
+
+      return allVariables;
+    } catch (error) {
+      logError("Error getting variables:", error instanceof Error ? error.message : String(error));
+      return {};
+    }
   };
 
-  const readDir = async (path: string) => {
-    const gitInfo = await gitInfoPromise;
+  // Initialize variables promise
+  const variablesPromise: Promise<Record<string, string>> = repoInfoPromise.then(getVariables);
 
-    const url = `${GITHUB_API_URL}/repos/${gitInfo.owner}/${gitInfo.repo}/contents/${path}?ref=${gitInfo.branch}`;
+  /**
+   * Reads a text file from the GitHub repository
+   * 
+   * @param filePath - Path to the file in the repository
+   * @returns File content and variables, or null if not found
+   */
+  const readTextFile = async (filePath: string): Promise<FileContent | null> => {
+    try {
+      const repoInfo = await repoInfoPromise;
 
-    const response = await withCache(
-      (url: string, options: any) => fetch(url, options).then(async res => {
-        if (res.status === 200) {
-          return res.json()
-        } else if (res.status === 403) {
-          throw { error: 'Forbidden' }
-        } else {
-          return []
+      const fileUrl = `${GITHUB_API_URL}/repos/${repoInfo.owner}/${repoInfo.repo}/contents/${filePath}?ref=${repoInfo.branch}`;
+
+      const [fileResponse, variables] = await Promise.all([
+        cacheModule(
+          async (url: string, options: RequestInit) => {
+            const response = await fetch(url, options);
+
+            if (response.status === 200) {
+              return await response.json();
+            } else if (response.status === 403) {
+              throw new Error('GitHub API access forbidden. Check your API key.');
+            } else {
+              logError(`GitHub API error: ${response.status} ${response.statusText} for file ${filePath}`);
+              return null;
+            }
+          },
+          {
+            keys: ['github', fileUrl],
+            bustCache: config.bustCache,
+            cachettl: config.cachettl,
+            useCache: config.useCache
+          },
+          fileUrl,
+          { headers: requestHeaders }
+        ),
+        variablesPromise
+      ]);
+
+      if (!fileResponse || !fileResponse.content) {
+        logDebug(`File not found: ${filePath}`);
+        return null;
+      }
+
+      // Decode base64 content
+      const decodedContent = atob(fileResponse.content);
+
+      return {
+        content: decodedContent,
+        variables: {
+          ENV: repoInfo.environment,
+          ...variables
         }
-      }),
-      { keys: ['github', url], bustCache: config.bustCache, cachettl: config.cachettl, useCache: config.useCache, },
-      url,
-      { headers }
-    )
-
-    return response.map((entry: any) => ({
-      name: entry.name,
-      isFile: entry.type === "file",
-      isDirectory: entry.type === "dir",
-    }));
-
+      };
+    } catch (error) {
+      logError("Error reading file:", error instanceof Error ? error.message : String(error));
+      return null;
+    }
   };
 
+  /**
+   * Reads a directory from the GitHub repository
+   * 
+   * @param directoryPath - Path to the directory in the repository
+   * @returns Array of directory entries, or empty array if not found
+   */
+  const readDir = async (directoryPath: string): Promise<DirectoryEntry[]> => {
+    try {
+      const repoInfo = await repoInfoPromise;
+
+      const directoryUrl = `${GITHUB_API_URL}/repos/${repoInfo.owner}/${repoInfo.repo}/contents/${directoryPath}?ref=${repoInfo.branch}`;
+
+      const directoryContents = await cacheModule(
+        async (url: string, options: RequestInit) => {
+          const response = await fetch(url, options);
+
+          if (response.status === 200) {
+            return await response.json();
+          } else if (response.status === 403) {
+            throw new Error('GitHub API access forbidden. Check your API key.');
+          } else {
+            logError(`GitHub API error: ${response.status} ${response.statusText} for directory ${directoryPath}`);
+            return [];
+          }
+        },
+        {
+          keys: ['github', directoryUrl],
+          bustCache: config.bustCache,
+          cachettl: config.cachettl,
+          useCache: config.useCache
+        },
+        directoryUrl,
+        { headers: requestHeaders }
+      );
+
+      if (!Array.isArray(directoryContents)) {
+        logDebug(`Directory not found or not a directory: ${directoryPath}`);
+        return [];
+      }
+
+      // Map GitHub API response to DirectoryEntry format
+      return directoryContents.map((entry) => ({
+        name: entry.name,
+        isFile: entry.type === "file",
+        isDirectory: entry.type === "dir",
+      }));
+    } catch (error) {
+      logError("Error reading directory:", error instanceof Error ? error.message : String(error));
+      return [];
+    }
+  };
+
+  // Return the file loader adapter interface
   return {
     readTextFile,
-    readDir,
-    getVariables
+    readDir
   };
 }

@@ -57,6 +57,7 @@ const handlerConfig = {
                 const queryParams = Object.fromEntries(new URL(data.url).searchParams.entries());
                 const importUrl = atob(queryParams.__importUrl__);
                 const url = atob(queryParams.__proxyUrl__);
+                
                 const isJSX = queryParams.__isJSX__ === 'true';
                 data.url = url;
                 if (isJSX) {
