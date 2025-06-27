@@ -213,18 +213,20 @@ export default async function moduleLoader({
     try {
       instantiatedDependencies = await sharedModule({ ...instantiatedDependencies });
     } catch (err) {
-      console.error(`Error instantiating shared module: ${err.toString()}`);
+      if (err instanceof Error) {
+        console.error(`Error instantiating shared module: ${err.toString()}`);
+      } else {
+        console.error(`Error instantiating shared module: ${err}`);
+      }
     }
   }
 
   // Compose the middleware executor function.
-  async function middlewareExecutor(req, response): Promise<MiddlewareFunction> {
+  async function middlewareExecutor(this: any, req: any, response: any): Promise<MiddlewareFunction> {
     let currentReq = req;
     for (const Middleware of Middlewares) {
       if (Middleware) {
-        // Object.assign(Middleware, { ...middlewareExecutor });
         const middlewareResult = await Middleware.bind(this)(currentReq, response);
-        // Object.assign(middlewareExecutor, { ...Middleware });
         currentReq = middlewareResult;
       }
     }

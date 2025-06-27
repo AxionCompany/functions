@@ -1,6 +1,6 @@
-# Axion Framework
+# Oxian.js
 
-Axion is a versatile server-side framework designed for modular and adaptable web applications. It leverages Deno's capabilities to provide a robust environment for building scalable and efficient web services.
+Oxian.js is a versatile server-side framework designed for modular and adaptable web applications. It leverages Deno's capabilities to provide a robust environment for building scalable and efficient web services.
 
 ## Key Components
 
@@ -17,7 +17,7 @@ These components are initialized sequentially, with built-in error handling and 
 
 The File Loader is responsible for:
 
-- Loading and caching project configurations (axion.config.json and deno.json).
+- Loading and caching project configurations (oxian.config.json and deno.json).
 - Handling file requests with support for various loaders (local, GitHub, etc.).
 - Implementing caching strategies for improved performance.
 
@@ -33,7 +33,7 @@ The API Service:
 
 1. **Modular Architecture**: The framework is designed with modularity in mind, allowing easy extension and customization.
 
-2. **Dynamic Configuration**: Project-specific configurations (axion.config.json and deno.json) are dynamically loaded and applied.
+2. **Dynamic Configuration**: Project-specific configurations (oxian.config.json and deno.json) are dynamically loaded and applied.
 
 3. **Isolation**: The framework uses Deno's worker capabilities to isolate different components, enhancing stability and resource management.
 
@@ -56,12 +56,13 @@ The API Service:
 
 This architecture allows for a flexible and scalable system that can adapt to various project requirements while maintaining performance and stability.
 
+---
 
-# Axion Framework Architecture
+# Oxian.js Framework Architecture
 
 ## Overview
 
-Axion is a versatile server-side framework designed for building modular and adaptable web applications. It leverages Deno's capabilities to provide a robust environment for scalable and efficient web services.
+Oxian.js is a versatile server-side framework designed for building modular and adaptable web applications. It leverages Deno's capabilities to provide a robust environment for scalable and efficient web services.
 
 ## Key Components
 
@@ -88,7 +89,6 @@ Configuration options:
 ### 3. Proxy (proxy/main.ts)
 
 The proxy acts as the main request handler and manages isolates:
-
 
 Key functionalities:
 - Parses incoming request URLs
@@ -122,13 +122,11 @@ Configuration options:
 
 #### 5.1 Regular Isolate (isolate/adapters/isolate.ts)
 
-Handles regular JavaScript/TypeScript isolate initialization and execution:
-
+Handles regular JavaScript/TypeScript isolate initialization and execution.
 
 #### 5.2 JSX Isolate (isolate/adapters/jsx-isolate.ts)
 
-Handles JSX-specific isolate initialization and execution:
-
+Handles JSX-specific isolate initialization and execution.
 
 Both isolate adapters:
 - Initialize the execution environment
@@ -171,7 +169,7 @@ Configuration options:
 
 1. Isolates are created on-demand based on incoming requests.
 2. Each isolate is associated with a specific file path and runs in a sandboxed environment.
-3. Isolates can be upgraded if they become outdated (based on `shouldUpgradeAfter` config).
+3. Isolates can be upgraded when the upgrade system determines it's necessary.
 4. Idle isolates are terminated after a configurable period (`isolateMaxIdleTime`) to manage resources efficiently.
 
 ## Caching Strategies
@@ -180,10 +178,9 @@ Configuration options:
 - Isolate metadata is cached to avoid unnecessary recreation of isolates.
 - CSS processing results are cached and streamed asynchronously for optimal performance.
 
-
 ## Adapters
 
-Adapters in the Axion Framework provide a powerful mechanism to customize and extend the behavior of various components. They are loaded dynamically and can modify the configuration and behavior of the system.
+Adapters in the Oxian.js Framework provide a powerful mechanism to customize and extend the behavior of various components. They are loaded dynamically and can modify the configuration and behavior of the system.
 
 ### Location and Loading
 
@@ -198,7 +195,7 @@ An adapter is a module that exports a default function. This function receives t
 Adapters can export and modify the following properties and functions:
 
 1. `loaderConfig`: Configures the file loader behavior.
-   - `username`: Sets the username for the file loader URL, that is used  by file-loader to determine the source for serving the files. Has the following format:
+   - `username`: Sets the username for the file loader URL, that is used by file-loader to determine the source for serving the files. Has the following format:
         - `${provider}--${org}--${repo}--${branch}--${environment}`.
         - By default, it'll consider `provider`= `local`, and load files for local filesystem.
    - `password`: Sets the password for the file loader URL (if applicable).
@@ -213,9 +210,9 @@ Adapters can export and modify the following properties and functions:
     }
     ```
 
-2. `shouldUpgradeAfter`: A timestamp indicating when isolates should be upgraded. Instead of needing to deploy an application (if you are using any remote file-loader option like github), you unly need to update this variable in order to update your app to the newest version. Before redirecting trafic, it performs a healthchek, and if it passes, traffic is redirected to the newly instantiated isolate. Else, it goes back to the previous healthy isolate serving the requests.
+2. Production upgrade control: Use `triggerUpgrade()` function from the upgrade manager to trigger upgrades when needed. This provides a clean way to implement custom upgrade strategies without complex timestamp logic.
 
-3. `isolateType`:  The 'isolateType' property is a crucial configuration option in Axion Functions that determines how isolated environments (isolates) are created for executing code. This property can be customized in the adapters.ts file and is implemented in the isolateFactory.ts file within the proxy directory.
+3. `isolateType`: The 'isolateType' property is a crucial configuration option in Oxian.js that determines how isolated environments (isolates) are created for executing code. This property can be customized in the adapters.ts file and is implemented in the isolateFactory.ts file within the proxy directory.
 
 There are two main types of isolates supported:
 
@@ -247,8 +244,7 @@ Let's look at the key differences between these two types:
 
 The choice between these two types allows developers to optimize their application based on their specific needs. For most cases, the Web Worker Isolate (default) provides a good balance of isolation and performance. However, for situations requiring stricter isolation or specific system-level permissions, the Subprocess Isolate can be used.
 
-To change the isolate type, you would modify the 'isolateType' property in the adapters.ts file. This flexibility allows Axion Functions to cater to a wide range of use cases and performance requirements.
-
+To change the isolate type, you would modify the 'isolateType' property in the adapters.ts file. This flexibility allows Oxian.js to cater to a wide range of use cases and performance requirements.
 
 ### Usage in the System
 
@@ -263,31 +259,42 @@ To change the isolate type, you would modify the 'isolateType' property in the a
 
 ### Example Adapter
 
-Here's a simple example of an adapter:
+Here's a simple example of an adapter using the new upgrade system:
 
 ```typescript
+import { triggerUpgrade } from "./src/utils/upgradeManager.ts";
+
 export default async function adapter(config: any) {
+  // Production upgrade example: every hour
+  if (config.env?.ENV === 'production') {
+    const lastUpgrade = globalThis.lastUpgradeTime || 0;
+    const hoursSinceLastUpgrade = (Date.now() - lastUpgrade) / (1000 * 60 * 60);
+    
+    if (hoursSinceLastUpgrade >= 1) {
+      triggerUpgrade();
+      globalThis.lastUpgradeTime = Date.now();
+    }
+  }
+
   return {
     ...config,
     loaderConfig: {
       username: 'custom-loader',
       password: 'secret-password'
     },
-    shouldUpgradeAfter: Date.now() + 3600000, // Upgrade after 1 hour
-    isolateType:'subprocess',
-    mapFilePathToIsolateId: ({formattedFilePath})=>formattedFileUrl) // one isolate per file
-    
+    isolateType: 'subprocess',
+    mapFilePathToIsolateId: ({formattedFilePath}) => formattedFileUrl // one isolate per file
   };
 }
 ```
 
 ## Configuration and Customization
 
-The Axion Framework allows for extensive configuration and customization:
+The Oxian.js Framework allows for extensive configuration and customization:
 
 1. Project-wide configuration:
-   - `adapters.{ts|js}`: Overrides default behaviors of axion-functions.
-   - `axion.config.json`: Defines project-wide settings
+   - `adapters.{ts|js}`: Overrides default behaviors of oxian.js.
+   - `oxian.config.json`: Defines project-wide settings
    - `deno.json`: Configures Deno-specific options
 
 2. Custom loaders:
@@ -307,6 +314,118 @@ The Axion Framework allows for extensive configuration and customization:
 6. Caching:
    - Configure caching strategies for file content, isolate metadata, and execution results
 
+## Upgrade System
+
+Oxian.js implements an **isolate-based upgrade mechanism** following DRY and KISS principles:
+
+### Development Mode
+- **Instant upgrades**: File watcher automatically triggers upgrades for all isolates when relevant files change
+- **Smart filtering**: Ignores changes in the `data` folder (Deno cache) to prevent infinite loops
+- **File types**: Monitors `.html`, `.js`, `.jsx`, `.tsx`, `.ts`, and `.json` files
+- **Zero configuration**: Works automatically when `ENV=development`
+- **Global effect**: All isolates are upgraded when any file changes (suitable for development)
+
+### Production Mode
+- **Isolate-specific control**: Applications implement upgrade strategies per isolate via adapters
+- **Granular targeting**: Upgrade individual isolates without affecting others
+- **Flexible triggers**: Time-based, external signals, version checks, or custom logic per isolate
+- **Zero-downtime**: New isolates are health-checked before receiving traffic
+- **Graceful fallback**: Failed upgrades don't affect existing healthy isolates
+- **Multi-tenant support**: Different projects/tenants can upgrade independently
+
+### Implementation
+
+The upgrade system is centralized in the `UpgradeManager` class with per-isolate tracking:
+
+```typescript
+// Development: automatic file watching (affects all isolates)
+if (env === 'development') {
+  // File watcher triggers upgrades for all isolates
+  triggerUpgradeForAll();
+}
+
+// Production: isolate-specific control
+export function triggerUpgrade(isolateId: string): void {
+  // Trigger upgrade for specific isolate only
+}
+
+// Isolate-specific check
+export function shouldUpgradeNow(isolateId: string): boolean {
+  // Returns true if this specific isolate should upgrade
+}
+```
+
+### Adapter Examples
+
+#### Isolate Identification
+Adapters can identify isolates based on various strategies:
+
+```typescript
+function getIsolateIdForRequest(adapterData: any): string {
+  const url = new URL(adapterData.url);
+  const pathParts = url.pathname.split('/').filter(Boolean);
+  
+  // Strategy 1: Project-based
+  if (pathParts[0] === 'api' && pathParts[1]) {
+    return `project_${pathParts[1]}`;
+  }
+  
+  // Strategy 2: User-based
+  const userId = adapterData.headers.get('x-user-id');
+  if (userId) return `user_${userId}`;
+  
+  // Strategy 3: Environment-based
+  return adapterData.env?.ENV || 'default';
+}
+```
+
+#### Upgrade Strategies
+```typescript
+// Time-based upgrades per isolate
+if (baseAdapters.env?.ENV === 'production') {
+  const timestampKey = `lastUpgradeTime_${isolateId}`;
+  const hoursSinceLastUpgrade = (Date.now() - lastUpgrade) / (1000 * 60 * 60);
+  if (hoursSinceLastUpgrade >= 1) {
+    triggerUpgrade(isolateId); // Only this isolate
+  }
+}
+
+// External signal upgrades per isolate
+if (checkExternalUpgradeSignal(isolateId)) {
+  triggerUpgrade(isolateId);
+}
+
+// Version-based upgrades per project
+if (getCurrentVersion(isolateId) !== getTargetVersion(isolateId)) {
+  triggerUpgrade(isolateId);
+}
+
+// Feature flag based upgrades
+if (isFeatureFlagEnabled('new_version', isolateId)) {
+  triggerUpgrade(isolateId);
+}
+```
+
+### Benefits
+
+- **Granular Control**: Upgrade specific isolates without affecting others
+- **Multi-tenant Safe**: Different projects can upgrade independently
+- **Flexible Targeting**: Isolates can be identified by project, user, environment, etc.
+- **Development Friendly**: All isolates upgrade together in development mode
+- **Production Optimized**: Fine-grained control for production deployments
+- **Simple API**: Clean `triggerUpgrade(isolateId)` interface
+- **DRY**: No duplicate upgrade logic across files
+- **KISS**: Easy to understand and maintain
+
+### Use Cases
+
+1. **Multi-tenant SaaS**: Each tenant can upgrade independently
+2. **A/B Testing**: Upgrade specific user groups or feature flags
+3. **Environment Isolation**: Staging vs production upgrades
+4. **Project Isolation**: Different projects in the same instance
+5. **Gradual Rollouts**: Upgrade isolates in phases
+6. **Emergency Fixes**: Target specific affected isolates only
+
 ## Conclusion
 
-The Axion Framework provides a flexible and scalable architecture for building web applications. Its modular design, isolate-based execution model, and extensive configuration options allow developers to create efficient and secure server-side applications while maintaining the ability to customize and extend the framework's capabilities.
+The Oxian.js Framework provides a flexible and scalable architecture for building web applications. Its modular design, isolate-based execution model, and extensive configuration options allow developers to create efficient and secure server-side applications while maintaining the ability to customize and extend the framework's capabilities.

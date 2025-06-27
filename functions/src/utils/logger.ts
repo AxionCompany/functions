@@ -1,7 +1,8 @@
 /**
- * Logger utility for Axion Functions
+ * Logger utility for Oxian Functions
  * 
- * Provides consistent logging functionality with configurable log levels
+ * Provides centralized logging functionality with different log levels
+ * and environment-specific behavior.
  */
 
 /**

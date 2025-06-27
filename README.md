@@ -1,566 +1,564 @@
-# Axion Functions
+# Oxian Functions
 
-Axion Functions is a full-stack development framework designed to simplify the process of developing applications. It leverages JavaScript (JS) and ES Modules, supporting both backend modules and front-end React components, with automatic routing and rendering. Axion Functions runs on the Deno runtime, eliminating the need for npm package management (but still compatible with it).
-# Quickstart
+Oxian Functions is a full-stack development framework designed to simplify the process of developing applications. It leverages JavaScript (JS) and ES Modules, supporting both backend modules and front-end React components, with automatic routing and rendering. Oxian Functions runs on the Deno runtime, eliminating the need for npm package management (but still compatible with it).
 
-Get started with Axion Functions in a few simple steps:
+## Quick Start
+Get started with Oxian Functions in a few simple steps:
 
-1. **Install Deno**: Download from [deno.land](https://deno.land/)
+Create a simple React page:
 
-2. **Create project structure**:
-   ```
-   my-project/
-   ├── api/
-   │   └── hello.ts
-   ├── pages/
-   │   └── home.jsx
-   ```
+```bash
+mkdir functions
+mkdir functions/pages
 
-3. **Create a backend module** (`api/hello.ts`):
-   ```typescript
-   export default (props) => {
-     return `Hello, ${props.name || 'World'}!`;
-   };
-   ```
+cat > functions/pages/home.jsx << EOF
+export default function HomePage({ user = 'World' }) {
+  return <div>Welcome to Oxian Functions!</div>;
+}
+EOF
+```
 
-4. **Create a frontend component** (`pages/home.jsx`):
-   ```jsx
-   import React from 'npm:react'; // in Deno, you can use npm: specifiers to import modules without need to `npm install`.
+Create a simple API endpoint:
 
-   const HomePage = (props) => {
-     return <div>Welcome to Axion Functions!</div>;
-   };
+```bash
+mkdir functions/api
 
-   export default HomePage;
-   ```
+cat > functions/api/hello.js << EOF
+export default function ({ name = 'World' }) {
+  return { message: \`Hello, \${name}!\` };
+}
+EOF
+```
 
-5. **Start the application**:
-   ```sh
-   deno run -A https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts
-   ```
+Start the server:
+```bash
+deno run -A https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts
+```
 
-7. **Test your application**:
-   - Backend: `curl http://localhost:9002/api/hello?name=Axion`
-   - Frontend: Open `http://localhost:9002/pages/home` in your browser
+Test your endpoints:
+- Frontend: Visit `http://localhost:9002/pages/home` to see your React component rendered
+- Backend: `curl http://localhost:9002/api/hello?name=Oxian`
 
-You now have a basic Axion Functions application up and running!
+You now have a basic Oxian Functions application up and running!
 
+---
 
-## Our Commitment
+**⚠️ This project is under active development, APIs may change, and the documentation might not always be up to date.**
 
-Our end goal is to increase productivity for JS developers, and our commitment is to always push to the frontier of what web technology allowes, and keeping the utmost simplicity for JS software developers. 
+---
 
-## Why we built Axion Functions
-Axion Functions was developed by Axion Company, a custom software development company. The main motivation behind creating this framework was to facilitate the development process for our projects, which predominantly use the JavaScript stack. We found ourselves solving similar coding problems across different projects and wanted a way to reuse code snippets efficiently, both for backend modules and frontend components. 
-Beyond reusing front-end components or backend modules that were common across different projects, we've realized other aspects of the lifecycle of a project can be optimized as well, many of which we hope to address with this framework going forward, but always with the core mantra in mind: keep the utmost simplicity for software developers:
-- Observability
-- Performance
-- Deployment in Distributed Systems
+## Why we built Oxian Functions
+Oxian Functions was developed by Oxian Company, a custom software development company. The main motivation behind creating this framework was to facilitate the development process for our projects, which predominantly use the JavaScript ecosystem for both frontend and backend development.
 
-### Inspiration
-The framework draws significant inspiration from several sources:
+In many cases, traditional tools seemed unnecessarily complex or required extensive configuration for relatively simple tasks. We wanted a solution that would allow developers to build full-stack applications quickly, without the overhead of managing build tools, bundlers, or complex deployment setups.
 
-- **Module Federation in Webpack** : Developed by the amazing Zach Jackson, Module Federation provides a way to dynamically import modules across different projects. We extended this concept to Deno, taking advantage of its compatibility with Node modules and its ability to import modules from HTTP URLs with security restrictions.
-- **Deno Deploy** : We were amazed by the speed and developer experience of Deno Deploy. The concepts of process isolation and the N+2 port requirement in Axion Functions are (albeit different) inspired by Deno Deploy's architecture, which ensures fast, isolated, and efficient execution of code.
-- **Next.js** : Next.js is a popular React framework that simplifies the development of full-stack applications. We wanted to create a similar experience for Deno developers, allowing them to write backend modules and frontend components in a unified environment with automatic routing and rendering.
+We aim to provide a more streamlined development experience while maintaining the flexibility to handle complex requirements as applications grow. The focus on 'isolated processes' and the N+2 port requirement in Oxian Functions are (albeit different) inspired by Deno Deploy's architecture, which ensures fast, isolated, and efficient execution of code.
 
-### Why Deno?
-We chose Deno as the foundation for Axion Functions because it offers:
+**Our philosophy:**
 
-- Native TypeScript Support: Deno supports TypeScript out of the box, which aligns with our development needs.
-- Secure by Default: Deno's security model allows us to specify permissions for file system access, environment variables, and network requests.
-- Node Compatibility: Deno is compatible with Node modules, making it easy to reuse existing JavaScript code.
-- HTTP Imports: Deno's ability to import modules directly from URLs simplifies dependency management and enhances modularity.
+We chose Deno as the foundation for Oxian Functions because it offers:
+- **Modern JavaScript**: Full support for ES Modules, TypeScript, and modern JS features out of the box
+- **Security by default**: Permissions-based security model
+- **No node_modules**: Direct import from URLs eliminates dependency management headaches
+- **Web Standards**: Built on web platform APIs that developers already know
 
-We believe that developers should spend more time creating and less time configuring. Axion Functions simplifies the development process by providing a unified environment for writing backend and front-end code, with automatic routing and rendering, but still - all of it as isolated processes. With Axion Functions, you can build full-stack applications quickly and efficiently, without the overhead of managing dependencies, build tools, routes, boilerplates, etc. Less configuration, more coding - that's the Axion way.
+We believe that developers should spend more time creating and less time configuring. Oxian Functions simplifies the development process by providing a unified environment for writing backend and front-end code, with automatic routing and rendering, but still - all of it as isolated processes. With Oxian Functions, you can build full-stack applications quickly and efficiently, without the overhead of managing dependencies, build tools, routes, boilerplates, etc. Less configuration, more coding - that's the Oxian way.
 
-## Features
+---
 
-- **Full-Stack Development**: Write ES Modules for both backend and front-end components.
-- **Automatic Routing**: File structure determines API endpoint routes and website paths.
-- **Easy Imports**: Directly import npm packages using `npm:` specifiers.
-- **Just-in-Time Building**: Automatic, on-the-fly building and caching of files.
-- **Simplified Setup**: No need for `npm install` or manual builds.
-- **Process Isolation**: Isolated execution of modules and components to prevent application-wide crashes.
+## Getting Started
 
-## Installation
+For a more detailed introduction to the system, check out the [ARCHITECTURE.md](./ARCHITECTURE.md) file, which provides a comprehensive overview of how the framework works.
 
-Axion Functions runs on the Deno runtime. Ensure you have Deno installed on your machine. You can download and install Deno from [deno.land](https://deno.land/).
+For quick reference and common patterns, see the [Cheat_Sheet.md](./Cheat_Sheet.md).
 
-## Starting the Application Server
+### Prerequisites
 
-The recommended way of starting the application is by creating a `deno.json` file with the following content:
+Oxian Functions runs on the Deno runtime. Ensure you have Deno installed on your machine. You can download and install Deno from [deno.land](https://deno.land/).
+
+### Running Oxian Functions
+
+You can run Oxian Functions in two ways:
+
+**Method 1: Using deno task**
+
+Create a `deno.json` file in your project root:
 
 ```json
 {
-    "tasks":  {
-        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts",
-        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=https://raw.githubusercontent.com/AxionCompany/functions/main -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts"
+    "tasks": {
+        "start": "DENO_DIR=./data/oxian/cache/.deno ENV=production deno run -A --importmap=deno.json --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts",
+        "dev": "DENO_DIR=./data/oxian/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=https://raw.githubusercontent.com/AxionCompany/functions/main -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts"
+    },
+    "imports": {
+        "react": "npm:react",
+        "react-dom/server": "npm:react-dom/server"
     }
 }
 ```
-This configuration defines two tasks:
-- start: Runs the application on port 8000.
-- dev: Runs the application in development mode with reload-on-save.
 
-### Add Configuration File
+Optionally, create a configuration file:
+
 ```json
-// axion.config.json
+// oxian.config.json
 {
-    "functionsDir": ".",
-    "dirEntrypoint": "main"
+    "dirEntrypoint": "index",
+    "functionsDir": "functions"
 }
 ```
 
-This configuration specifies that the current directory (` .`) should be served as the root directory for modules and components, and the default entry point for directories is `main`.
-
-### Start the Application
-
-To start the application, run:
-
-```sh
-deno task start
+And then run:
+```bash
+deno task start # for production
+deno task dev   # for development with hot reload
 ```
-For development mode, run:
 
-```sh
-deno task dev
-```
-### Alternative: Using npm Scripts
-If you prefer to use npm, you can create a package.json file with the following content:
+**Method 2: Direct execution**
 
 ```json
 {
-    "scripts": {
-        "start": "DENO_DIR=./data/axion/cache/.deno ENV=production deno run -A --importmap=deno.json --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts",
-        "dev": "DENO_DIR=./data/axion/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=https://raw.githubusercontent.com/AxionCompany/functions/main -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts"
+    "tasks": {
+        "start": "DENO_DIR=./data/oxian/cache/.deno ENV=production deno run -A --importmap=deno.json --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts",
+        "dev": "DENO_DIR=./data/oxian/cache/.deno ENV=development WATCH=true deno run --importmap=deno.json --reload=https://raw.githubusercontent.com/AxionCompany/functions/main -A --no-lock --unstable-sloppy-imports  --no-prompt --unstable https://raw.githubusercontent.com/AxionCompany/functions/main/main.ts"
+    },
+    "imports": {
+        "react": "npm:react",
+        "react-dom/server": "npm:react-dom/server",
+        "oxian-components/": "https://raw.githubusercontent.com/AxionCompany/axions-web/main/src/components/",
+        "oxian-modules/": "https://raw.githubusercontent.com/AxionCompany/functions/main/functions/modules/"
     }
 }
 ```
-To start the application using npm, run:
 
-```sh
-npm run start
-```
-For development mode, run:
+Both methods will pull Oxian Functions' code from GitHub and execute it on your local machine, starting the server.
 
-```sh
-npm run dev
-```
+---
 
-Both methods will pull Axion Functions' code from GitHub and execute it on your local machine, starting the server.
+## Backend Usage
 
-* p.s.: even if using npm commands, you still need to have Deno installed on your machine. *
+Backend modules in Oxian Functions are JavaScript files that export a default function. These functions are automatically mapped to API endpoints based on their file structure.
 
+### Example: Basic API Endpoint
 
-## Usage
-
-1. **Creating Backend Modules**: Use `.ts` or `.js` extensions.
-
-Any exported function will be automatically executed for the corresponding http method. If the function is not explicitly defined, the default export function will be executed, which accepts any http method.
-Any query, body or path parameters will be automatically parsed from the request and passed to the function as parameters.
+Create a file `functions/api/hello.js`:
 
 ```javascript
-// api/hello.ts
-export default (props) => { // default export functions will be executed for any http method that is not explicitly defined
-    return `Hello, ${props.name || 'World'}!`;
-};
-
-export const GET = (props) => { // GET method will be executed for the api/hello endpoint. If available, takes precedence over the default export function
-    return `Hello, ${props.name || 'World'} via GET!`;
-};
-
-export const POST = (props) => { // POST method will be executed for the api/hello endpoint. If available, takes precedence over the default export function
-    return `Hello, ${props.name || 'World'} via POST!`;
-};
-
-export const PUT = (props) => { // PUT method will be executed for the api/hello endpoint. If available, takes precedence over the default export function
-    return `Hello, ${props.name || 'World'} via PUT!`;
-};
-
-export const DELETE = (props) => { // DELETE method will be executed for the api/hello endpoint. If available, takes precedence over the default export function
-    return `Hello, ${props.name || 'World'} via DELETE!`;
-};
+export default function({ name = 'World' }) {
+  return { message: `Hello, ${name}!` };
+}
 ```
 
-**Testing Backend Modules with curl**:
-```sh
-# Default export
-curl -X GET "http://localhost:9002/api/hello?name=Axion" // will execute the default export function
+This creates an API endpoint accessible at `http://localhost:9002/api/hello`.
 
-# GET method
-curl -X GET "http://localhost:9002/api/hello/GET?name=Axion"
+### HTTP Methods
 
-# POST method
-curl -X POST "http://localhost:9002/api/hello/POST" -d '{"name":"Axion"}'
+You can handle different HTTP methods by exporting named functions or using a default function:
+
+```bash
+curl -X GET "http://localhost:9002/api/hello?name=Oxian" // will execute the default export function
+curl -X GET "http://localhost:9002/api/hello/GET?name=Oxian"
+curl -X POST "http://localhost:9002/api/hello/POST" -d '{"name":"Oxian"}'
 ```
 
-2. **Creating Front-End Modules**: Use `.jsx` or `.tsx` extensions.
+---
 
-    Axion functions will assume that front-end modules are React components, and will automatically render them in the browser. Any files with the .jsx or .tsx extension will be considered as React components. 
+## Frontend Usage
 
-    ```jsx
-    // pages/home.jsx
-    import React from 'npm:react';
+Oxian functions will assume that front-end modules are React components, and will automatically render them in the browser. Any files with the .jsx or .tsx extension will be considered as React components.
 
-    const HomePage = (props) => {
-        return <div>Welcome, {props.user || 'Guest'}!</div>;
-    };
+### Example: Basic React Component
 
-    export default HomePage;
-    ```
-
-    **Testing Front-End Modules in Browser**:
-    - Open your browser and navigate to `http://localhost:9002/pages/home?user=Axion` to see the HomePage component in action.
-
-3. **Path Parameters**: Use `[filename]` syntax for dynamic routes.
-    ```jsx
-    // pages/[userId]/profile.jsx
-    import React from 'npm:react';
-
-    const UserProfile = (props) => {
-        return <div>User Profile for ID: {props.userId}</div>;
-    };
-
-    export default UserProfile;
-    ```
-
-    **Testing Dynamic Routes in Browser**:
-    - Open your browser and navigate to `http://localhost:9002/pages/123/profile` to see the UserProfile component for user ID 123.
-
-
-### Full-Stack Example: Mini Task Management Application
-
-#### Backend Module
-This backend module will handle adding, viewing, and deleting tasks. It will use an in-memory storage for simplicity.
-
-```javascript
-// api/tasks.ts
-import { v4 as uuidv4 } from 'npm:uuid';
-
-let tasks = [];
-
-// Get all tasks
-export const GET = ({...params}) => { // GET is the default method for the api/tasks endpoint. Any query parameters will be automatically passed to the function
-    return tasks;
-};
-
-// Add a new task
-export const POST = ({name}) => { // name is the body parameter, and will be automatically parsed from the request body and passed to the function
-    const task = { id: uuidv4(), name };
-    tasks.push(task);
-    return task;
-};
-
-// Delete a task
-export const DELETE = ({id}) => { // :id path parameter will automatically be passed to the function
-    tasks = tasks.filter(task => task.id !== id);
-    return { success: true };
-};
-```
-
-#### Testing Backend Module with curl:
-
-```sh
-# Get all tasks
-curl -X GET "http://localhost:9002/api/tasks?name=Axion"
-
-# Add a new task
-curl -X POST "http://localhost:9002/api/tasks" -H "Content-Type: application/json" -d '{"name":"Sample Task"}'
-
-# Delete a task (replace <task-id> with actual task ID)
-curl -X DELETE "http://localhost:9002/api/tasks?id=<task-id>"
-```
-
-#### Front-End Component
-This front-end component will interact with the backend to display the list of tasks and provide a form to add new tasks.
+Create a file `functions/pages/home.jsx`:
 
 ```jsx
-// pages/tasks.jsx
-import React, { useState, useEffect } from 'npm:react';
-
-const TasksPage = ({...props}) => {
-    const [tasks, setTasks] = useState([]);
-    const [taskName, setTaskName] = useState('');
-
-    useEffect(() => {
-        fetch('/api/tasks')
-            .then(response => response.json())
-            .then(data => setTasks(data));
-    }, []);
-
-    const addTask = (e) => {
-        e.preventDefault();
-        fetch('/api/tasks', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ name: taskName }),
-        })
-            .then(response => response.json())
-            .then(newTask => {
-                setTasks([...tasks, newTask]);
-                setTaskName('');
-            });
-    };
-
-    const deleteTask = (id) => {
-        fetch(`/api/tasks?id=${id}`, {
-            method: 'DELETE',
-        })
-            .then(() => {
-                setTasks(tasks.filter(task => task.id !== id));
-            });
-    };
-
-    return (
-        <div>
-            <h1>Task Management</h1>
-            <form onSubmit={addTask}>
-                <input
-                    type="text"
-                    value={taskName}
-                    onChange={(e) => setTaskName(e.target.value)}
-                    placeholder="Enter task name"
-                    required
-                />
-                <button type="submit">Add Task</button>
-            </form>
-            <ul>
-                {tasks.map(task => (
-                    <li key={task.id}>
-                        {task.name} <button onClick={() => deleteTask(task.id)}>Delete</button>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
-
-export default TasksPage;
+export default function HomePage({ user = 'Guest' }) {
+  return (
+    <div>
+      <h1>Welcome, {user}!</h1>
+      <p>This is your home page.</p>
+    </div>
+  );
+}
 ```
 
-#### Testing Front-End Component in Browser:
+- Open your browser and navigate to `http://localhost:9002/pages/home?user=Oxian` to see the HomePage component in action.
 
-Open your browser and navigate to `http://localhost:9002/pages/tasks` to see the task management application in action.
+---
 
-## Advanced Concepts
-### Shared Modules
-Axion Functions supports "shared" modules, which allow you to reuse code across multiple files in the same directory or any subdirectories. This helps keep your code DRY (Don't Repeat Yourself) and maintainable.
+## Advanced Examples
 
-#### Example: Using Shared Modules
+### Backend: Task Management API
 
-1. Create a Shared Module:
+Create `functions/api/tasks.js`:
 
 ```javascript
-// backend/shared.js
-import { v4 as uuidv4 } from 'npm:uuid'; // in Deno, we use the npm: prefix to import modules from npm, without the need for npm install
+const tasks = [];
 
-export default (modules) => ({ ...modules, uuid: uuidv4 });
+export function GET() {
+  return { tasks };
+}
+
+export function POST({ title, description }) {
+  const task = { id: Date.now(), title, description, completed: false };
+  tasks.push(task);
+  return { task };
+}
+
+export function PUT({ id, completed }) {
+  const task = tasks.find(t => t.id === parseInt(id));
+  if (task) {
+    task.completed = completed;
+    return { task };
+  }
+  return { error: 'Task not found' };
+}
+
+export function DELETE({ id }) {
+  const index = tasks.findIndex(t => t.id === parseInt(id));
+  if (index !== -1) {
+    const task = tasks.splice(index, 1)[0];
+    return { task };
+  }
+  return { error: 'Task not found' };
+}
 ```
-2. Consume the Shared Module:
+
+Test the API:
+```bash
+curl -X GET "http://localhost:9002/api/tasks?name=Oxian"
+curl -X POST "http://localhost:9002/api/tasks" -d '{"title":"Learn Oxian","description":"Explore the framework"}'
+```
+
+### Frontend: Task Management Interface
+
+Create `functions/pages/tasks.jsx`:
+
+```jsx
+import { useState, useEffect } from 'react';
+
+export default function TasksPage() {
+  const [tasks, setTasks] = useState([]);
+  const [newTask, setNewTask] = useState({ title: '', description: '' });
+
+  useEffect(() => {
+    fetch('/api/tasks')
+      .then(res => res.json())
+      .then(data => setTasks(data.tasks));
+  }, []);
+
+  const addTask = async () => {
+    const response = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTask)
+    });
+    const data = await response.json();
+    setTasks([...tasks, data.task]);
+    setNewTask({ title: '', description: '' });
+  };
+
+  return (
+    <div>
+      <h1>Task Management</h1>
+      <div>
+        <input
+          type="text"
+          placeholder="Title"
+          value={newTask.title}
+          onChange={(e) => setNewTask({...newTask, title: e.target.value})}
+        />
+        <input
+          type="text"
+          placeholder="Description"
+          value={newTask.description}
+          onChange={(e) => setNewTask({...newTask, description: e.target.value})}
+        />
+        <button onClick={addTask}>Add Task</button>
+      </div>
+      <ul>
+        {tasks.map(task => (
+          <li key={task.id}>
+            <strong>{task.title}</strong>: {task.description}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+---
+
+## Shared Modules
+
+Oxian Functions supports "shared" modules, which allow you to reuse code across multiple files in the same directory or any subdirectories. This helps keep your code DRY (Don't Repeat Yourself) and maintainable.
+
+### How Shared Modules Work
+
+Create a file named `shared.js` or `shared.ts` in any directory. This module will be automatically available to all files in the same directory and any subdirectories.
+
+### Example: Database Connection Shared Module
+
+Create `functions/shared.js`:
 
 ```javascript
-// backend/tasks.ts
-export const POST = (body) => {
-    const { uuid } = POST;
-    const task = { id: uuid(), ...body };
-    tasks.push(task);
-    return task;
+// This will be available to all files in the functions directory and subdirectories
+export const db = {
+  users: [],
+  
+  addUser(user) {
+    this.users.push({ id: Date.now(), ...user });
+  },
+  
+  getUsers() {
+    return this.users;
+  }
+};
+
+export const config = {
+  apiVersion: 'v1',
+  maxUsers: 100
 };
 ```
 
-In this example, the uuid function is shared across the backend directory and its subdirectories, allowing you to easily generate unique IDs in multiple modules without repeating the import statement. 
+Now you can use this shared module in any API endpoint or page:
 
-You'll be able to deconstruct it from the exported function name being executed (in this example, from `POST` function inside the `api/tasks.ts` file).
+`functions/api/users.js`:
+```javascript
+import { db, config } from './shared.js';
 
-### Layout Components
-Axion Functions also supports "layout" components, which allow you to define a common structure or layout for your frontend components. This is particularly useful for elements like headers, footers, and menus that should be consistent across multiple pages.
+export function GET() {
+  return { users: db.getUsers(), version: config.apiVersion };
+}
 
-#### Example: Using Layout Components
+export function POST({ name, email }) {
+  if (db.users.length >= config.maxUsers) {
+    return { error: 'Maximum users reached' };
+  }
+  
+  db.addUser({ name, email });
+  return { success: true, users: db.getUsers() };
+}
+```
 
-1. Create a Layout Component:
+## Layout Components
+
+Oxian Functions also supports "layout" components, which allow you to define a common structure or layout for your frontend components. This is particularly useful for elements like headers, footers, navigation bars, and other UI components that should be consistent across multiple pages.
+
+### How Layout Components Work
+
+Create a file named `layout.jsx` or `layout.tsx` in any directory. This layout will be automatically applied to all pages in the same directory and any subdirectories.
+
+### Example: Common Layout
+
+Create `functions/pages/layout.jsx`:
 
 ```jsx
-// pages/layout.jsx
-export default ({ children }) => {
-    return (
-        <>
-            <header>This is a header</header>
-            <main>{children}</main>
-            <footer>This is a footer</footer>
-        </>
-    );
-};
+export default function Layout({ children, title = 'My App' }) {
+  return (
+    <html>
+      <head>
+        <title>{title}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
+      <body>
+        <header>
+          <nav>
+            <a href="/pages/home">Home</a>
+            <a href="/pages/about">About</a>
+            <a href="/pages/tasks">Tasks</a>
+          </nav>
+        </header>
+        <main>
+          {children}
+        </main>
+        <footer>
+          <p>&copy; 2024 My App. All rights reserved.</p>
+        </footer>
+      </body>
+    </html>
+  );
+}
 ```
-2. Consume the Layout Component:
 
-```jsx
-// pages/home.jsx
-import React from 'npm:react';
+Now all pages in the `functions/pages/` directory will automatically use this layout.
 
-const HomePage = () => {
-    return <div>Welcome to the Home Page!</div>;
-};
+## Custom HTML Structure
 
-export default HomePage;
-```
+Oxian Functions allows you to customize the HTML structure of your pages by using index.html files. The closest index.html file to the current path will be considered, while higher-level index.html files are inherited but can be overridden.
 
-In this example, any component declared in the pages directory (or its subdirectories) will automatically be wrapped with the layout component, including the header and footer.
+### Example: Custom HTML Template
 
-### Nested Shared and Layout Files
+Create `functions/pages/index.html`:
 
-Both "shared" modules and "layout" components can be nested within directories, and they will accumulate from the higher directories. This means you can have multiple layers of shared functionality and layouts, enhancing modularity and code reuse.
-
-### Custom HTML (index.html)
-Axion Functions allows you to customize the HTML structure of your pages by using index.html files. The closest index.html file to the current path will be considered, while higher-level index.html files will be ignored.
-
-#### Example: Using index.html
-
-1. Create an index.html File:
 ```html
-<!-- pages/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Application</title>
+    <title>{{title}}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+    </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div class="container">
+        {{content}}
+    </div>
 </body>
 </html>
-``` 
-In this example, the index.html file will be used as the base HTML structure for all pages within the pages directory and its subdirectories.
+```
 
-### Global CSS (globals.css)
+The `{{title}}` and `{{content}}` placeholders will be replaced with the appropriate content from your React components.
 
-Axion Functions supports the use of global CSS files, which can be defined at any level in the folder structure. These CSS files will be accumulated from the root directory up to the directory containing the current file being executed.
+## Global CSS
 
-#### Example: Using globals.css
+Oxian Functions supports the use of global CSS files, which can be defined at any level in the folder structure. These CSS files will be accumulated from the root directory up to the directory containing the current module, allowing for cascading styles and modular CSS organization.
 
-1. Create a `globals.css` File in root directory:
+### How Global CSS Works
+
+Create CSS files in any directory within your functions folder. The framework will automatically include all CSS files found in the path hierarchy.
+
+### Example: Global and Modular CSS
+
+Create `functions/global.css`:
 ```css
-/* globals.css */
+/* Global styles applied to all pages */
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
 }
 ```
-2. Create a `globals.css` File in a `pages` directory:
+
+Create `functions/pages/pages.css`:
 ```css
-/* pages/globals.css */
-h1 {
-    color: blue;
+/* Styles specific to pages */
+.page-header {
+    background-color: #007bff;
+    color: white;
+    padding: 1rem;
+    margin-bottom: 2rem;
 }
 ```
-
-In this example, the styles defined in the `globals.css` file at the root directory will be applied to all pages, and the styles in `pages/globals.css` will be applied to all pages within the pages directory and its subdirectories, accumulating with the root styles.
-
-Any CSS file named `globals.css` will be automatically included in the HTML output, always respecting the hierarchy of the directories.
 
 ## Configuration
-Axion Functions aims to make the development process as straightforward as possible while still allowing for extensive configuration as applications scale. Configuration can be set via environment variables or a configuration file at the root of the project called axion.config.json.
+
+Oxian Functions aims to make the development process as straightforward as possible while still allowing for extensive configuration as applications scale. Configuration can be set via environment variables or a configuration file at the root of the project called oxian.config.json.
 
 ### Environment Variables
 
-- **FUNCTIONS_DIR** : Specifies the root directory to be served as modules or components. Files and directories outside this root will not be available on the web but can still be used in the project. Defaults to `.` (root project directory).
-- **DIR_ENTRYPOINT** : Specifies the default file name to be considered as the main entry point in a directory. This makes it unnecessary to specify it when importing by the path of its parent directory. Defaults to index.
-- **FILE_LOADER_URL**: Defines the URL where the file loader is running if the developer wants to run it separately. Defaults to http://localhost:9000.
-- **FILE_LOADER_PORT**: Specifies the port for the file loader. Defaults to 9000.
-- **DEFAULT_LOADER_TYPE**: Specifies the loader type to load the files. Options are local or github, and it defaults to local.
-- **USE_CACHE**: Determines if the cache should be enabled by default when loading a file. Defaults to false if DEFAULT_LOADER_TYPE is local and true otherwise.
-- **DEBUG**: Enables Axion Functions logs for debugging purposes. Defaults to false.
+- **PORT**: The port number for the API server. Defaults to 9002.
+- **FUNCTIONS_DIR**: The directory containing your functions. Defaults to 'functions'.
+- **DIR_ENTRYPOINT**: The default file name to look for in directories (without extension). Defaults to 'index'.
+- **DEBUG**: Enables Oxian Functions logs for debugging purposes. Defaults to false.
 
 ### Configuration File
-You can also set these configurations in a axion.config.json file at the root of your project. Use camelCase for the properties.
 
-#### Example axion.config.json:
+You can also set these configurations in a oxian.config.json file at the root of your project. Use camelCase for the properties.
+
+#### Example oxian.config.json:
 
 ```json
 {
-    "functionsDir": "src",
-    "dirEntrypoint": "main",
-    "fileLoaderUrl": "http://localhost:9001",
-    "fileLoaderPort": 9001,
-    "defaultLoaderType": "github",
-    "useCache": true,
-    "debug": true
+  "port": 3000,
+  "functionsDir": "src",
+  "dirEntrypoint": "main",
+  "debug": true
 }
 ```
-This configuration provides the flexibility needed for larger applications while maintaining the simplicity and ease of use for smaller projects.
 
-## How it Works
-Axion Functions is designed to provide an isolated and robust development environment, preventing errors from affecting the entire application. It achieves this through a system of process isolation and efficient resource management, inspired by Deno Deploy.
+---
+
+## Isolation and Architecture
+
+Oxian Functions is designed to provide an isolated and robust development environment, preventing errors from affecting the entire application. It achieves this through a system of process isolation and automatic recovery.
 
 ### Process Isolation
-Each module or component in Axion Functions runs as an isolated process. This ensures that an error in one endpoint or component does not crash the entire application. This isolation is managed through the Deno runtime, leveraging its capabilities for secure, efficient execution. This approach borrows concepts from Deno Deploy, known for its fast deployment and excellent developer experience.
+
+Each module or component in Oxian Functions runs as an isolated process. This ensures that an error in one endpoint or component does not crash the entire application. This isolation is managed through the Deno runtime, leveraging its security model and process management capabilities.
 
 ### Port Requirements
-To run an Axion Functions application, you will need 2+N ports, where N is the number of files that should be executed either as modules or components. The two essential ports are for the file loader and the API server:
 
-- File Loader Port: Used to load and serve files dynamically.
-- API Server Port: Handles incoming API requests.
-Each additional file being executed will run on its own port, managed by the Deno runtime. This structure ensures efficient handling of requests and execution of modules and components.
+To run an Oxian Functions application, you will need 2+N ports, where N is the number of files that should be executed either as modules or components. The two essential ports are for the file loader and the API server. Each additional module gets its own port for complete isolation.
 
-## Axions
-Axions are the prebuilt modules and components that we have developed for our applications. These axions represent the common functionalities we repeatedly use across different projects. By packaging these reusable pieces of code, we aim to increase productivity and maintain consistency in our applications.
+- **File Loader**: Default port 9000 (configurable)
+- **API Server**: Default port 9002 (configurable)
+- **Individual Modules**: Ports assigned dynamically starting from a base port
 
-### Using Axions
-The Axion Functions repository comes with a set of prebuilt axions, both for backend modules and frontend components. These axions are battle-tested in production environments and maintained by our team.
+## Oxians
 
-We provide a builtin we for using them in your project by using the adding a reference to this repository directly in your `deno.json` importmap. 
-```javascript
-//deno.json
+Oxians are the prebuilt modules and components that we have developed for our applications. These oxians represent the common functionalities we repeatedly use across different projects. By packaging these reusable pieces of code, we aim to increase productivity and maintain consistency in our applications.
+
+### Using Oxians
+
+The Oxian Functions repository comes with a set of prebuilt oxians, both for backend modules and frontend components. These oxians are battle-tested in production environments and maintained by our team.
+
+To use oxians in your project, you can import them using the oxian-modules and oxian-components import maps.
+
+First, add the oxian imports to your `deno.json`:
+
+```json
 {
-    "tasks": {
-        ...tasks
-    },
-    "imports": {
-        "axion-modules/":"https://raw.githubusercontent.com/AxionCompany/functions/main/functions/modules/",
-        ... other imports
-    }
+  "imports": {
+    "react": "npm:react",
+    "react-dom/server": "npm:react-dom/server",
+    "oxian-modules/":"https://raw.githubusercontent.com/AxionCompany/functions/main/functions/modules/",
+    "oxian-components/":"https://raw.githubusercontent.com/AxionCompany/axions-web/main/src/components/"
+  }
 }
 ```
 
-and then, use them in your project like so:
-```javascript
-import MongoDbCrud from "axion-modules/features/crud/mongodb";
+Then import and use them in your code:
 
-// use the function as you'd like here...
+```javascript
+import MongoDbCrud from "oxian-modules/features/crud/mongodb";
 ```
 
-We intend to provide better documentation and a dedicated website for browsing and using these axions in the future, but for now, please, refer to `/functions/components` and `/functions/modules` directories in the source code for examples.
+We intend to provide better documentation and a dedicated website for browsing and using these oxians in the future, but for now, please, refer to `/functions/components` and `/functions/modules` directories in the source code for examples.
 
-### Extending with Axions
-Developers can easily extend their applications by incorporating these axions. The modular nature of Axion Functions allows for seamless integration and customization, making it easy to adapt these prebuilt components to specific project requirements.
+### Extending with Oxians
+
+Developers can easily extend their applications by incorporating these oxians. The modular nature of Oxian Functions allows for seamless integration and customization, making it easy to adapt these prebuilt components to specific project requirements.
 
 ## Roadmap
 
-Axion functions is still in pre-release phase, and we are actively working on improving the framework and adding new features.
+Oxian functions is still in pre-release phase, and we are actively working on improving the framework and adding new features.
 
-Our roadmap for Axion Functions includes the following features and improvements:
+Our roadmap for Oxian Functions includes the following features and improvements:
 
-- **Improved Documentation**: Enhance the documentation with more examples, tutorials, and guides.
-- **Performance Optimization**: Optimize the framework for faster execution and better resource management.
-- **Testing and Quality Assurance**: Implement automated testing and quality assurance processes to ensure the stability and reliability of the framework.
-- **Community Contributions**: Encourage community contributions and feedback to improve the framework and make it more accessible to developers.
+- **Enhanced Documentation**: Comprehensive guides, tutorials, and API references
+- **Oxian Marketplace**: A dedicated website for browsing and using prebuilt oxians
+- **Performance Optimizations**: Improved startup times, better caching, and optimized builds
+- **Testing Framework**: Built-in testing utilities and patterns
+- **Deployment Tools**: Simplified deployment to various platforms and cloud providers
+- **IDE Integration**: Better development experience with code completion and debugging tools
 
-## Performance
+## Performance Considerations
 
-Axion Functions is still in early phases of development, and we started by prioritizing Developer Experience over performance. We are, however, committed to improving the performance of the framework as we continue to develop it. Our goal is to provide a fast and efficient development environment that can scale with your applications, and we will be working on optimizing the framework in the future.
+Oxian Functions is still in early phases of development, and we started by prioritizing Developer Experience over performance. We are, however, committed to improving the performance of the framework over time.
 
-**To do**: Add performance benchmarks and optimizations.
+Currently, the framework introduces some overhead due to:
+- Process isolation requiring separate ports for each module
+- Dynamic module loading and compilation
+- File watching and hot reload capabilities in development mode
 
-## Contributing
+We are actively working on optimizations including:
+- Better caching strategies
+- Optimized bundling for production
+- Reduced memory footprint
+- Faster startup times
 
-We welcome contributions! If you have ideas for new features, improvements, or bug fixes, please open an issue or submit a pull request. We are actively working on improving the framework and would love to have your input.
+## Community and Support
 
-## License
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-## Contact
-For questions or issues, please open an issue in this repository or contact us at [functions@axion.company].
+For questions or issues, please open an issue in this repository or contact us at [functions@oxian.company].
 

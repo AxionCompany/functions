@@ -1,8 +1,15 @@
 /**
- * Axion File Loader
+ * Oxian File Loader
  * 
- * This is the main entry point for the Axion File Loader server.
- * It handles file loading, caching, and configuration management for Deno modules.
+ * This is the main entry point for the Oxian File Loader server.
+ * It provides file loading capabilities from both local filesystem and GitHub repositories
+ * with dynamic configuration support.
+ * 
+ * Usage: deno run -A file-loader.ts
+ * 
+ * Environment Variables:
+ * - PORT: Server port (default: 9000)
+ * - ENV: Environment mode ('development' or 'production')
  */
 
 /// <reference lib="deno.unstable" />
@@ -13,12 +20,12 @@ import getEnv, { EnvVars } from "./functions/src/utils/environmentVariables.ts";
 import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
 import Cache from "./functions/src/utils/withCache.ts";
 import { logDebug, logError, logInfo, logWarning, setLogConfig } from "./functions/src/utils/logger.ts";
-import axionDenoConfig from "./deno.json" with { type: "json" };
+import oxianDenoConfig from "./deno.json" with { type: "json" };
 
 /**
  * Configuration interfaces
  */
-interface AxionConfig {
+interface OxianConfig {
   dirEntrypoint?: string;
   [key: string]: any;
 }
@@ -59,7 +66,7 @@ interface FileLoaderModules {
 /**
  * Configuration caches
  */
-const axionConfigs = new Map<string, AxionConfig>();
+const oxianConfigs = new Map<string, OxianConfig>();
 const denoConfigs = new Map<string, DenoConfig>();
 
 /**
@@ -159,27 +166,27 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
     // Create URLs for configuration files
     const url = new URL(req.url);
     logDebug("Processing URL:", url.pathname);
-    const axionConfigUrl = new URL('/axion.config.json', url);
+    const oxianConfigUrl = new URL('/oxian.config.json', url);
     const denoConfigUrl = new URL('/deno.json', url);
     const urlWithBasicAuth = new URL(url);
 
     // Apply authentication if available
     if (username) {
-      axionConfigUrl.username = username;
+      oxianConfigUrl.username = username;
       denoConfigUrl.username = username;
       urlWithBasicAuth.username = username;
     }
     
     if (password) {
-      axionConfigUrl.password = password;
+      oxianConfigUrl.password = password;
       denoConfigUrl.password = password;
       urlWithBasicAuth.password = password;
     }
 
     // Reset search and set correct paths
-    axionConfigUrl.search = '';
+    oxianConfigUrl.search = '';
     denoConfigUrl.search = '';
-    axionConfigUrl.pathname = '/axion.config.json';
+    oxianConfigUrl.pathname = '/oxian.config.json';
     denoConfigUrl.pathname = '/deno.json';
 
     // Create base file loader config
@@ -206,7 +213,7 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
     };
 
     // Check for cached configurations
-    let axionConfig = axionConfigs.get(axionConfigUrl.href);
+    let oxianConfig = oxianConfigs.get(oxianConfigUrl.href);
     let denoConfig = denoConfigs.get(denoConfigUrl.href);
 
     // Create a file loader instance
@@ -226,24 +233,24 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
       }
     };
 
-    // Load Axion configuration if not cached
-    if (!axionConfig) {
-      logDebug('axion.config.json not found in cache for', axionConfigUrl.origin, 'fetching from server...');
+    // Load Oxian configuration if not cached
+    if (!oxianConfig) {
+      logDebug('oxian.config.json not found in cache for', oxianConfigUrl.origin, 'fetching from server...');
       
       try {
-        const axionConfigText = await enhancedFileLoader({
+        const oxianConfigText = await enhancedFileLoader({
           queryParams: {},
           headers: { 'content-type': 'text/plain; charset=utf-8' },
-          pathname: axionConfigUrl.pathname,
-          url: axionConfigUrl,
+          pathname: oxianConfigUrl.pathname,
+          url: oxianConfigUrl,
         }, responseMock);
         
-        const parsedConfig = JSON.parse(axionConfigText || '{}') as AxionConfig;
-        axionConfig = parsedConfig;
-        axionConfigs.set(axionConfigUrl.href, parsedConfig);
+        const parsedConfig = JSON.parse(oxianConfigText || '{}') as OxianConfig;
+        oxianConfig = parsedConfig;
+        oxianConfigs.set(oxianConfigUrl.href, parsedConfig);
       } catch (err) {
-        logError('Error loading axion.config.json:', err instanceof Error ? err.message : String(err));
-        axionConfig = {}; // Initialize with empty object to avoid undefined
+        logError('Error loading oxian.config.json:', err instanceof Error ? err.message : String(err));
+        oxianConfig = {}; // Initialize with empty object to avoid undefined
       }
     }
 
@@ -262,7 +269,7 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
         
         // Initialize with default values
         denoConfig = {
-          imports: { ...axionDenoConfig.imports },
+          imports: { ...oxianDenoConfig.imports },
           scopes: {}
         };
         
@@ -305,16 +312,16 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
         }
         
         // Handle potential type mismatch between configs
-        const axionScopes = (axionDenoConfig as any).scopes;
-        if (axionScopes) {
-          denoConfig.scopes = { ...(denoConfig.scopes || {}), ...axionScopes };
+        const oxianScopes = (oxianDenoConfig as any).scopes;
+        if (oxianScopes) {
+          denoConfig.scopes = { ...(denoConfig.scopes || {}), ...oxianScopes };
         }
         
         // Cache the config
         denoConfigs.set(denoConfigUrl.href, denoConfig);
       } catch (err) {
         logError('Error loading deno configuration:', err instanceof Error ? err.message : String(err));
-        denoConfig = { imports: { ...axionDenoConfig.imports }, scopes: {} };
+        denoConfig = { imports: { ...oxianDenoConfig.imports }, scopes: {} };
       }
     }
 
@@ -322,7 +329,7 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
     const finalFileLoader = FileLoader({
       config: { 
         ...fileLoaderConfig, 
-        ...axionConfig 
+        ...oxianConfig 
       },
       modules: fileLoaderModules
     });

@@ -1,8 +1,15 @@
 /**
- * Axion Functions API Server
+ * Oxian Functions API Server
  * 
- * This is the main entry point for the Axion Functions API server.
- * It handles request routing, configuration loading, and isolate management.
+ * This is the main entry point for the Oxian Functions API server.
+ * It provides a robust API framework with dynamic configuration and isolate-based execution.
+ * 
+ * Usage: deno run -A api.ts
+ * 
+ * Environment Variables:
+ * - PORT: Server port (default: 9002)
+ * - ENV: Environment mode ('development' or 'production')
+ * - WATCH: Enable file watching in development mode
  */
 
 /// <reference lib="deno.unstable" />
@@ -16,7 +23,8 @@ import Proxy from "./functions/src/proxy/main.ts";
 import getEnv, { EnvVars } from "./functions/src/utils/environmentVariables.ts";
 import replaceTemplate from "./functions/src/utils/template.ts";
 import { logDebug, logError, logInfo, setLogConfig } from "./functions/src/utils/logger.ts";
-import axionDenoConfig from "./deno.json" with { type: "json" };
+import { initializeUpgradeManager } from "./functions/src/utils/upgradeManager.ts";
+import oxianDenoConfig from "./deno.json" with { type: "json" };
 
 // Worker environment error handling
 // @ts-ignore: self is defined in worker environments
@@ -39,7 +47,7 @@ if (typeof self !== 'undefined' && 'postMessage' in self) {
 /**
  * Configuration cache interfaces
  */
-interface AxionConfig {
+interface OxianConfig {
   functionsDir?: string;
   dirEntrypoint?: string;
   loaderUrl?: string;
@@ -64,7 +72,6 @@ interface AdapterData {
     password?: string;
     [key: string]: any;
   };
-  shouldUpgradeAfter?: number;
   [key: string]: any;
 }
 
@@ -72,10 +79,9 @@ interface AdapterData {
  * Main application state
  */
 let adapters: ((config: AdapterData) => Promise<AdapterData> | AdapterData) | null = null;
-let shouldUpgradeAfter = 0;
 
 // Configuration caches
-const axionConfigs = new Map<string, AxionConfig>();
+const oxianConfigs = new Map<string, OxianConfig>();
 const denoConfigs = new Map<string, DenoConfig>();
 
 /**
@@ -91,6 +97,12 @@ const denoConfigs = new Map<string, DenoConfig>();
     errorLogs: true,
     infoLogs: env.INFO === 'true',
     warningLogs: true
+  });
+
+  // Initialize upgrade manager
+  initializeUpgradeManager({
+    env: env.ENV || 'development',
+    projectPath: Deno.cwd()
   });
 
   // Create and start the server
@@ -109,11 +121,6 @@ const denoConfigs = new Map<string, DenoConfig>();
   }
   
   logInfo('Server started successfully');
-
-  // Start file watcher if in watch mode
-  if (Deno.env.get('WATCH')) {
-    watchFiles(env);
-  }
 })();
 
 /**
@@ -187,12 +194,7 @@ function createRequestHandler(env: EnvVars): RequestHandler {
     }
 
     // Extract adapter configuration
-    const { loaderConfig, shouldUpgradeAfter: newUpgradeTime, ...adaptersData } = adapterData;
-    
-    // Update upgrade time if provided
-    if (newUpgradeTime) {
-      shouldUpgradeAfter = newUpgradeTime;
-    }
+    const { loaderConfig, ...adaptersData } = adapterData;
 
     // Configure file loader URL authentication
     if (loaderConfig?.username) {
@@ -205,23 +207,23 @@ function createRequestHandler(env: EnvVars): RequestHandler {
       fileLoaderUrl.password = loaderConfig.password;
     }
 
-    // Load Axion configuration if not cached
+    // Load Oxian configuration if not cached
     const requestOrigin = new URL(req.url).origin;
-    let axionConfig: AxionConfig = axionConfigs.get(requestOrigin) || {};
+    let oxianConfig: OxianConfig = oxianConfigs.get(requestOrigin) || {};
 
-    if (!Object.keys(axionConfig).length) {
+    if (!Object.keys(oxianConfig).length) {
       try {
-        const response = await fetch(new URL('axion.config.json', fileLoaderUrl).href);
-        axionConfig = await response.json();
-      } catch (_) {
-        axionConfig = {};
+        const response = await fetch(new URL('oxian.config.json', fileLoaderUrl).href);
+        oxianConfig = await response.json();
+      } catch {
+        oxianConfig = {};
       }
       
-      axionConfigs.set(requestOrigin, axionConfig);
+      oxianConfigs.set(requestOrigin, oxianConfig);
     }
 
-    // Update functions directory from config if available
-    functionsDir = axionConfig?.functionsDir || functionsDir;
+    // Apply configuration
+    functionsDir = oxianConfig?.functionsDir || functionsDir;
 
     // Load Deno configuration if not cached
     let denoConfig = denoConfigs.get(requestOrigin);
@@ -311,25 +313,25 @@ function createRequestHandler(env: EnvVars): RequestHandler {
       denoConfigs.set(requestOrigin, denoConfig);
     }
 
-    // Merge with Axion's default Deno config
-    denoConfig.imports = { ...axionDenoConfig.imports, ...denoConfig.imports };
+    // Merge with Oxian's default Deno config
+    denoConfig.imports = { ...oxianDenoConfig.imports, ...denoConfig.imports };
     
-    // Handle potential type mismatch between configs
-    const axionScopes = (axionDenoConfig as any).scopes;
-    if (axionScopes && denoConfig.scopes) {
-      denoConfig.scopes = { ...axionScopes, ...denoConfig.scopes };
-    } else if (axionScopes) {
-      denoConfig.scopes = { ...axionScopes };
+    // Merge scopes if they exist
+    const oxianScopes = (oxianDenoConfig as any).scopes;
+    if (oxianScopes && denoConfig.scopes) {
+      denoConfig.scopes = { ...oxianScopes, ...denoConfig.scopes };
+    } else if (oxianScopes) {
+      denoConfig.scopes = { ...oxianScopes };
     }
 
     // Create and return the proxy response
+    // Note: The isolate-specific upgrade check will be done in the proxy
     return Proxy({
       config: {
         loaderUrl: fileLoaderUrl.href,
         dirEntrypoint: env.DIR_ENTRYPOINT || "index",
-        shouldUpgradeAfter,
         functionsDir,
-        ...axionConfig,
+        ...oxianConfig,
         denoConfig,
         ...adaptersData,
       },
@@ -340,35 +342,6 @@ function createRequestHandler(env: EnvVars): RequestHandler {
       },
     })(req);
   };
-}
-
-/**
- * Watches for file changes and triggers code upgrades
- * 
- * @param env - Environment variables
- */
-async function watchFiles(env: EnvVars): Promise<void> {
-  logInfo('Starting file watcher');
-  
-  for await (const event of Deno.watchFs("./", { recursive: true })) {
-    // Only handle file modifications for relevant file types
-    if (event.kind === "modify" && event.paths.some(path => /\.(html|js|jsx|tsx|ts)$/.test(path))) {
-      const dir = Deno.cwd();
-      const files = event.paths.map(path => path.split(dir).join(''));
-      
-      // Skip data/cache files to prevent infinite loops
-      if (files.some(file =>
-        file.indexOf('data') > -1 && (
-          (file.indexOf('cache') > file.indexOf('data')) ||
-          (file.lastIndexOf('data') > file.indexOf('data'))
-        )
-      )) continue;
-
-      // Set upgrade time to trigger code reload
-      shouldUpgradeAfter = Date.now();
-      logInfo('Files modified:', files, 'upgrading code version...');
-    }
-  }
 }
 
 

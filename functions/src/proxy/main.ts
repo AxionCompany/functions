@@ -1,6 +1,7 @@
 import isolateFactory, { IsolateFactoryConfig, IsolateInstance } from "./utils/isolateFactory.ts";
 import { PermissionsConfig } from "./utils/runOptions.ts";
 import { logDebugWithConfig, logError, logInfo, logWarning, setLogConfig, LogConfig } from "../utils/logger.ts";
+import { shouldUpgradeNow, clearUpgradeFlag } from "../utils/upgradeManager.ts";
 
 // ===== Type Definitions =====
 /**
@@ -41,8 +42,6 @@ export interface ProxyConfig {
     loaderUrl: string;
     /** Directory entrypoint file name */
     dirEntrypoint?: string;
-    /** Timestamp when code should be upgraded */
-    shouldUpgradeAfter?: number;
     /** Functions directory path */
     functionsDir?: string;
     /** Deno configuration */
@@ -1037,10 +1036,15 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
             logDebugWithConfig(config, `Cleared existing timer for isolate ${isolateId}`);
         }
 
-        // 4. Check if we need to bust the cache
-        const shouldUpgradeAfter = config?.shouldUpgradeAfter || 0;
-        bustCache = Boolean(isolateMetadata?.loadedAt && (isolateMetadata?.loadedAt <= shouldUpgradeAfter));
-        logDebugWithConfig(config, `Bust cache: ${bustCache}`);
+        // 4. Check if we need to bust the cache for this specific isolate
+        const shouldUpgradeThisIsolate = shouldUpgradeNow(isolateId);
+        bustCache = Boolean(isolateMetadata?.loadedAt && shouldUpgradeThisIsolate);
+        
+        if (bustCache) {
+            logInfo(`Isolate ${isolateId} scheduled for upgrade`);
+        }
+        
+        logDebugWithConfig(config, `Bust cache for isolate ${isolateId}: ${bustCache}`);
 
         // 5. If isolate is already up and we don't need to bust cache, process the request
         if (isolateMetadata.status === 'up' && !bustCache) {
@@ -1077,7 +1081,13 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
             return errorResponse;
         }
 
-        // 8. Process the request with the newly created/updated isolate
+        // 8. Clear upgrade flag after successful upgrade
+        if (bustCache) {
+            clearUpgradeFlag(isolateId);
+            logDebugWithConfig(config, `Cleared upgrade flag for isolate ${isolateId}`);
+        }
+
+        // 9. Process the request with the newly created/updated isolate
         const finalMetadata = isolateManager.getIsolate(isolateId);
         if (!finalMetadata || finalMetadata.status !== 'up') {
             logError(`Isolate ${isolateId} is not up after creation/update, status: ${finalMetadata?.status || 'undefined'}`);

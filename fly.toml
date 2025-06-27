@@ -1,10 +1,10 @@
-# fly.toml app configuration file generated for axion-functions on 2024-04-03T15:43:23-03:00
+# fly.toml app configuration file generated for oxian-js on 2024-04-03T15:43:23-03:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'axion-functions'
-primary_region = 'gig'
+app = 'oxian-js'
+primary_region = 'gru'
 
 [build]
 
@@ -20,3 +20,19 @@ primary_region = 'gig'
   memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
+
+[[services]]
+  internal_port = 8080
+  protocol = 'tcp'
+
+  [[services.ports]]
+    handlers = ['http']
+    port = 80
+
+  [[services.ports]]
+    handlers = ['tls', 'http']
+    port = 443
+
+[env]
+  ENV = 'production'
+  PORT = '8080'

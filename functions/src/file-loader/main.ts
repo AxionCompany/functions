@@ -1,11 +1,8 @@
 /**
- * Axion File Loader Core
+ * Oxian File Loader Core
  * 
- * This module provides functionality for loading files from various sources,
- * handling redirects, bundling, and setting appropriate content types.
- * 
- * The file loader supports multiple loader types (local, github, etc.) and
- * can be configured to use caching, bundling, and other features.
+ * This module provides the core file loading functionality for the Oxian system.
+ * It handles file resolution, caching, and transformation.
  */
 
 import FileLoader from "./adapters/loaders/main.ts";
@@ -185,7 +182,7 @@ export default function createFileLoader({
     const { content, redirect: shouldRedirect, params, path, variables, matchPath } = fileData;
 
     // Handle bundling if requested
-    if (shouldBundle) {
+    if (shouldBundle && false) {
       const bundledContent = await handleBundling({
         bundleUrl: new URL(url.href),
         useCache: config.useCache || false,

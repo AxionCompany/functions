@@ -8,7 +8,7 @@ import React from "npm:react";
 import { DOMParser } from "npm:linkedom";
 import Cache from "../../utils/withCache.ts";
 
-let port: number;
+let port: number | undefined;
 let config: any;
 
 
@@ -21,6 +21,7 @@ if (portString && configString) {
     config = JSON.parse(configString || '{}');
     Deno.cwd = () => config.projectPath;
 } else {
+    // @ts-ignore: self is defined in worker environments
     self.onmessage = function (event: any) {
         const { port: _port, ..._config } = event.data;
         port = _port;

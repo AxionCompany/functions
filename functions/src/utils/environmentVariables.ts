@@ -5,7 +5,7 @@
  * .env files and the system environment.
  */
 
-import { load } from "jsr:@std/dotenv";
+import { load } from "jsr:@std/dotenv@0.225.3";
 
 /**
  * Environment variables record type

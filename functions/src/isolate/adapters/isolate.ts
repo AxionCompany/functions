@@ -8,7 +8,7 @@ import Cache from "../../utils/withCache.ts";
 
 // globalThis.context = context;
 
-let port: number;
+let port: number | undefined;
 let config: any;
 
 const moduleExecutors = new Map<string, any>();
@@ -20,6 +20,7 @@ if (portString && configString) {
     config = JSON.parse(configString || '{}');
     Deno.cwd = () => config.projectPath;
 } else {
+    // @ts-ignore: self is defined in worker environments
     self.onmessage = function (event: any) {
 
         const { port: _port, ..._config } = event.data;

@@ -1,5 +1,5 @@
 // import AlertProvider from "components/Hooks/Alert";
-import { AuthProvider, WithAuth } from "axion-components/Hooks/Auth/Basic";
+import { AuthProvider, WithAuth } from "oxian-components/Hooks/Auth/Basic";
 
 const BaseLayout = ({ children, ...props }) => {
   return (
