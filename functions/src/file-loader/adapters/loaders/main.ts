@@ -6,7 +6,7 @@
  * implements a file finding algorithm that supports path variables and directory traversal.
  */
 
-import { SEPARATOR, basename, extname, join } from "https://deno.land/std/path/mod.ts";
+import { SEPARATOR, basename, extname, join } from "jsr:@std/path@1.1.0";
 import { logDebug, logError, logInfo } from "../../../utils/logger.ts";
 
 /**

@@ -14,8 +14,8 @@
 
 /// <reference lib="deno.unstable" />
 
-import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
-import { ensureDir } from "https://deno.land/std@0.224.0/fs/ensure_dir.ts";
+import { SEPARATOR, basename, extname, join, dirname } from "jsr:@std/path@1.1.0";
+import { ensureDir } from "jsr:@std/fs@1.0.18";
 
 // Import server components
 import createServer, { RequestHandler } from "./functions/src/server/main.ts";

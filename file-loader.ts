@@ -17,7 +17,7 @@
 import FileLoader from "./functions/src/file-loader/main.ts";
 import createServer from "./functions/src/server/main.ts";
 import getEnv, { EnvVars } from "./functions/src/utils/environmentVariables.ts";
-import { SEPARATOR, basename, extname, join, dirname } from "https://deno.land/std/path/mod.ts";
+import { SEPARATOR, basename, extname, join, dirname } from "jsr:@std/path@1.1.0";
 import Cache from "./functions/src/utils/withCache.ts";
 import { logDebug, logError, logInfo, logWarning, setLogConfig } from "./functions/src/utils/logger.ts";
 import oxianDenoConfig from "./deno.json" with { type: "json" };

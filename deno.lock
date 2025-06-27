@@ -12,9 +12,13 @@
     "jsr:@std/bytes@1": "1.0.5",
     "jsr:@std/crypto@1": "1.0.4",
     "jsr:@std/dotenv@*": "0.225.3",
+    "jsr:@std/dotenv@0.225.3": "0.225.3",
     "jsr:@std/encoding@1": "1.0.7",
     "jsr:@std/encoding@^1.0.5": "1.0.7",
+    "jsr:@std/fs@1.0.18": "1.0.18",
     "jsr:@std/media-types@1": "1.1.0",
+    "jsr:@std/path@1.1.0": "1.1.0",
+    "jsr:@std/path@^1.1.0": "1.1.0",
     "jsr:@std/path@~0.225.1": "0.225.2",
     "jsr:@std/semver@^1.0.2": "1.0.5",
     "npm:@coderspirit/nominal@^4.1.1": "4.1.1",
@@ -60,7 +64,7 @@
         "jsr:@logtape/logtape",
         "jsr:@std/assert@0.223",
         "jsr:@std/assert@~0.225.2",
-        "jsr:@std/path",
+        "jsr:@std/path@~0.225.1",
         "jsr:@std/semver",
         "npm:acorn",
         "npm:acorn-walk",
@@ -114,6 +118,12 @@
     "@std/encoding@1.0.7": {
       "integrity": "f631247c1698fef289f2de9e2a33d571e46133b38d042905e3eac3715030a82d"
     },
+    "@std/fs@1.0.18": {
+      "integrity": "24bcad99eab1af4fde75e05da6e9ed0e0dce5edb71b7e34baacf86ffe3969f3a",
+      "dependencies": [
+        "jsr:@std/path@^1.1.0"
+      ]
+    },
     "@std/media-types@1.1.0": {
       "integrity": "c9d093f0c05c3512932b330e3cc1fe1d627b301db33a4c2c2185c02471d6eaa4"
     },
@@ -122,6 +132,9 @@
       "dependencies": [
         "jsr:@std/assert@0.226"
       ]
+    },
+    "@std/path@1.1.0": {
+      "integrity": "ddc94f8e3c275627281cbc23341df6b8bcc874d70374f75fec2533521e3d6886"
     },
     "@std/semver@1.0.5": {
       "integrity": "529f79e83705714c105ad0ba55bec0f9da0f24d2f726b6cc1c15e505cc2c0624"
@@ -1807,7 +1820,6 @@
   "workspace": {
     "dependencies": [
       "npm:react-dom@*",
-      "npm:react-icons@*",
       "npm:react@*"
     ]
   }
