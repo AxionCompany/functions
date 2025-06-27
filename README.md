@@ -1,9 +1,9 @@
-# Oxian Functions
+# Oxian.js
 
-Oxian Functions is a full-stack development framework designed to simplify the process of developing applications. It leverages JavaScript (JS) and ES Modules, supporting both backend modules and front-end React components, with automatic routing and rendering. Oxian Functions runs on the Deno runtime, eliminating the need for npm package management (but still compatible with it).
+Oxian.js is a full-stack development framework designed to simplify the process of developing applications. It leverages JavaScript (JS) and ES Modules, supporting both backend modules and front-end React components, with automatic routing and rendering. Oxian.js runs on the Deno runtime, eliminating the need for npm package management (but still compatible with it).
 
 ## Quick Start
-Get started with Oxian Functions in a few simple steps:
+Get started with Oxian.js in a few simple steps:
 
 Create a simple React page:
 
@@ -13,7 +13,7 @@ mkdir functions/pages
 
 cat > functions/pages/home.jsx << EOF
 export default function HomePage({ user = 'World' }) {
-  return <div>Welcome to Oxian Functions!</div>;
+  return <div>Welcome to Oxian.js!</div>;
 }
 EOF
 ```
@@ -39,7 +39,7 @@ Test your endpoints:
 - Frontend: Visit `http://localhost:9002/pages/home` to see your React component rendered
 - Backend: `curl http://localhost:9002/api/hello?name=Oxian`
 
-You now have a basic Oxian Functions application up and running!
+You now have a basic Oxian.js application up and running!
 
 ---
 
@@ -47,22 +47,22 @@ You now have a basic Oxian Functions application up and running!
 
 ---
 
-## Why we built Oxian Functions
-Oxian Functions was developed by Oxian Company, a custom software development company. The main motivation behind creating this framework was to facilitate the development process for our projects, which predominantly use the JavaScript ecosystem for both frontend and backend development.
+## Why we built Oxian.js
+Oxian.js was developed by Oxian Company, a custom software development company. The main motivation behind creating this framework was to facilitate the development process for our projects, which predominantly use the JavaScript ecosystem for both frontend and backend development.
 
 In many cases, traditional tools seemed unnecessarily complex or required extensive configuration for relatively simple tasks. We wanted a solution that would allow developers to build full-stack applications quickly, without the overhead of managing build tools, bundlers, or complex deployment setups.
 
-We aim to provide a more streamlined development experience while maintaining the flexibility to handle complex requirements as applications grow. The focus on 'isolated processes' and the N+2 port requirement in Oxian Functions are (albeit different) inspired by Deno Deploy's architecture, which ensures fast, isolated, and efficient execution of code.
+We aim to provide a more streamlined development experience while maintaining the flexibility to handle complex requirements as applications grow. The focus on 'isolated processes' and the N+2 port requirement in Oxian.js are (albeit different) inspired by Deno Deploy's architecture, which ensures fast, isolated, and efficient execution of code.
 
 **Our philosophy:**
 
-We chose Deno as the foundation for Oxian Functions because it offers:
+We chose Deno as the foundation for Oxian.js because it offers:
 - **Modern JavaScript**: Full support for ES Modules, TypeScript, and modern JS features out of the box
 - **Security by default**: Permissions-based security model
 - **No node_modules**: Direct import from URLs eliminates dependency management headaches
 - **Web Standards**: Built on web platform APIs that developers already know
 
-We believe that developers should spend more time creating and less time configuring. Oxian Functions simplifies the development process by providing a unified environment for writing backend and front-end code, with automatic routing and rendering, but still - all of it as isolated processes. With Oxian Functions, you can build full-stack applications quickly and efficiently, without the overhead of managing dependencies, build tools, routes, boilerplates, etc. Less configuration, more coding - that's the Oxian way.
+We believe that developers should spend more time creating and less time configuring. Oxian.js simplifies the development process by providing a unified environment for writing backend and front-end code, with automatic routing and rendering, but still - all of it as isolated processes. With Oxian.js, you can build full-stack applications quickly and efficiently, without the overhead of managing dependencies, build tools, routes, boilerplates, etc. Less configuration, more coding - that's the Oxian way.
 
 ---
 
@@ -74,11 +74,11 @@ For quick reference and common patterns, see the [Cheat_Sheet.md](./Cheat_Sheet.
 
 ### Prerequisites
 
-Oxian Functions runs on the Deno runtime. Ensure you have Deno installed on your machine. You can download and install Deno from [deno.land](https://deno.land/).
+Oxian.js runs on the Deno runtime. Ensure you have Deno installed on your machine. You can download and install Deno from [deno.land](https://deno.land/).
 
-### Running Oxian Functions
+### Running Oxian.js
 
-You can run Oxian Functions in two ways:
+You can run Oxian.js in two ways:
 
 **Method 1: Using deno task**
 
@@ -130,13 +130,13 @@ deno task dev   # for development with hot reload
 }
 ```
 
-Both methods will pull Oxian Functions' code from GitHub and execute it on your local machine, starting the server.
+Both methods will pull Oxian.js' code from GitHub and execute it on your local machine, starting the server.
 
 ---
 
 ## Backend Usage
 
-Backend modules in Oxian Functions are JavaScript files that export a default function. These functions are automatically mapped to API endpoints based on their file structure.
+Backend modules in Oxian.js are JavaScript files that export a default function. These functions are automatically mapped to API endpoints based on their file structure.
 
 ### Example: Basic API Endpoint
 
@@ -164,7 +164,7 @@ curl -X POST "http://localhost:9002/api/hello/POST" -d '{"name":"Oxian"}'
 
 ## Frontend Usage
 
-Oxian functions will assume that front-end modules are React components, and will automatically render them in the browser. Any files with the .jsx or .tsx extension will be considered as React components.
+Oxian.js will assume that front-end modules are React components, and will automatically render them in the browser. Any files with the .jsx or .tsx extension will be considered as React components.
 
 ### Example: Basic React Component
 
@@ -291,7 +291,7 @@ export default function TasksPage() {
 
 ## Shared Modules
 
-Oxian Functions supports "shared" modules, which allow you to reuse code across multiple files in the same directory or any subdirectories. This helps keep your code DRY (Don't Repeat Yourself) and maintainable.
+Oxian.js supports "shared" modules, which allow you to reuse code across multiple files in the same directory or any subdirectories. This helps keep your code DRY (Don't Repeat Yourself) and maintainable.
 
 ### How Shared Modules Work
 
@@ -343,7 +343,7 @@ export function POST({ name, email }) {
 
 ## Layout Components
 
-Oxian Functions also supports "layout" components, which allow you to define a common structure or layout for your frontend components. This is particularly useful for elements like headers, footers, navigation bars, and other UI components that should be consistent across multiple pages.
+Oxian.js also supports "layout" components, which allow you to define a common structure or layout for your frontend components. This is particularly useful for elements like headers, footers, navigation bars, and other UI components that should be consistent across multiple pages.
 
 ### How Layout Components Work
 
@@ -385,7 +385,7 @@ Now all pages in the `functions/pages/` directory will automatically use this la
 
 ## Custom HTML Structure
 
-Oxian Functions allows you to customize the HTML structure of your pages by using index.html files. The closest index.html file to the current path will be considered, while higher-level index.html files are inherited but can be overridden.
+Oxian.js allows you to customize the HTML structure of your pages by using index.html files. The closest index.html file to the current path will be considered, while higher-level index.html files are inherited but can be overridden.
 
 ### Example: Custom HTML Template
 
@@ -415,7 +415,7 @@ The `{{title}}` and `{{content}}` placeholders will be replaced with the appropr
 
 ## Global CSS
 
-Oxian Functions supports the use of global CSS files, which can be defined at any level in the folder structure. These CSS files will be accumulated from the root directory up to the directory containing the current module, allowing for cascading styles and modular CSS organization.
+Oxian.js supports the use of global CSS files, which can be defined at any level in the folder structure. These CSS files will be accumulated from the root directory up to the directory containing the current module, allowing for cascading styles and modular CSS organization.
 
 ### How Global CSS Works
 
@@ -453,14 +453,14 @@ Create `functions/pages/pages.css`:
 
 ## Configuration
 
-Oxian Functions aims to make the development process as straightforward as possible while still allowing for extensive configuration as applications scale. Configuration can be set via environment variables or a configuration file at the root of the project called oxian.config.json.
+Oxian.js aims to make the development process as straightforward as possible while still allowing for extensive configuration as applications scale. Configuration can be set via environment variables or a configuration file at the root of the project called oxian.config.json.
 
 ### Environment Variables
 
 - **PORT**: The port number for the API server. Defaults to 9002.
 - **FUNCTIONS_DIR**: The directory containing your functions. Defaults to 'functions'.
 - **DIR_ENTRYPOINT**: The default file name to look for in directories (without extension). Defaults to 'index'.
-- **DEBUG**: Enables Oxian Functions logs for debugging purposes. Defaults to false.
+- **DEBUG**: Enables Oxian.js logs for debugging purposes. Defaults to false.
 
 ### Configuration File
 
@@ -481,15 +481,15 @@ You can also set these configurations in a oxian.config.json file at the root of
 
 ## Isolation and Architecture
 
-Oxian Functions is designed to provide an isolated and robust development environment, preventing errors from affecting the entire application. It achieves this through a system of process isolation and automatic recovery.
+Oxian.js is designed to provide an isolated and robust development environment, preventing errors from affecting the entire application. It achieves this through a system of process isolation and automatic recovery.
 
 ### Process Isolation
 
-Each module or component in Oxian Functions runs as an isolated process. This ensures that an error in one endpoint or component does not crash the entire application. This isolation is managed through the Deno runtime, leveraging its security model and process management capabilities.
+Each module or component in Oxian.js runs as an isolated process. This ensures that an error in one endpoint or component does not crash the entire application. This isolation is managed through the Deno runtime, leveraging its security model and process management capabilities.
 
 ### Port Requirements
 
-To run an Oxian Functions application, you will need 2+N ports, where N is the number of files that should be executed either as modules or components. The two essential ports are for the file loader and the API server. Each additional module gets its own port for complete isolation.
+To run an Oxian.js application, you will need 2+N ports, where N is the number of files that should be executed either as modules or components. The two essential ports are for the file loader and the API server. Each additional module gets its own port for complete isolation.
 
 - **File Loader**: Default port 9000 (configurable)
 - **API Server**: Default port 9002 (configurable)
@@ -501,7 +501,7 @@ Oxians are the prebuilt modules and components that we have developed for our ap
 
 ### Using Oxians
 
-The Oxian Functions repository comes with a set of prebuilt oxians, both for backend modules and frontend components. These oxians are battle-tested in production environments and maintained by our team.
+The Oxian.js repository comes with a set of prebuilt oxians, both for backend modules and frontend components. These oxians are battle-tested in production environments and maintained by our team.
 
 To use oxians in your project, you can import them using the oxian-modules and oxian-components import maps.
 
@@ -528,13 +528,13 @@ We intend to provide better documentation and a dedicated website for browsing a
 
 ### Extending with Oxians
 
-Developers can easily extend their applications by incorporating these oxians. The modular nature of Oxian Functions allows for seamless integration and customization, making it easy to adapt these prebuilt components to specific project requirements.
+Developers can easily extend their applications by incorporating these oxians. The modular nature of Oxian.js allows for seamless integration and customization, making it easy to adapt these prebuilt components to specific project requirements.
 
 ## Roadmap
 
-Oxian functions is still in pre-release phase, and we are actively working on improving the framework and adding new features.
+Oxian.js is still in pre-release phase, and we are actively working on improving the framework and adding new features.
 
-Our roadmap for Oxian Functions includes the following features and improvements:
+Our roadmap for Oxian.js includes the following features and improvements:
 
 - **Enhanced Documentation**: Comprehensive guides, tutorials, and API references
 - **Oxian Marketplace**: A dedicated website for browsing and using prebuilt oxians
@@ -545,7 +545,7 @@ Our roadmap for Oxian Functions includes the following features and improvements
 
 ## Performance Considerations
 
-Oxian Functions is still in early phases of development, and we started by prioritizing Developer Experience over performance. We are, however, committed to improving the performance of the framework over time.
+Oxian.js is still in early phases of development, and we started by prioritizing Developer Experience over performance. We are, however, committed to improving the performance of the framework over time.
 
 Currently, the framework introduces some overhead due to:
 - Process isolation requiring separate ports for each module

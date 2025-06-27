@@ -1,7 +1,7 @@
 /**
- * Oxian Functions API Server
+ * Oxian.js API Server
  * 
- * This is the main entry point for the Oxian Functions API server.
+ * This is the main entry point for the Oxian.js API server.
  * It provides a robust API framework with dynamic configuration and isolate-based execution.
  * 
  * Usage: deno run -A api.ts

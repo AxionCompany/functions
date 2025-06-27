@@ -1,5 +1,5 @@
 /**
- * Logger utility for Oxian Functions
+ * Logger utility for Oxian.js
  * 
  * Provides centralized logging functionality with different log levels
  * and environment-specific behavior.

@@ -1,7 +1,7 @@
 import {Button} from "oxian-components/Base/Button";
 import React, {useState} from "react";
 
-export default ()=>'Welcome to Oxian Functions 3!';
+export default ()=>'Welcome to Oxian.js 3!';
 
 export const GET = () =>{
     const [count, setCount] = useState(0);
