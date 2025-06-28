@@ -70,7 +70,7 @@ async function bundleModule(
 
   // Check cache first (unless cache busting is requested)
   if (bustCache) {
-    const cacheFolder = `./cache/remote/http/${new URL(moduleUrl).origin.replace(/^https?:\/\//, '').replace(/:/g, '_PORT')}`
+    const cacheFolder = `./cache/.deno/remote/http/${new URL(moduleUrl).origin.replace(/^https?:\/\//, '').replace(/:/g, '_PORT')}`
     // check if the cache folder exists
     if (Deno.statSync(cacheFolder).isDirectory) {
       // delete the temp folder

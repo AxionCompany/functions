@@ -53,7 +53,7 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
   
   // Prepare environment variables
   const envVars = { 
-    DENO_DIR: restConfig.cacheDir || `${Deno.cwd()}data/${projectId}/cache/.deno`, 
+    DENO_DIR: restConfig.cacheDir || `${Deno.cwd()}/data/${projectId}/cache/.deno`, 
     DENO_AUTH_TOKENS: `${username}:${password}@${hostname}:${fileLoaderPort}` 
   };
   
