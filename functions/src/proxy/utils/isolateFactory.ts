@@ -58,11 +58,10 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
   };
   
   // Prepare run options
-  const options = runOptions(
-    { reload, ...restConfig.permissions }, 
+  const options = runOptions(restConfig.permissions, 
     { 
       config: { 
-        isolateType: 'subprocess',
+        isolateType: 'worker',
         projectId, 
         projectPath, 
         ...restConfig 
@@ -71,8 +70,6 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
       variables: env 
     }
   ) as string[];
-
-  console.log('[ISOLATE FACTORY] OPTIONS', options)
   
   // Determine isolate script based on JSX support
   const isolateScript = new URL(
@@ -92,12 +89,12 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
   // Create and spawn the subprocess
   const command = new Deno.Command(Deno.execPath(), {
     env: envVars,
-    cwd: `./data/${projectId}`,
+    cwd: `${Deno.cwd()}/data/${projectId}`,
     args: [
       'run',
       ...options,
       isolateScript,
-      `${port}`,
+      port.toString(),
       isolateConfig,
     ].filter(Boolean),
   });
@@ -133,30 +130,11 @@ function createWebWorkerIsolate(config: IsolateFactoryConfig): Worker {
     `../../isolate/adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, 
     import.meta.url
   ).href;
-
-  // Handle special case for JSX and picocolors dependency
-  let permissions = { ...restConfig.permissions };
-  
-  if (isJSX) {
-    // picocolors dependency (css-related) requires access to "NO_COLOR" ENV 
-    // or it needs to read directory. To maintain behavior, set it to empty string, 
-    // if not set in ENV, and set permission for "NO_COLOR" ENV variable
-    Deno.env.set("NO_COLOR", env.NO_COLOR || "");
-    
-    // Update permissions for NO_COLOR environment variable
-    const currentEnvPerm = permissions["allow-env"];
-    permissions = {
-      ...permissions,
-      "allow-env": typeof currentEnvPerm === 'boolean'
-        ? currentEnvPerm ? true : ["NO_COLOR"]
-        : [...(currentEnvPerm || []), "NO_COLOR"]
-    };
-  }
-
+ 
   // Prepare run options for worker
   const runOptionsObj = !restConfig?.permissions?.['allow-all']
     ? runOptions(
-        permissions, 
+      restConfig.permissions, 
         { 
           config: { 
             isolateType: 'worker',

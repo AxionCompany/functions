@@ -109,23 +109,18 @@ const runOptions = (
   // Get platform-specific cache directories for @deno/emit WebAssembly caching
   const cacheDirectories = getUserCacheDirectories();
   
-  // Log the cache directories being added (useful for debugging)
-  if (cacheDirectories.length > 0) {
-    console.log(`[Permissions] Adding platform-specific cache directories for @deno/emit:`, cacheDirectories);
-  }
-  
   // Combine base read permissions with cache directories
   const readPermissions = [...readWritePermissions, ...cacheDirectories];
 
   // Build base permissions object
   const basePermissions: PermissionsConfig = {
-    "deny-run": customPermissions['allow-run'] ? false : true,
-    "allow-env": true,
     "allow-write": readWritePermissions,
     "allow-read": readPermissions,
-    "allow-import": true,
-    "allow-ffi": true,
-    "allow-net": true,
+    'allow-run': true,
+    'allow-env': true,
+    'allow-import': true,
+    'allow-ffi': true,
+    'allow-net': true,
     "unstable-sloppy-imports": true,
     "unstable-kv": true,
     "unstable": true,

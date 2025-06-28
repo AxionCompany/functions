@@ -1,6 +1,6 @@
 {
   "name": "@oxian/oxian-js",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "license": "MIT",
   "exports": "./main.ts",
   "tasks": {
@@ -10,8 +10,6 @@
     "api": "ENV=production deno run -A --reload=http://localhost:9000 --no-lock --unstable --unstable-kv --unstable-sloppy-imports api.ts"
   },
   "imports": {
-    "react": "npm:react",
-    "react-dom/server": "npm:react-dom/server",
     "@deno/emit": "jsr:@deno/emit@0.46.0"
   }
 }
