@@ -7,6 +7,10 @@ import ReactDOMServer from "npm:react-dom/server";
 import React from "npm:react";
 import { DOMParser } from "npm:linkedom";
 import Cache from "../../utils/withCache.ts";
+import { installSourceMapSupport } from "../utils/sourceMapSupport.ts";
+
+// Install source map support for better debugging
+installSourceMapSupport();
 
 let port: number | undefined;
 let config: any;
@@ -19,7 +23,6 @@ const [portString, configString]: string[] = Deno?.args || [];
 if (portString && configString) {
     port = parseInt(portString) || 3000;
     config = JSON.parse(configString || '{}');
-    Deno.cwd = () => config.projectPath;
 } else {
     // @ts-ignore: self is defined in worker environments
     self.onmessage = function (event: any) {
@@ -27,7 +30,6 @@ if (portString && configString) {
         port = _port;
         config = _config;
         cachePathPrefix = config.projectPath;
-        Deno.cwd = () => config.projectPath;
     };
 }
 
@@ -75,9 +77,20 @@ const handlerConfig = {
                 const url = atob(queryParams.__proxyUrl__);
                 const isJSX = queryParams.__isJSX__ === 'true';
                 data.url = url;
-                if (moduleExecutors.has(importUrl)) {
+                
+                // Check if we should bust the cache for this module
+                const bustCache = config.bustCache || false;
+                
+                if (moduleExecutors.has(importUrl) && !bustCache) {
+                    console.log('JSX Module already loaded:', importUrl);
                     moduleExecutor = moduleExecutors.get(importUrl);
                 } else {
+                    if (bustCache && moduleExecutors.has(importUrl)) {
+                        console.log('Busting cache and reloading JSX module:', importUrl);
+                        moduleExecutors.delete(importUrl);
+                    } else {
+                        console.log('Loading JSX module:', importUrl);
+                    }
                     moduleExecutor = await ModuleExecution({
                         ...config,
                         isJSX,

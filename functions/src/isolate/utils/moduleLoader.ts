@@ -1,5 +1,29 @@
 // moduleLoader.ts
 import getAllFiles from "./getAllFiles.ts";
+import { bundle } from "@deno/emit";
+import { enhanceErrorWithSourceMap } from "./sourceMapSupport.ts";
+
+// Cache for bundled modules to avoid re-bundling
+const bundleCache = new Map<string, { code: string; sourceMap?: string; dataUrl: string }>();
+
+/**
+ * Clear the entire bundle cache (useful for debugging or forced cache busting)
+ */
+export function clearBundleCache(): void {
+  const cacheSize = bundleCache.size;
+  bundleCache.clear();
+  console.log(`[Bundle Cache] Cleared entire bundle cache (${cacheSize} entries)`);
+}
+
+/**
+ * Get bundle cache statistics
+ */
+export function getBundleCacheStats(): { size: number; keys: string[] } {
+  return {
+    size: bundleCache.size,
+    keys: Array.from(bundleCache.keys())
+  };
+}
 
 interface ModuleLoaderParams {
   url: string;
@@ -36,36 +60,112 @@ export interface ModuleLoaderResult {
 }
 
 /**
- * Helper to build a new URL with appended query parameters.
+ * Bundles a module and returns it as a data URL for importing
  */
-function buildUrlWithParams(baseUrl: URL, params: Record<string, string | boolean>): URL {
-  const newUrl = new URL(baseUrl.toString());
-  Object.entries(params).forEach(([key, value]) => {
-    newUrl.searchParams.append(key, value.toString());
-  });
-  return newUrl;
+async function bundleModule(
+  moduleUrl: string,
+  importMap?: any,
+  bustCache = false
+): Promise<{ code: string; sourceMap?: string; dataUrl: string }> {
+
+  // Check cache first (unless cache busting is requested)
+  if (bustCache) {
+    const cacheFolder = `./cache/remote/http/${new URL(moduleUrl).origin.replace(/^https?:\/\//, '').replace(/:/g, '_PORT')}`
+    // check if the cache folder exists
+    if (Deno.statSync(cacheFolder).isDirectory) {
+      // delete the temp folder
+      Deno.removeSync(cacheFolder, { recursive: true })
+    }
+  }
+
+  try {
+    console.log(`[Bundle] Bundling module: ${moduleUrl}`);
+
+    const result = await bundle(moduleUrl, {
+      allowRemote: true,
+      compilerOptions: {
+        inlineSourceMap: true,  // Enable inline source maps for automatic stack trace support
+        inlineSources: true,    // Include original source code in source maps
+      },
+      cacheSetting: [new URL(moduleUrl).origin],
+      importMap,
+    });
+
+
+    const { code } = result;
+
+    // Extract source map if available (for debugging purposes)
+    let sourceMap: string | undefined;
+    const sourceMapMatch = code.match(/\/\/# sourceMappingURL=data:application\/json;base64,(.+)$/m);
+    if (sourceMapMatch) {
+      sourceMap = atob(sourceMapMatch[1]);
+      console.log(`[Bundle] Generated source map for ${moduleUrl} (${sourceMap.length} bytes)`);
+    }
+
+    // Create data URL for the bundled code
+    const dataUrl = `data:text/javascript;base64,${btoa(code)}`;
+
+    const bundleResult = { code, sourceMap, dataUrl };
+
+    // Cache the result
+    console.log(`[Bundle] Successfully bundled module: ${moduleUrl} (${code.length} bytes)${sourceMap ? ' with source maps' : ''}`);
+
+    return bundleResult;
+  } catch (err) {
+    console.error(`[Bundle Error] Failed to bundle module ${moduleUrl}:`, err);
+    throw err;
+  }
 }
 
 /**
- * Dynamically imports a list of files and returns their default exports.
+ * Dynamically bundles and imports a list of files and returns their default exports.
+ * Falls back to regular imports if bundling fails.
  */
-async function dynamicImportModules(
+async function dynamicImportBundledModules(
   files: FileData[],
   moduleType: string,
   importUrl: string,
-  baseSearch: string
+  baseSearch: string,
+  importMap?: any,
+  bustCache = false
 ): Promise<any[]> {
   return Promise.all(
-    files.map((file) => {
+    files.map(async (file) => {
       const fileUrl = new URL(`/${file?.matchPath}`, importUrl);
       fileUrl.search = baseSearch;
-      return import(fileUrl.href)
-        .then((mod) => mod.default)
-        .catch((err) => {
-          const errorMessage = `Error Importing ${moduleType} Module \`${file?.matchPath}\`: ${err.toString()}`;
+
+      try {
+        // Try bundling first
+        const { dataUrl, code } = await bundleModule(fileUrl.href, importMap, bustCache);
+
+        // Import from the data URL with enhanced error handling
+        try {
+          const mod = await import(dataUrl);
+          console.log(`[Bundle Import] Successfully imported bundled ${moduleType} module: ${file?.matchPath}`);
+          return mod.default;
+        } catch (importError) {
+          // Enhance error with source map information
+          const enhancedError = enhanceErrorWithSourceMap(
+            importError instanceof Error ? importError : new Error(String(importError)),
+            code,
+            fileUrl.href
+          );
+          throw enhancedError;
+        }
+      } catch (bundleErr) {
+        console.warn(`[Bundle Fallback] Bundling failed for ${moduleType} module ${file?.matchPath}, falling back to regular import:`, bundleErr);
+
+        // Fallback to regular import
+        try {
+          const mod = await import(fileUrl.href);
+          console.log(`[Regular Import] Successfully imported ${moduleType} module: ${file?.matchPath}`);
+          return mod.default;
+        } catch (importErr) {
+          const errorMessage = `Error importing ${moduleType} Module \`${file?.matchPath}\` (both bundling and regular import failed): ${importErr instanceof Error ? importErr.message : String(importErr)}`;
           console.error(errorMessage);
           throw { message: errorMessage, status: 401 };
-        });
+        }
+      }
     })
   );
 }
@@ -82,8 +182,12 @@ export default async function moduleLoader({
   functionsDir,
   bustCache,
 }: ModuleLoaderParams): Promise<ModuleLoaderResult> {
-  // Convert importUrl to URL instance for consistency.
 
+  console.log(`[ModuleLoader] Starting module load for ${importUrl}`);
+  console.log(`[ModuleLoader] BustCache flag: ${bustCache}`);
+  console.log(`[ModuleLoader] Current bundle cache size: ${bundleCache.size}`);
+
+  // Convert importUrl to URL instance for consistency.
   const importUrlObj = new URL(importUrl);
 
   const importPromises: Promise<any>[] = [];
@@ -162,11 +266,17 @@ export default async function moduleLoader({
 
   const loadPromises: Promise<any>[] = [];
 
+  // Extract import map from dependencies if available
+  const importMap = dependencies?.denoConfig?.imports ? {
+    imports: dependencies.denoConfig.imports,
+    scopes: dependencies.denoConfig.scopes || {}
+  } : undefined;
+
   // Load shared modules.
-  loadPromises.push(dynamicImportModules(sharedModulesData, "Shared", importUrl, importUrlObj.search));
+  loadPromises.push(dynamicImportBundledModules(sharedModulesData, "Shared", importUrl, importUrlObj.search, importMap, bustCache));
 
   // Load middleware modules.
-  loadPromises.push(dynamicImportModules(middlewaresData, "Middleware", importUrl, importUrlObj.search));
+  loadPromises.push(dynamicImportBundledModules(middlewaresData, "Middleware", importUrl, importUrlObj.search, importMap, bustCache));
 
   // Load interceptor module.
   if (!interceptorData || interceptorData.length === 0) {
@@ -176,19 +286,43 @@ export default async function moduleLoader({
     const interceptorUrl = new URL(`/${interceptorFile.matchPath}`, importUrl);
     interceptorUrl.search = importUrlObj.search;
     loadPromises.push(
-      import(interceptorUrl.href)
-        .then((mod) => mod)
-        .catch((err) => {
-          const errorMessage = `Error Importing Interceptor Module \`${interceptorFile.matchPath}\`: ${err.toString()}`;
-          console.error(errorMessage);
-          throw { message: errorMessage, status: 401 };
+      bundleModule(interceptorUrl.href, importMap, bustCache)
+        .then(({ dataUrl, code }) => {
+          return import(dataUrl)
+            .then((mod) => {
+              console.log(`[Bundle Import] Successfully imported bundled Interceptor module: ${interceptorFile.matchPath}`);
+              return mod;
+            })
+            .catch((importError) => {
+              // Enhance error with source map information
+              const enhancedError = enhanceErrorWithSourceMap(
+                importError instanceof Error ? importError : new Error(String(importError)),
+                code,
+                interceptorUrl.href
+              );
+              throw enhancedError;
+            });
+        })
+        .catch(async (bundleErr) => {
+          console.warn(`[Bundle Fallback] Bundling failed for Interceptor module ${interceptorFile.matchPath}, falling back to regular import:`, bundleErr);
+
+          // Fallback to regular import
+          try {
+            const mod = await import(interceptorUrl.href);
+            console.log(`[Regular Import] Successfully imported Interceptor module: ${interceptorFile.matchPath}`);
+            return mod;
+          } catch (importErr) {
+            const errorMessage = `Error importing Interceptor Module \`${interceptorFile.matchPath}\` (both bundling and regular import failed): ${importErr instanceof Error ? importErr.message : String(importErr)}`;
+            console.error(errorMessage);
+            throw { message: errorMessage, status: 401 };
+          }
         })
     );
   }
 
   // Load layout modules if JSX is enabled.
   if (isJSX && bundledLayouts) {
-    loadPromises.push(dynamicImportModules(bundledLayouts, "Layout", importUrl, importUrlObj.search));
+    loadPromises.push(dynamicImportBundledModules(bundledLayouts, "Layout", importUrl, importUrlObj.search, importMap, bustCache));
   }
 
   const [SharedModules, Middlewares, InterceptorModule, LayoutModules] = await Promise.all(loadPromises);
@@ -236,13 +370,29 @@ export default async function moduleLoader({
   const { beforeRun, afterRun } = InterceptorModule || {};
 
   try {
-    // Dynamically import the target module.
-    const targetModule = await import(importUrl)
-      .then((mod) => mod)
-      .catch((err) => {
-        const errorMessage = `Error Importing Module \`${importUrl}\`: ${err.toString()}`.replace(new URL(importUrl).origin, "");
-        throw { message: errorMessage, status: 401 };
-      });
+    // Bundle and dynamically import the target module.
+    let targetModule;
+    try {
+      const { dataUrl, code } = await bundleModule(importUrl, importMap, bustCache);
+      try {
+        targetModule = await import(dataUrl);
+        console.log(`[Bundle Import] Successfully imported bundled target module: ${importUrl}`);
+      } catch (importError) {
+        // Enhance error with source map information
+        const enhancedError = enhanceErrorWithSourceMap(
+          importError instanceof Error ? importError : new Error(String(importError)),
+          code,
+          importUrl
+        );
+        throw enhancedError;
+      }
+    } catch (bundleErr) {
+      console.warn(`[Bundle Fallback] Bundling failed for target module ${importUrl}, falling back to regular import:`, bundleErr);
+
+      // Fallback to regular import
+      targetModule = await import(importUrl);
+      console.log(`[Regular Import] Successfully imported target module: ${importUrl}`);
+    }
 
     if (typeof targetModule === "string") {
       throw { message: "Module Not Found", status: 404 };

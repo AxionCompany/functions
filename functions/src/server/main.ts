@@ -87,7 +87,7 @@ export default function createServer(options: ServerOptions): Promise<void> {
         });
       } catch (error) {
         // Handle any errors that occur during request processing
-        console.error("Error handling request:", error);
+        console.error("Error handling request:", error, request);
         
         // Return a 500 error response
         return new Response(

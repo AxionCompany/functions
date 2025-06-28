@@ -11,6 +11,7 @@
   },
   "imports": {
     "react": "npm:react",
-    "react-dom/server": "npm:react-dom/server"
+    "react-dom/server": "npm:react-dom/server",
+    "@deno/emit": "jsr:@deno/emit@0.46.0"
   }
 }

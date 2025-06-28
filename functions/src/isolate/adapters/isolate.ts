@@ -4,9 +4,13 @@ import server from "../../server/main.ts";
 import RequestHandler from "../../handler/main.ts";
 import ModuleExecution from "../main.ts";
 import Cache from "../../utils/withCache.ts";
+import { installSourceMapSupport } from "../utils/sourceMapSupport.ts";
 // import { context } from "npm:@opentelemetry/api@1"
 
 // globalThis.context = context;
+
+// Install source map support for better debugging
+installSourceMapSupport();
 
 let port: number | undefined;
 let config: any;
@@ -18,16 +22,13 @@ const [portString, configString]: string[] = Deno?.args || [];
 if (portString && configString) {
     port = parseInt(portString) || 3000;
     config = JSON.parse(configString || '{}');
-    Deno.cwd = () => config.projectPath;
 } else {
     // @ts-ignore: self is defined in worker environments
     self.onmessage = function (event: any) {
-
         const { port: _port, ..._config } = event.data;
         port = _port;
         config = _config;
         cachePathPrefix = config.projectPath;
-        Deno.cwd = () => config.projectPath;
     };
 }
 // await for port and config
@@ -64,11 +65,20 @@ const handlerConfig = {
                 if (isJSX) {
                     throw new Error(`Isolate of type "${globalThis.isolateType}" is not compatible with JSX modules`);
                 }
-                if (moduleExecutors.has(importUrl)) {
+                
+                // Check if we should bust the cache for this module
+                const bustCache = config.bustCache || false;
+                
+                if (moduleExecutors.has(importUrl) && !bustCache) {
                     console.log('Module already loaded:', importUrl);
                     moduleExecutor = moduleExecutors.get(importUrl);
                 } else {
-                    console.log('Loading module:', importUrl);
+                    if (bustCache && moduleExecutors.has(importUrl)) {
+                        console.log('Busting cache and reloading module:', importUrl);
+                        moduleExecutors.delete(importUrl);
+                    } else {
+                        console.log('Loading module:', importUrl);
+                    }
                     moduleExecutor = await ModuleExecution({ ...config, isJSX, importUrl, url, dependencies: { withCache } });
                     moduleExecutors.set(importUrl, moduleExecutor);
                 }

@@ -53,7 +53,7 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
   
   // Prepare environment variables
   const envVars = { 
-    DENO_DIR: restConfig.cacheDir || `./cache/.deno`, 
+    DENO_DIR: restConfig.cacheDir || `${Deno.cwd()}data/${projectId}/cache/.deno`, 
     DENO_AUTH_TOKENS: `${username}:${password}@${hostname}:${fileLoaderPort}` 
   };
   
@@ -71,6 +71,8 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
       variables: env 
     }
   ) as string[];
+
+  console.log('[ISOLATE FACTORY] OPTIONS', options)
   
   // Determine isolate script based on JSX support
   const isolateScript = new URL(
@@ -196,6 +198,9 @@ function createWebWorkerIsolate(config: IsolateFactoryConfig): Worker {
  */
 export default async function isolateFactory(config: IsolateFactoryConfig): Promise<IsolateInstance> {
   try {
+
+    if (!config.isolateType)  config.isolateType = 'subprocess'
+    
     if (config.isolateType === 'subprocess') {
       return await createSubprocessIsolate(config);
     } else {

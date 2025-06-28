@@ -150,7 +150,7 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
     logInfo("Received request:", req.url);
     
     // Parse authorization header for credentials
-    const authorizationEncoded = req.headers.get('authorization')?.slice(6);
+    const authorizationEncoded = req.headers.get('authorization')?.split(',')[0]?.slice(6);
     let [username, password] = authorizationEncoded ? atob(authorizationEncoded).split(':') : [];
     
     logDebug("Auth credentials:", username || 'anonymous');

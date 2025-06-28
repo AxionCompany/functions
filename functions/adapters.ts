@@ -124,7 +124,7 @@ export default function defaultAdapters(baseAdapters: any) {
   return {
     ...baseAdapters,
     // Isolate configuration
-    isolateType: 'worker', // or 'worker'
+    isolateType: 'subprocess', // or 'worker'
     isolateMaxIdleTime: 5000,   // 5 seconds
     
     // Store the isolate ID for debugging/logging
@@ -140,7 +140,8 @@ export default function defaultAdapters(baseAdapters: any) {
     
     // Permissions
     permissions: { 
-      "allow-sys": true 
+      "allow-sys": true ,
+      'allow-env': true,
     }
   };
 }

@@ -46,6 +46,43 @@ export interface RunOptionsContext {
 }
 
 /**
+ * Get platform-specific user cache directories
+ * This is needed for @deno/emit WebAssembly caching
+ */
+function getUserCacheDirectories(): string[] {
+  const platform = Deno.build.os;
+  const homeDir = Deno.env.get("HOME") || Deno.env.get("USERPROFILE") || ".";
+  
+  switch (platform) {
+    case "darwin": // macOS
+      return [
+        `${homeDir}/Library/Application Support/deno-wasmbuild`,
+        `${homeDir}/Library/Caches/deno-wasmbuild`,
+      ];
+    case "linux":
+      const xdgCacheHome = Deno.env.get("XDG_CACHE_HOME");
+      const xdgDataHome = Deno.env.get("XDG_DATA_HOME");
+      return [
+        xdgCacheHome ? `${xdgCacheHome}/deno-wasmbuild` : `${homeDir}/.cache/deno-wasmbuild`,
+        xdgDataHome ? `${xdgDataHome}/deno-wasmbuild` : `${homeDir}/.local/share/deno-wasmbuild`,
+      ];
+    case "windows":
+      const appData = Deno.env.get("APPDATA");
+      const localAppData = Deno.env.get("LOCALAPPDATA");
+      return [
+        appData ? `${appData}/deno-wasmbuild` : `${homeDir}/AppData/Roaming/deno-wasmbuild`,
+        localAppData ? `${localAppData}/deno-wasmbuild` : `${homeDir}/AppData/Local/deno-wasmbuild`,
+      ];
+    default:
+      // Fallback for unknown platforms
+      return [
+        `${homeDir}/.cache/deno-wasmbuild`,
+        `${homeDir}/.local/share/deno-wasmbuild`,
+      ];
+  }
+}
+
+/**
  * Generate Deno run options based on permissions configuration
  * 
  * @param customPermissions - Custom permissions to override defaults
@@ -67,12 +104,23 @@ const runOptions = (
         `${config.projectPath}/../../node_modules`
       ];
 
+  // Get platform-specific cache directories for @deno/emit WebAssembly caching
+  const cacheDirectories = getUserCacheDirectories();
+  
+  // Log the cache directories being added (useful for debugging)
+  if (cacheDirectories.length > 0) {
+    console.log(`[Permissions] Adding platform-specific cache directories for @deno/emit:`, cacheDirectories);
+  }
+  
+  // Combine base read permissions with cache directories
+  const readPermissions = [...readWritePermissions, ...cacheDirectories];
+
   // Build base permissions object
   const basePermissions: PermissionsConfig = {
     "deny-run": customPermissions['allow-run'] ? false : true,
     "allow-env": false,
     "allow-write": readWritePermissions,
-    "allow-read": readWritePermissions,
+    "allow-read": readPermissions,
     "allow-import": true,
     "allow-ffi": true,
     "allow-net": true,

@@ -1,1 +1,2 @@
-export default () => 'ok'
+import test from './test.js'
+export default () => { return 'ok 2' }
