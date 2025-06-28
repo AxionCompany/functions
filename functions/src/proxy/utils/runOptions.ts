@@ -59,20 +59,22 @@ function getUserCacheDirectories(): string[] {
         `${homeDir}/Library/Application Support/deno-wasmbuild`,
         `${homeDir}/Library/Caches/deno-wasmbuild`,
       ];
-    case "linux":
+    case "linux":{
       const xdgCacheHome = Deno.env.get("XDG_CACHE_HOME");
       const xdgDataHome = Deno.env.get("XDG_DATA_HOME");
       return [
         xdgCacheHome ? `${xdgCacheHome}/deno-wasmbuild` : `${homeDir}/.cache/deno-wasmbuild`,
         xdgDataHome ? `${xdgDataHome}/deno-wasmbuild` : `${homeDir}/.local/share/deno-wasmbuild`,
       ];
-    case "windows":
+    }
+    case "windows":{
       const appData = Deno.env.get("APPDATA");
       const localAppData = Deno.env.get("LOCALAPPDATA");
       return [
         appData ? `${appData}/deno-wasmbuild` : `${homeDir}/AppData/Roaming/deno-wasmbuild`,
         localAppData ? `${localAppData}/deno-wasmbuild` : `${homeDir}/AppData/Local/deno-wasmbuild`,
       ];
+    }
     default:
       // Fallback for unknown platforms
       return [
@@ -118,7 +120,7 @@ const runOptions = (
   // Build base permissions object
   const basePermissions: PermissionsConfig = {
     "deny-run": customPermissions['allow-run'] ? false : true,
-    "allow-env": false,
+    "allow-env": true,
     "allow-write": readWritePermissions,
     "allow-read": readPermissions,
     "allow-import": true,
