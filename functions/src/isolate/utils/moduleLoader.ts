@@ -1,6 +1,6 @@
 // moduleLoader.ts
 import getAllFiles from "./getAllFiles.ts";
-import { bundle } from "@deno/emit";
+import { bundle } from "jsr:@deno/emit";
 import { enhanceErrorWithSourceMap } from "./sourceMapSupport.ts";
 
 // Cache for bundled modules to avoid re-bundling
@@ -70,7 +70,7 @@ async function bundleModule(
 
   // Check cache first (unless cache busting is requested)
   if (bustCache) {
-    const cacheFolder = `./cache/.deno/remote/http/${new URL(moduleUrl).origin.replace(/^https?:\/\//, '').replace(/:/g, '_PORT')}`
+    const cacheFolder = `${Deno.env.get('DENO_DIR')}/remote/http/${new URL(moduleUrl).origin.replace(/^https?:\/\//, '').replace(/:/g, '_PORT')}`
     // check if the cache folder exists
     if (Deno.statSync(cacheFolder).isDirectory) {
       // delete the temp folder
@@ -79,8 +79,6 @@ async function bundleModule(
   }
 
   try {
-    console.log(`[Bundle] Bundling module: ${moduleUrl}`);
-
     const result = await bundle(moduleUrl, {
       allowRemote: true,
       compilerOptions: {
@@ -99,16 +97,12 @@ async function bundleModule(
     const sourceMapMatch = code.match(/\/\/# sourceMappingURL=data:application\/json;base64,(.+)$/m);
     if (sourceMapMatch) {
       sourceMap = atob(sourceMapMatch[1]);
-      console.log(`[Bundle] Generated source map for ${moduleUrl} (${sourceMap.length} bytes)`);
     }
 
     // Create data URL for the bundled code
     const dataUrl = `data:text/javascript;base64,${btoa(code)}`;
 
     const bundleResult = { code, sourceMap, dataUrl };
-
-    // Cache the result
-    console.log(`[Bundle] Successfully bundled module: ${moduleUrl} (${code.length} bytes)${sourceMap ? ' with source maps' : ''}`);
 
     return bundleResult;
   } catch (err) {
@@ -141,7 +135,6 @@ async function dynamicImportBundledModules(
         // Import from the data URL with enhanced error handling
         try {
           const mod = await import(dataUrl);
-          console.log(`[Bundle Import] Successfully imported bundled ${moduleType} module: ${file?.matchPath}`);
           return mod.default;
         } catch (importError) {
           // Enhance error with source map information
@@ -182,10 +175,6 @@ export default async function moduleLoader({
   functionsDir,
   bustCache,
 }: ModuleLoaderParams): Promise<ModuleLoaderResult> {
-
-  console.log(`[ModuleLoader] Starting module load for ${importUrl}`);
-  console.log(`[ModuleLoader] BustCache flag: ${bustCache}`);
-  console.log(`[ModuleLoader] Current bundle cache size: ${bundleCache.size}`);
 
   // Convert importUrl to URL instance for consistency.
   const importUrlObj = new URL(importUrl);
@@ -290,7 +279,6 @@ export default async function moduleLoader({
         .then(({ dataUrl, code }) => {
           return import(dataUrl)
             .then((mod) => {
-              console.log(`[Bundle Import] Successfully imported bundled Interceptor module: ${interceptorFile.matchPath}`);
               return mod;
             })
             .catch((importError) => {
@@ -376,7 +364,6 @@ export default async function moduleLoader({
       const { dataUrl, code } = await bundleModule(importUrl, importMap, bustCache);
       try {
         targetModule = await import(dataUrl);
-        console.log(`[Bundle Import] Successfully imported bundled target module: ${importUrl}`);
       } catch (importError) {
         // Enhance error with source map information
         const enhancedError = enhanceErrorWithSourceMap(

@@ -42,7 +42,7 @@ export interface ModuleLoaderResult {
   [key: string]: any;
 }
 
-export type ModuleFunction = (args: any, response?: ResponseHandler | null) => Promise<any>;
+export type ModuleFunction = (args: any, response?: ResponseHandler | null) => Promise<any> | any;
 export type MiddlewareFunction = (data: RequestData, response: ResponseHandler | null) => Promise<RequestData>;
 export type HookFunction = (...args: any[]) => any;
 
@@ -52,6 +52,10 @@ export interface Dependencies {
     fn: (...args: any[]) => T
   ) => (...args: any[]) => T | Promise<T>;
   withHook?: Function;
+  db?: any;
+  dbWorker?: Worker;
+  schema?: Record<string, any>;
+  dbConfig?: any;
   LayoutModules?: any[];
   React?: any;
   ReactDOMServer?: any;
@@ -400,9 +404,6 @@ export default async function createModuleExecutor(
       if (processedRequest._forceResponse) {
         return processedRequest._forceResponse;
       }
-
-      // Optionally merge middleware properties into dependencies
-      // Object.assign(dependencies, { ...middlewares });
 
       const { method, body, params, headers: requestHeaders, __requestId__ } = processedRequest;
 

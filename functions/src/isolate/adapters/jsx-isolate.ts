@@ -15,7 +15,6 @@ installSourceMapSupport();
 let port: number | undefined;
 let config: any;
 
-
 const moduleExecutors = new Map<string, any>();
 let cachePathPrefix = '';
 

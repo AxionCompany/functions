@@ -1,4 +1,13 @@
 {
-    "dirEntrypoint": "index",
-    "functionsDir": "functions"
-}
+  "dirEntrypoint": "index",
+  "functionsDir": "functions",
+  "isolateType": "subprocess",
+  "isolateMaxIdleTime": 300000,
+  "database": {
+    "enabled": true,
+    "lwwColumn": "updated_at"
+  },
+  "permissions":{
+   "unstable-worker-options": true
+  }
+} 

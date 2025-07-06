@@ -56,6 +56,7 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
     DENO_DIR: restConfig.cacheDir || `${Deno.cwd()}/data/${projectId}/cache/.deno`, 
     DENO_AUTH_TOKENS: `${username}:${password}@${hostname}:${fileLoaderPort}` 
   };
+
   
   // Prepare run options
   const options = runOptions(restConfig.permissions, 
@@ -70,6 +71,7 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
       variables: env 
     }
   ) as string[];
+
   
   // Determine isolate script based on JSX support
   const isolateScript = new URL(

@@ -207,10 +207,17 @@ class IsolateManager {
     }
 
     // Cleanup all isolates
-    cleanupAllIsolates(): void {
+    async cleanupAllIsolates(): Promise<void> {
         logInfo("Cleaning up all isolates");
-        for (const isolateId of this.isolates.keys()) {
-            this.cleanupIsolate(isolateId);
+        const cleanupPromises = Array.from(this.isolates.keys()).map(isolateId => 
+            this.cleanupIsolate(isolateId)
+        );
+        
+        try {
+            await Promise.allSettled(cleanupPromises);
+            logInfo("All isolate cleanup operations completed");
+        } catch (error) {
+            logError("Error during batch isolate cleanup:", error);
         }
     }
 
@@ -233,9 +240,34 @@ class IsolateManager {
                 isolate.worker.terminate();
                 delete isolate.worker;
             } else if (isolate.pid) {
-                logInfo(`Terminating subprocess isolate: ${isolateId}`);
+                logInfo(`Gracefully terminating subprocess isolate: ${isolateId}`);
                 try {
-                    Deno.kill(isolate.pid, 'SIGKILL');
+                    // Try graceful shutdown first with SIGTERM
+                    Deno.kill(isolate.pid, 'SIGTERM');
+                    
+                    // Give the process some time to cleanup gracefully
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // Check if process is still running
+                    try {
+                        // Try to get process info to check if it still exists
+                        const process = new Deno.Command("ps", {
+                            args: ["-p", isolate.pid.toString()],
+                            stdout: "piped",
+                            stderr: "piped"
+                        });
+                        const { success } = await process.output();
+                        
+                        if (success) {
+                            logWarning(`Process ${isolateId} still running, forcing termination with SIGKILL`);
+                            Deno.kill(isolate.pid, 'SIGKILL');
+                        } else {
+                            logInfo(`Process ${isolateId} terminated gracefully`);
+                        }
+                    } catch (error) {
+                        // If ps command fails or process doesn't exist, assume it's terminated
+                        logInfo(`Process ${isolateId} terminated gracefully`);
+                    }
                 } catch (killError) {
                     if (!(killError instanceof Deno.errors.NotFound)) {
                         throw killError;
@@ -300,14 +332,14 @@ class IsolateManager {
             for (let port = startPort; port <= endPort; port++) {
                 try {
                     logDebugWithConfig(globalConfig, `Trying port ${port}`);
-            const listener = Deno.listen({ port });
-            listener.close();
+                    const listener = Deno.listen({ port });
+                    listener.close();
                     logInfo(`Found available port: ${port}`);
-            return port;
-        } catch (error) {
-            if (error instanceof Deno.errors.AddrInUse) {
+                    return port;
+                } catch (error) {
+                    if (error instanceof Deno.errors.AddrInUse) {
                         logDebugWithConfig(globalConfig, `Port ${port} is in use, trying next`);
-                continue;
+                        continue;
                     }
                     logError(`Error checking port ${port}:`, error);
                     throw error;
@@ -380,12 +412,55 @@ async function waitForServer(url: string, timeout: number = 1000 * 60): Promise<
 }
 
 // ===== Main Handler =====
-export const cleanupIsolates = (): void => {
-    isolateManager.cleanupAllIsolates();
+export const cleanupIsolates = async (): Promise<void> => {
+    await isolateManager.cleanupAllIsolates();
 };
 
 // Create a singleton instance of IsolateManager
 const isolateManager = new IsolateManager();
+
+// ===== Signal Handlers for Graceful Shutdown =====
+let isShuttingDown = false;
+
+async function gracefulShutdown(signal: string) {
+    if (isShuttingDown) {
+        console.log(`Already shutting down, ignoring ${signal}`);
+        return;
+    }
+    
+    isShuttingDown = true;
+    console.log(`Received ${signal}, starting graceful shutdown...`);
+    
+    try {
+        // Clean up all isolates
+        await isolateManager.cleanupAllIsolates();
+        console.log('All isolates cleaned up successfully');
+    } catch (error) {
+        console.error('Error during isolate cleanup:', error);
+    }
+    
+    console.log('Graceful shutdown complete');
+}
+
+// Set up signal handlers for the main proxy process
+if (typeof Deno !== 'undefined' && Deno.addSignalListener) {
+    try {
+        Deno.addSignalListener("SIGTERM", () => gracefulShutdown("SIGTERM"));
+        Deno.addSignalListener("SIGINT", () => gracefulShutdown("SIGINT"));
+        console.log('Signal handlers registered for graceful shutdown');
+    } catch (error) {
+        console.warn('Failed to register signal handlers:', error);
+    }
+}
+
+// Handle unhandled process exits
+if (typeof globalThis.addEventListener === 'function') {
+    globalThis.addEventListener('beforeunload', () => {
+        if (!isShuttingDown) {
+            gracefulShutdown('beforeunload');
+        }
+    });
+}
 
 export default ({ config, modules }: ProxyParams) => async (req: Request): Promise<Response> => {
     // Update global config for logging
@@ -395,7 +470,7 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
         infoLogs: config.infoLogs,
         warningLogs: config.warningLogs
     };
-    
+
     // Set global log config
     setLogConfig(globalConfig);
 
@@ -527,7 +602,7 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
             logError(`Cannot wait for isolate to load: isolateId is undefined`);
             return undefined;
         }
-        
+
         logDebugWithConfig(config, `Isolate is loading. Waiting for it to finish: ${isolateId}`);
         let status = isolateManager.getIsolate(isolateId)?.status;
 
@@ -590,7 +665,7 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
             config.projectId = projectId;
 
             try {
-            await modules.fs.ensureDir(`./data/${projectId}`);
+                await modules.fs.ensureDir(`${Deno.env.get('DENO_DIR')}/../${projectId}`);
                 logDebugWithConfig(config, `Ensured project directory ./data/${projectId}`);
             } catch (dirError) {
                 logError(`Failed to create project directory for ${projectId}:`, dirError);
@@ -607,21 +682,23 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
 
             // Create the isolate
             let isolateInstance;
+            console.log(config.permissions)
             try {
                 logDebugWithConfig(config, `Creating isolate with type: ${config.isolateType}`);
                 isolateInstance = await isolateFactory({
-                isolateType: config.isolateType,
-                isolateId,
-                projectId,
-                modules,
-                port,
-                isJSX,
-                functionsDir: config.functionsDir,
-                denoConfig: config.denoConfig,
-                type: config.isolateType,
-                reload,
-                bustCache,
-                permissions: config.permissions,
+                    isolateType: config.isolateType,
+                    isolateId,
+                    projectId,
+                    modules,
+                    port,
+                    isJSX,
+                    functionsDir: config.functionsDir,
+                    denoConfig: config.denoConfig,
+                    type: config.isolateType,
+                    reload,
+                    bustCache,
+                    permissions: config.permissions,
+                    database: config.database,
                     env: { ...(metadata.variables || {}), ...config.variables, IMPORT_URL: fileLoaderUrl.href }
                 });
                 logInfo(`Successfully created isolate instance for ${isolateId}`);
@@ -650,7 +727,7 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
             // Wait for the isolate server to be ready
             try {
                 logDebugWithConfig(config, `Waiting for isolate server at http://localhost:${port}/__healthcheck__`);
-            await waitForServer(`http://localhost:${port}/__healthcheck__`);
+                await waitForServer(`http://localhost:${port}/__healthcheck__`);
                 logInfo(`Isolate server for ${isolateId} is ready on port ${port}`);
             } catch (serverError) {
                 logError(`Failed to connect to isolate server for ${isolateId}:`, serverError);
@@ -724,12 +801,12 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
 
     // ===== Handle Public File Request =====
     async function handlePublicFile(): Promise<Response | undefined> {
-    if (importUrl.href && config?.publicDir) {
-        const publicDirPath = new URL(`/${config.publicDir.split('/').filter(Boolean).join('/')}`, importUrl).pathname;
+        if (importUrl.href && config?.publicDir) {
+            const publicDirPath = new URL(`/${config.publicDir.split('/').filter(Boolean).join('/')}`, importUrl).pathname;
 
-        if (importUrl.pathname.startsWith(publicDirPath)) {
-            const response = await fetch(importUrl);
-            return new Response(await response.blob(), {
+            if (importUrl.pathname.startsWith(publicDirPath)) {
+                const response = await fetch(importUrl);
+                return new Response(await response.blob(), {
                     headers: response.headers,
                     status: response.status
                 });
@@ -1039,11 +1116,11 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
         // 4. Check if we need to bust the cache for this specific isolate
         const shouldUpgradeThisIsolate = shouldUpgradeNow(isolateId);
         bustCache = Boolean(isolateMetadata?.loadedAt && shouldUpgradeThisIsolate);
-        
+
         if (bustCache) {
             logInfo(`Isolate ${isolateId} scheduled for upgrade`);
         }
-        
+
         logDebugWithConfig(config, `Bust cache for isolate ${isolateId}: ${bustCache}`);
 
         // 5. If isolate is already up and we don't need to bust cache, process the request

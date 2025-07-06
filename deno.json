@@ -1,15 +1,16 @@
 {
   "name": "@oxian/oxian-js",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "license": "MIT",
   "exports": "./main.ts",
   "tasks": {
-    "start": "DENO_DIR=./data/local/cache/.deno ENV=production deno run -A --no-lock --unstable --no-prompt --unstable-kv --unstable-sloppy-imports main.ts",
-    "dev": "importmap=deno.json DENO_DIR=./data/local/cache/.deno ENV=development WATCH=true PORT=9002 deno run -A -r --no-lock --unstable --unstable-kv --unstable-sloppy-imports --unstable-worker-options main.ts",
+    "start": "DENO_DIR=./data/local/cache/.deno ENV=development deno run --unstable-ffi --unstable-kv --unstable-sloppy-imports --unstable-worker-options --allow-env --allow-net --allow-read --allow-write --allow-run main.ts",
+    "dev": "DENO_DIR=./data/local/cache/.deno ENV=development WATHC=true deno run --unstable-ffi --unstable-kv --unstable-sloppy-imports --unstable-worker-options -A -r --no-lock main.ts",
     "file-loader": "ENV=production deno run -A --reload=http://local@localhost:9000 --no-lock --unstable --unstable-kv --unstable-sloppy-imports file-loader.ts",
     "api": "ENV=production deno run -A --reload=http://localhost:9000 --no-lock --unstable --unstable-kv --unstable-sloppy-imports api.ts"
   },
   "imports": {
-    "@deno/emit": "jsr:@deno/emit@0.46.0"
+    "drizzle-orm/node-postgres": "npm:drizzle-orm/node-postgres",
+    "pg": "npm:pg"
   }
 }

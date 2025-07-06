@@ -14,9 +14,12 @@ setLogConfig({
 let fileLoaderStarted: any;
 const maxRestarts = 100;
 
+let fileLoader: Worker | undefined;
+let api: Worker | undefined;
+
 const startFileLoader = async (iter = 0) => {
     logInfo("Starting File Loader Worker", iter > 0 ? `(attempt ${iter + 1})` : "");
-    const fileLoader = new Worker(new URL("./file-loader.ts", import.meta.url).href, { type: "module" });
+    fileLoader = new Worker(new URL("./file-loader.ts", import.meta.url).href, { type: "module" });
     
     fileLoader.onmessage = (event) => {
         logDebug("Received message from File Loader:", event?.data);
@@ -24,7 +27,7 @@ const startFileLoader = async (iter = 0) => {
             logInfo("File Loader started successfully");
             return fileLoaderStarted();
         }
-        fileLoader.terminate();
+        fileLoader?.terminate();
         logError('File Loader Restarting:', event.data.message);
         if (iter < maxRestarts) startFileLoader(iter + 1);
     }
@@ -40,7 +43,7 @@ const startApi = async (iter = 0) => {
     const apiBaseUrl = env.DEFAULT_LOADER_TYPE === 'local' && !import.meta.url.startsWith('http') ? fileLoaderUrl : import.meta.url;
 
     logInfo("Starting API Worker with base URL:", apiBaseUrl, iter > 0 ? `(attempt ${iter + 1})` : "");
-    const api = new Worker(new URL("./api.ts", apiBaseUrl), { type: "module" });
+    api = new Worker(new URL("./api.ts", apiBaseUrl), { type: "module" });
     logInfo("API Worker started");
 
     api.onmessage = (event) => {
@@ -51,7 +54,7 @@ const startApi = async (iter = 0) => {
         }
         logWarning('API Restarting:', event.data.message);
         if (env.ENV !== 'production') {
-            api.terminate();
+            api?.terminate();
             if (iter < maxRestarts) startApi(iter + 1);
         }
     }
@@ -73,3 +76,26 @@ waitForFileLoader.then(() => {
     logInfo("File Loader ready, starting API");
     startApi();
 });
+
+let isShuttingDown = false;
+async function gracefulShutdown(signal: string) {
+    if (isShuttingDown) {
+        return;
+    }
+    isShuttingDown = true;
+    logInfo(`Received ${signal}, shutting down workers...`);
+    if (api) {
+        logInfo('Terminating API worker...');
+        api.terminate();
+    }
+    if (fileLoader) {
+        logInfo('Terminating File Loader worker...');
+        fileLoader.terminate();
+    }
+    logInfo('Workers terminated.');
+}
+
+if (typeof Deno !== 'undefined' && Deno.addSignalListener) {
+    Deno.addSignalListener("SIGINT", () => gracefulShutdown("SIGINT"));
+    Deno.addSignalListener("SIGTERM", () => gracefulShutdown("SIGTERM"));
+}

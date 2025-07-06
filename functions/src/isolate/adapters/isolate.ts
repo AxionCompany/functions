@@ -5,7 +5,14 @@ import RequestHandler from "../../handler/main.ts";
 import ModuleExecution from "../main.ts";
 import Cache from "../../utils/withCache.ts";
 import { installSourceMapSupport } from "../utils/sourceMapSupport.ts";
+import { withDatabase, cleanupDatabase, DatabaseDependencies } from "../utils/withDatabase.ts";
 // import { context } from "npm:@opentelemetry/api@1"
+
+// Extend globalThis interface for type safety
+declare global {
+  var isServer: boolean;
+  var isolateType: string;
+}
 
 // globalThis.context = context;
 
@@ -14,6 +21,7 @@ installSourceMapSupport();
 
 let port: number | undefined;
 let config: any;
+let dependencies: DatabaseDependencies | null = null;
 
 const moduleExecutors = new Map<string, any>();
 let cachePathPrefix = '';
@@ -37,11 +45,30 @@ while (true) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 }
 
-const isServer = true;
-globalThis.isServer = isServer;
+// Set global variables with proper typing
+globalThis.isServer = true;
 globalThis.isolateType = 'regular';
 
 const withCache = (await Cache(config.projectId, cachePathPrefix));
+
+// Graceful shutdown handler
+const cleanup = async () => {
+    console.log('Isolate shutting down, cleaning up resources...');
+    if (dependencies) {
+        await cleanupDatabase(dependencies);
+    }
+};
+
+// Handle shutdown signals
+if (typeof Deno !== 'undefined') {
+    Deno.addSignalListener("SIGTERM", cleanup);
+    Deno.addSignalListener("SIGINT", cleanup);
+}
+
+// Handle worker termination
+if (typeof self !== 'undefined') {
+    self.addEventListener("beforeunload", cleanup);
+}
 
 const handlerConfig = {
     middlewares: {},
@@ -79,7 +106,23 @@ const handlerConfig = {
                     } else {
                         console.log('Loading module:', importUrl);
                     }
-                    moduleExecutor = await ModuleExecution({ ...config, isJSX, importUrl, url, dependencies: { withCache } });
+                    
+                    const databaseDependencies = await withDatabase(dependencies || { withCache }, {
+                        database: config.database,
+                        projectPath: config.projectPath || Deno.cwd(),
+                        isolateId: config.isolateId || 'default',
+                        loaderUrl: config.env?.IMPORT_URL ? new URL(config.env.IMPORT_URL).origin : undefined
+                    })
+                    
+                    dependencies = databaseDependencies
+
+                    moduleExecutor = await ModuleExecution({ 
+                        ...config, 
+                        isJSX, 
+                        importUrl, 
+                        url, 
+                        dependencies: databaseDependencies
+                    });
                     moduleExecutors.set(importUrl, moduleExecutor);
                 }
                 const chunk = await moduleExecutor(data, response);

@@ -1,23 +1,17 @@
 /**
- * Default Oxian.js Adapters
+ * Oxian.js Adapters Configuration
  * 
- * This file provides the default adapters for the Oxian.js framework.
- * Adapters allow customization of core framework behavior.
+ * This file configures how requests are handled, including:
+ * - Database configuration per isolate
+ * - Isolate management and load balancing
+ * - Authentication and permissions
+ * - Upgrade management
  */
 
-import { triggerUpgrade } from "./src/utils/upgradeManager.ts";
-import { PermissionsConfig } from "./src/proxy/utils/runOptions.ts";
+import type { AdapterConfig } from "./src/utils/adapters.ts";
 
 /**
- * Base adapter configuration interface
- */
-export interface AdapterConfig {
-  /** Any additional properties */
-  [key: string]: any;
-}
-
-/**
- * Extended adapter configuration with isolate settings
+ * Enhanced adapter configuration with isolate settings
  */
 export interface IsolateAdapterConfig extends AdapterConfig {
   /** Function to map file paths to isolate IDs */
@@ -26,8 +20,13 @@ export interface IsolateAdapterConfig extends AdapterConfig {
   isolateMaxIdleTime?: number;
   /** Isolate type (worker or subprocess) */
   isolateType?: 'worker' | 'subprocess';
-  /** Permissions configuration */
-  permissions?: Partial<PermissionsConfig>;
+  /** Database configuration */
+  database?: {
+    enabled: boolean;
+    remoteURL?: string;
+    lwwColumn?: string;
+    edgeId?: string;
+  };
 }
 
 /**
@@ -45,8 +44,8 @@ let currentIsolateIndex = 0;
  * 
  * @returns A function that maps file paths to isolate IDs
  */
-function createRoundRobinMapper(): (params: { formattedFileUrl: string }) => string {
-  return ({ formattedFileUrl }) => {
+function createRoundRobinMapper() {
+  return () => {
     // Increment the isolate index and wrap around
     currentIsolateIndex = (currentIsolateIndex + 1) % MAX_ISOLATES;
     return String(currentIsolateIndex);
@@ -55,27 +54,67 @@ function createRoundRobinMapper(): (params: { formattedFileUrl: string }) => str
 
 /**
  * Helper function to extract isolate ID from request context
- * This could be based on URL patterns, user ID, project ID, etc.
+ * 
+ * @param adapterData - The adapter configuration data
  */
 function getIsolateIdForRequest(adapterData: any): string {
-  // Example: Extract from URL path
-  const url = new URL(adapterData.url);
-  const pathParts = url.pathname.split('/').filter(Boolean);
-  
-  // Example strategies:
-  // 1. Use project name from path: /api/projectA/function -> "projectA"
-  // 2. Use user ID from headers: Authorization header -> "user123" 
-  // 3. Use environment: staging, production -> "staging", "production"
-  // 4. Use file extension: .jsx/.tsx -> "jsx", .js/.ts -> "js"
-  
-  // For this example, let's use a simple approach:
-  // If path starts with /api/, use the next segment as project identifier
-  if (pathParts[0] === 'api' && pathParts[1]) {
-    return `project_${pathParts[1]}`;
+  try {
+    const url = new URL(adapterData.url);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    
+    // Strategy 1: Use first path segment for API routes
+    if (pathParts[0] === 'api' && pathParts[1]) {
+      return `api_${pathParts[1]}`;
+    }
+    
+    // Strategy 2: Use domain-based isolation for multi-tenant
+    if (url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+      return url.hostname.replace(/\./g, '_');
+    }
+    
+    // Strategy 3: Round-robin for other requests
+    return createRoundRobinMapper()();
+    
+  } catch (error) {
+    console.warn('Error extracting isolate ID:', error);
+    // Default isolate for other requests
+    return 'default';
   }
-  
-  // Default isolate for other requests
-  return 'default';
+}
+
+/**
+ * Enhanced database configuration function
+ * 
+ * @param isolateId - The isolate identifier
+ * @param env - Environment variables
+ * @returns Database configuration
+ */
+function getDatabaseConfig(isolateId: string, env: Record<string, string> = {}) {
+  // Example: Only enable database for API isolates
+  if (!isolateId.startsWith('api_')) {
+    return {
+      enabled: false
+    };
+  }
+
+  return {
+    enabled: true,
+    // url: env.DATABASE_URL,
+    syncUrl: env.DATABASE_URL,
+    lwwColumn: 'updated_at',
+    edgeId: `${isolateId}_${env.INSTANCE_ID || 'local'}`,
+  };
+}
+
+/**
+ * Trigger an isolate-specific upgrade
+ * 
+ * @param isolateId - The isolate to upgrade
+ */
+function triggerUpgrade(isolateId: string) {
+  console.log(`[Adapter] Triggering upgrade for isolate: ${isolateId}`);
+  // Implementation depends on your deployment strategy
+  // Could trigger a restart, reload modules, update dependencies, etc.
 }
 
 /**
@@ -84,48 +123,46 @@ function getIsolateIdForRequest(adapterData: any): string {
  * @param baseAdapters - Base adapter configuration
  * @returns Enhanced adapter configuration with isolate settings
  */
-export default function defaultAdapters(baseAdapters: any) {
+export default function defaultAdapters(baseAdapters: any): IsolateAdapterConfig {
   // Get isolate ID for this request
   const isolateId = getIsolateIdForRequest(baseAdapters);
-  
+
+  // Get database configuration
+  const database = getDatabaseConfig(isolateId, baseAdapters.env || {});
+
   // Example: Production upgrade logic per isolate
-  // This is where applications can implement their own upgrade strategies
-  
-  // Example 1: Time-based upgrades (every hour in production) for specific isolates
   if (baseAdapters.env?.ENV === 'production') {
-    // Use isolate-specific timestamp key
-    const timestampKey = `lastUpgradeTime_${isolateId}`;
-    const lastUpgrade = (globalThis as any)[timestampKey] || 0;
-    const hoursSinceLastUpgrade = (Date.now() - lastUpgrade) / (1000 * 60 * 60);
     
-    if (hoursSinceLastUpgrade >= 1) {
-      // Trigger upgrade for this specific isolate
-      triggerUpgrade(isolateId);
-      (globalThis as any)[timestampKey] = Date.now();
+    // Example 1: Time-based upgrades (every hour in production) for specific isolates
+    if (isolateId.startsWith('api_')) {
+      try {
+        // Use isolate-specific timestamp key
+        const timestampKey = `lastUpgradeTime_${isolateId}`;
+        const lastUpgrade = parseInt(globalThis.localStorage?.getItem?.(timestampKey) || '0');
+        const oneHour = 60 * 60 * 1000;
+        
+        if (Date.now() - lastUpgrade > oneHour) {
+          globalThis.localStorage?.setItem?.(timestampKey, Date.now().toString());
+          // Trigger upgrade for this specific isolate
+          triggerUpgrade(isolateId);
+        }
+      } catch (error) {
+        // LocalStorage may not be available in all environments
+        console.debug('LocalStorage not available for upgrade tracking');
+      }
     }
   }
-
-  // Example 2: External signal-based upgrades for specific isolates
-  // if (shouldCheckForUpgrade(isolateId)) {
-  //   triggerUpgrade(isolateId);
-  // }
-
-  // Example 3: Version-based upgrades for specific projects
-  // if (getCurrentVersion(isolateId) !== getTargetVersion(isolateId)) {
-  //   triggerUpgrade(isolateId);
-  // }
-
-  // Example 4: Feature flag based upgrades
-  // if (isFeatureFlagEnabled('new_version', isolateId)) {
-  //   triggerUpgrade(isolateId);
-  // }
 
   // Default configuration
   return {
     ...baseAdapters,
+    
+    // Enhanced database configuration
+    database,
+    
     // Isolate configuration
-    isolateType: 'worker', // or 'worker'
-    isolateMaxIdleTime: 5000,   // 5 seconds
+    isolateType: 'subprocess', // or 'worker'
+    isolateMaxIdleTime: database.enabled ? 30000 : 5000, // Longer for DB isolates
     
     // Store the isolate ID for debugging/logging
     currentIsolateId: isolateId,
@@ -136,37 +173,7 @@ export default function defaultAdapters(baseAdapters: any) {
       // For production with remote repos:
       // username: `github--owner--repo--branch--${isolateId}`, // Include isolate context
       // password: 'github_token_or_api_key'
-    },
-    
-    // // Permissions
-    // permissions: { 
-    //   "allow-sys": true ,
-    //   'allow-env': true,
-    // }
+    }
   };
 }
-
-// Helper functions for production upgrade strategies
-// (These are examples - implement according to your needs)
-
-// function shouldCheckForUpgrade(isolateId: string): boolean {
-//   // Check external signal for specific isolate (database, file, API)
-//   // For example: check if there's an upgrade flag for this specific project
-//   return false;
-// }
-
-// function getCurrentVersion(isolateId: string): string {
-//   // Get current deployed version for specific isolate
-//   return "1.0.0";
-// }
-
-// function getTargetVersion(isolateId: string): string {
-//   // Get target version for specific isolate from config/API
-//   return "1.0.0";
-// }
-
-// function isFeatureFlagEnabled(flagName: string, isolateId: string): boolean {
-//   // Check if feature flag is enabled for specific isolate
-//   return false;
-// }
 

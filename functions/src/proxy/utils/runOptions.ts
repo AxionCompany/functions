@@ -16,6 +16,8 @@ export interface PermissionsConfig {
   'no-lock'?: boolean;
   'no-prompt'?: boolean;
   'import-map'?: string;
+  'unstable-worker-options'?: boolean;
+  'unstable-ffi'?: boolean;
   [key: string]: boolean | string | string[] | undefined;
 }
 
@@ -109,8 +111,11 @@ const runOptions = (
   // Get platform-specific cache directories for @deno/emit WebAssembly caching
   const cacheDirectories = getUserCacheDirectories();
   
-  // Combine base read permissions with cache directories
-  const readPermissions = [...readWritePermissions, ...cacheDirectories];
+  // Add Deno executable path for worker creation (required for database workers)
+  const execPath = Deno.execPath();
+  
+  // Combine base read permissions with cache directories and exec path
+  const readPermissions = [...readWritePermissions, ...cacheDirectories, execPath];
 
   // Build base permissions object
   const basePermissions: PermissionsConfig = {
@@ -124,6 +129,8 @@ const runOptions = (
     "unstable-sloppy-imports": true,
     "unstable-kv": true,
     "unstable": true,
+    "unstable-ffi": true,
+    "unstable-worker-options": true,
     "no-lock": true,
     "no-prompt": true,
     "import-map": `data:application/json,${modules.template(
@@ -174,6 +181,7 @@ const runOptions = (
       if (concession === 'allow' && type) {
         workerPermissions[type] = value as boolean | string[];
       }
+     
       // Note: deny-{...} permission is not yet implemented in Deno webworkers permissions (as of v1.44.5)
     });
     
