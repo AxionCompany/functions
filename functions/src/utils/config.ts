@@ -5,7 +5,7 @@
 /**
  * Base adapter configuration interface
  */
-export interface AdapterConfig {
+export interface OxianConfig {
   /** Request URL */
   url: string;
   /** Request headers */

@@ -20,7 +20,7 @@ import getEnv, { EnvVars } from "./functions/src/utils/environmentVariables.ts";
 import { SEPARATOR, basename, extname, join, dirname } from "jsr:@std/path@1.1.0";
 import Cache from "./functions/src/utils/withCache.ts";
 import { logDebug, logError, logInfo, logWarning, setLogConfig } from "./functions/src/utils/logger.ts";
-import oxianDenoConfig from "./deno.json" with { type: "json" };
+import defaultDenoConfig from "./deno.json" with { type: "json" };
 
 /**
  * Configuration interfaces
@@ -213,8 +213,8 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
     };
 
     // Check for cached configurations
-    let oxianConfig = oxianConfigs.get(oxianConfigUrl.href);
-    let denoConfig = denoConfigs.get(denoConfigUrl.href);
+    let localOxianConfig = oxianConfigs.get(oxianConfigUrl.href);
+    let localDenoConfig = denoConfigs.get(denoConfigUrl.href);
 
     // Create a file loader instance
     const enhancedFileLoader = FileLoader({
@@ -234,7 +234,7 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
     };
 
     // Load Oxian configuration if not cached
-    if (!oxianConfig) {
+    if (!localOxianConfig) {
       logDebug('oxian.config.json not found in cache for', oxianConfigUrl.origin, 'fetching from server...');
       
       try {
@@ -246,16 +246,16 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
         }, responseMock);
         
         const parsedConfig = JSON.parse(oxianConfigText || '{}') as OxianConfig;
-        oxianConfig = parsedConfig;
+        localOxianConfig = parsedConfig;
         oxianConfigs.set(oxianConfigUrl.href, parsedConfig);
       } catch (err) {
         logError('Error loading oxian.config.json:', err instanceof Error ? err.message : String(err));
-        oxianConfig = {}; // Initialize with empty object to avoid undefined
+        localOxianConfig = {}; // Initialize with empty object to avoid undefined
       }
     }
 
     // Load Deno configuration if not cached
-    if (!denoConfig) {
+    if (!localDenoConfig) {
       logDebug('deno.json not found in cache for', denoConfigUrl.origin, 'fetching from server...');
       
       try {
@@ -268,17 +268,18 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
         }, responseMock);
         
         // Initialize with default values
-        denoConfig = {
-          imports: { ...oxianDenoConfig.imports },
+        localDenoConfig = {
+          // @ts-ignore: defaultDenoConfig.imports exists
+          imports: { ...defaultDenoConfig.imports },
           scopes: {}
         };
         
         // Parse the config if available
         if (denoConfigText) {
           const parsedConfig = JSON.parse(denoConfigText);
-          denoConfig.imports = { ...denoConfig.imports, ...(parsedConfig.imports || {}) };
+          localDenoConfig.imports = { ...localDenoConfig.imports, ...(parsedConfig.imports || {}) };
           if (parsedConfig.scopes) {
-            denoConfig.scopes = { ...denoConfig.scopes, ...parsedConfig.scopes };
+            localDenoConfig.scopes = { ...localDenoConfig.scopes, ...parsedConfig.scopes };
           }
         }
         
@@ -303,25 +304,26 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
                   depValue.startsWith('file') || 
                   depValue.startsWith('npm:') || 
                   depValue.startsWith('node:')) {
-                denoConfig!.imports[key] = depValue;
+                    localDenoConfig!.imports[key] = depValue;
               } else {
-                denoConfig!.imports[key] = `npm:${key}@${depValue}`;
+                localDenoConfig!.imports[key] = `npm:${key}@${depValue}`;
               }
             });
           }
         }
         
         // Handle potential type mismatch between configs
-        const oxianScopes = (oxianDenoConfig as any).scopes;
+        const oxianScopes = (defaultDenoConfig as any).scopes;
         if (oxianScopes) {
-          denoConfig.scopes = { ...(denoConfig.scopes || {}), ...oxianScopes };
+          localDenoConfig.scopes = { ...(localDenoConfig.scopes || {}), ...oxianScopes };
         }
         
         // Cache the config
-        denoConfigs.set(denoConfigUrl.href, denoConfig);
+        denoConfigs.set(denoConfigUrl.href, localDenoConfig);
       } catch (err) {
         logError('Error loading deno configuration:', err instanceof Error ? err.message : String(err));
-        denoConfig = { imports: { ...oxianDenoConfig.imports }, scopes: {} };
+        // @ts-ignore: defaultDenoConfig.imports exists
+        denoConfig = { imports: { ...defaultDenoConfig.imports }, scopes: {} };
       }
     }
 
@@ -329,7 +331,7 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
     const finalFileLoader = FileLoader({
       config: { 
         ...fileLoaderConfig, 
-        ...oxianConfig 
+        ...localOxianConfig 
       },
       modules: fileLoaderModules
     });
@@ -356,7 +358,7 @@ function createRequestHandler(env: EnvVars, useCache: boolean) {
         url: urlWithBasicAuth,
         data: {
           denoConfig: {
-            ...denoConfig,
+            ...localDenoConfig,
           }
         }
       }, {

@@ -217,6 +217,12 @@ export default function createFileLoader({
 
     // Set content type and return content
     setContentType(response, matchPath);
+
+    // add export with file path to eof:
+    if (matchPath?.endsWith('.tsx') || matchPath?.endsWith('.jsx') || matchPath?.endsWith('.ts') || matchPath?.endsWith('.js')) {
+      const extendedContent = content + `\nexport const __path__ = "${matchPath}";`;
+      return extendedContent;
+    }
     return content;
   };
 

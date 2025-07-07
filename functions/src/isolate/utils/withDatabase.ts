@@ -1,6 +1,7 @@
 import { Ominipg } from "jsr:@oxian/ominipg@0.0.6";
 import getAllFiles from "./getAllFiles.ts";
 import { Dependencies } from "../main.ts";
+import { dynamicImportBundledModules } from "./moduleLoader.ts";
 
 export interface DatabaseConfig {
   /** Remote PostgreSQL database URL */
@@ -37,12 +38,17 @@ export interface WithDatabaseConfig {
   isolateId: string;
   /** File loader base URL */
   loaderUrl?: string;
+  /** Bust cache for all bundled modules */
+  bustCache?: boolean;
 }
 
 /**
  * Load schema files dynamically using the same pattern as moduleLoader
  */
-async function loadSchemas(config: WithDatabaseConfig): Promise<{
+async function loadSchemas(
+  config: WithDatabaseConfig,
+  dependencies: Dependencies
+): Promise<{
   schemaSQL: string[];
   schemaExports: Record<string, any>;
 }> {
@@ -52,6 +58,7 @@ async function loadSchemas(config: WithDatabaseConfig): Promise<{
   try {
     // Use the same file loading pattern as moduleLoader.ts
     const baseUrl = new URL(config.loaderUrl || `http://localhost:9000`).origin;
+    const importUrlObj = new URL(baseUrl);
 
     // Get schema files using getAllFiles (same as moduleLoader)
     const schemaFiles = await getAllFiles({
@@ -60,21 +67,35 @@ async function loadSchemas(config: WithDatabaseConfig): Promise<{
       extensions: ["js", "ts"],
     });
 
+    const importMap = dependencies?.denoConfig?.imports
+      ? {
+        imports: dependencies.denoConfig.imports,
+        scopes: dependencies.denoConfig.scopes || {},
+      }
+      : undefined;
+
+    const schemaModules = await dynamicImportBundledModules(
+      schemaFiles,
+      "Schema",
+      baseUrl,
+      importUrlObj.search,
+      importMap,
+      config.bustCache,
+      false // returnDefault = false
+    );
+
     // Load and process each schema file
-    for (const schemaFile of schemaFiles) {
+    for (const schemaModule of schemaModules) {
+      if (!schemaModule) continue;
       try {
-        const schemaUrl = new URL(`/${schemaFile.matchPath}`, baseUrl);
-
-        const schemaModule = await import(schemaUrl.href);
-
         // Collect DDL statements
         if (schemaModule.schemaDDL && Array.isArray(schemaModule.schemaDDL)) {
           schemaSQL.push(...schemaModule.schemaDDL);
         }
 
         // Collect all exports except schemaDDL
-        Object.keys(schemaModule).forEach(key => {
-          if (key !== 'schemaDDL' && key !== 'default') {
+        Object.keys(schemaModule).forEach((key) => {
+          if (key !== "schemaDDL" && key !== "default") {
             schemaExports[key] = schemaModule[key];
           }
         });
@@ -83,15 +104,18 @@ async function loadSchemas(config: WithDatabaseConfig): Promise<{
         if (schemaModule.default) {
           Object.assign(schemaExports, schemaModule.default);
         }
-
       } catch (error) {
-        console.warn(`[Schema Loader] Failed to load schema ${schemaFile.matchPath}:`, error);
+        console.warn(
+          `[Schema Loader] Failed to process schema module:`,
+          error
+        );
       }
     }
-
-
   } catch (error) {
-    console.warn('[Schema Loader] Schema loading failed, using empty schema:', error);
+    console.warn(
+      "[Schema Loader] Schema loading failed, using empty schema:",
+      error
+    );
   }
 
   return { schemaSQL, schemaExports };
@@ -110,7 +134,7 @@ export async function withDatabase(
   }
 
   // Load schemas dynamically
-  const { schemaSQL, schemaExports } = await loadSchemas(config);
+  const { schemaSQL, schemaExports } = await loadSchemas(config, dependencies);
 
   // Configure database with loaded schemas
   const dbConfig: DatabaseConfig = {

@@ -18,13 +18,82 @@ import { SEPARATOR, basename, extname, join, dirname } from "jsr:@std/path@1.1.0
 import { ensureDir } from "jsr:@std/fs@1.0.18";
 
 // Import server components
-import createServer, { RequestHandler } from "./functions/src/server/main.ts";
+import createServer, { type RequestHandler } from "./functions/src/server/main.ts";
 import Proxy from "./functions/src/proxy/main.ts";
-import getEnv, { EnvVars } from "./functions/src/utils/environmentVariables.ts";
+import getEnv, { type EnvVars } from "./functions/src/utils/environmentVariables.ts";
 import replaceTemplate from "./functions/src/utils/template.ts";
 import { logDebug, logError, logInfo, setLogConfig } from "./functions/src/utils/logger.ts";
 import { initializeUpgradeManager } from "./functions/src/utils/upgradeManager.ts";
-import oxianDenoConfig from "./deno.json" with { type: "json" };
+import defaultDenoConfig from "./deno.json" with { type: "json" };
+import type { PermissionsConfig } from "./functions/src/proxy/utils/runOptions.ts";
+
+
+
+export interface OxianConfig {
+
+  /** Functions directory */
+  functionsDir?: string;
+  /** Directory entrypoint */
+  dirEntrypoint?: string;
+  /** Loader URL */
+  loaderUrl?: string;
+
+  /** Database configuration */
+  database?: {
+    enabled: boolean;
+    remoteURL?: string;
+    lwwColumn?: string;
+    edgeId?: string;
+  };
+
+  /** Loader configuration */
+  loaderConfig?: {
+    username?: string;
+    password?: string;
+    [key: string]: any;
+  };
+
+  /** Debug logging flag */
+  debugLogs?: boolean;
+  /** Error logging flag */
+  errorLogs?: boolean;
+  /** Info logging flag */
+  infoLogs?: boolean;
+  /** Warning logging flag */
+  warningLogs?: boolean;
+  /** Permissions configuration */
+  permissions?: Partial<PermissionsConfig>;
+
+  /** Any additional properties */
+  [key: string]: any;
+}
+
+/**
+ * Dynamic Oxian config input interface
+ */
+export interface DynamicOxianConfigInput {
+  /** Request URL */
+  url: string;
+  /** Request headers */
+  headers: Headers;
+  /** Environment variables */
+  env: Record<string, string>;
+  /** Loader configuration */
+}
+
+/**
+ * Dynamic Oxian config output interface
+ */
+export interface DynamicOxianConfigOutput extends OxianConfig, DynamicOxianConfigInput {
+  /** Isolate type */
+  isolateType?: 'worker' | 'subprocess';
+  /** Maximum idle time for isolates in milliseconds */
+  isolateMaxIdleTime?: number;
+  /** Current isolate ID */
+  currentIsolateId?: string;
+  /** Function to map file paths to isolate IDs */
+  mapFilePathToIsolateId?: ((params: { formattedFileUrl: string, fileUrl?: string }) => string) | null;
+}
 
 // Worker environment error handling
 // @ts-ignore: self is defined in worker environments
@@ -44,15 +113,6 @@ if (typeof self !== 'undefined' && 'postMessage' in self) {
   });
 }
 
-/**
- * Configuration cache interfaces
- */
-interface OxianConfig {
-  functionsDir?: string;
-  dirEntrypoint?: string;
-  loaderUrl?: string;
-  [key: string]: any;
-}
 
 interface DenoConfig {
   imports: Record<string, string>;
@@ -61,9 +121,9 @@ interface DenoConfig {
 }
 
 /**
- * Adapter data interface
+ * Oxian config data interface
  */
-interface AdapterData {
+interface OxianConfigData {
   url: string;
   headers: Headers;
   env: EnvVars;
@@ -72,13 +132,19 @@ interface AdapterData {
     password?: string;
     [key: string]: any;
   };
+  database?: {
+    enabled: boolean;
+    remoteURL?: string;
+    lwwColumn?: string;
+    edgeId?: string;
+  };
   [key: string]: any;
 }
 
 /**
  * Main application state
  */
-let adapters: ((config: AdapterData) => Promise<AdapterData> | AdapterData) | null = null;
+let oxianConfigModule: ((config: DynamicOxianConfigInput) => Promise<DynamicOxianConfigOutput> | DynamicOxianConfigOutput) | null = null;
 
 // Configuration caches
 const oxianConfigs = new Map<string, OxianConfig>();
@@ -90,7 +156,7 @@ const denoConfigs = new Map<string, DenoConfig>();
 (async () => {
   // Load environment variables
   const env = await getEnv();
-  
+
   // Configure logging based on environment
   setLogConfig({
     debugLogs: env.DEBUG === 'true',
@@ -119,7 +185,7 @@ const denoConfigs = new Map<string, DenoConfig>();
     // @ts-ignore: self is defined in worker environments
     self.postMessage({ message: { 'status': 'ok' } });
   }
-  
+
   logInfo('Server started successfully');
 })();
 
@@ -143,58 +209,88 @@ function createRequestHandler(env: EnvVars): RequestHandler {
       functionsDir = functionsDir.slice(0, -1);
     }
 
-    // Initialize adapter data
-    let adapterData: AdapterData = {
+    // Initialize dynamic oxian config data
+    const requestData: DynamicOxianConfigInput = {
       url: req.url,
       headers: req.headers,
       env
     };
 
-    // Load adapters if not already loaded
-    if (!adapters) {
-      logDebug('Loading Adapters', new URL(`${functionsDir}/adapters`, fileLoaderUrl).href);
-      
+    let oxianConfigJson: OxianConfig = {
+      functionsDir,
+      dirEntrypoint: env.DIR_ENTRYPOINT || "index",
+      loaderUrl: fileLoaderUrl.href,
+      database: {
+        enabled: false,
+        remoteURL: '',
+        lwwColumn: '',
+        edgeId: '',
+      }
+    };
+
+    // Load oxian config if not already loaded
+    if (!oxianConfigModule) {
+      logDebug('Loading Oxian Config', new URL(`./oxian.config.ts`, fileLoaderUrl).href);
+
       try {
-        const adapterModule = await import(new URL(`${functionsDir}/adapters`, fileLoaderUrl).href);
-        adapters = adapterModule.default;
+        console.log('Loading Oxian Config', new URL(`./oxian.config.ts`, fileLoaderUrl).href);
+        const [
+          _oxianConfigJson,
+          oxianConfigESModule,
+          legacyOxianConfigESModule
+        ] = await Promise.all([
+          import(new URL(`oxian.config.json`, fileLoaderUrl).href, {
+            with: { type: 'json' }
+          }),
+          import(new URL(`oxian.config.ts`, fileLoaderUrl).href),
+          import(new URL(`${functionsDir}/adapters`, fileLoaderUrl).href)
+        ]);
+
+        oxianConfigJson = _oxianConfigJson.default || {};
+
+        if (legacyOxianConfigESModule.default) {
+          console.warn('[WARNING] Adapters are deprecated and going to be removed in version 1.0.0. Please use `oxian.config.ts` at the root of your project instead.');
+        }
+        oxianConfigModule = oxianConfigESModule.default || legacyOxianConfigESModule.default;
       } catch (err) {
         logError(
-          `Error trying to load adapters: ${err instanceof Error ? err.message : String(err)}`
+          `Error trying to load oxian config: ${err instanceof Error ? err.message : String(err)}`
             .replaceAll(new URL(functionsDir, fileLoaderUrl).href, '')
         );
-        // Default adapter just passes through the data
-        adapters = (a: AdapterData) => a;
+        // Default config just passes through the data
+        oxianConfigModule = (a: OxianConfigData) => a;
       }
     }
 
-    // Apply adapters to the request data
+    // Apply dynamic oxian config to the request data
+    let dynamicOxianConfigOutput: DynamicOxianConfigOutput | null = null;
     try {
-      if (adapters) {
-        adapterData = await adapters(adapterData);
+      if (oxianConfigModule) {
+        dynamicOxianConfigOutput = await oxianConfigModule({ ...requestData, ...oxianConfigJson });
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      const errorStatus = (err instanceof Error && 'status' in err) ? 
+      const errorStatus = (err instanceof Error && 'status' in err) ?
         (err as any).status || 500 : 500;
-      
-      logError('Adapter error:', errorMessage);
-      
+
+      logError('Oxian Config error:', errorMessage);
+
       return new Response(
-        JSON.stringify({ 
-          error: { 
-            message: errorMessage, 
-            status: errorStatus 
-          } 
+        JSON.stringify({
+          error: {
+            message: errorMessage,
+            status: errorStatus
+          }
         }),
-        { 
-          status: errorStatus, 
-          headers: { 'content-type': 'application/json; charset=utf-8' } 
+        {
+          status: errorStatus,
+          headers: { 'content-type': 'application/json; charset=utf-8' }
         }
       );
     }
 
-    // Extract adapter configuration
-    const { loaderConfig, ...adaptersData } = adapterData;
+    // Extract oxian config configuration
+    const { loaderConfig, ...restOxianConfigData } = dynamicOxianConfigOutput || oxianConfigJson;
 
     // Configure file loader URL authentication
     if (loaderConfig?.username) {
@@ -202,28 +298,28 @@ function createRequestHandler(env: EnvVars): RequestHandler {
     } else {
       fileLoaderUrl.username = 'local';
     }
-    
+
     if (loaderConfig?.password) {
       fileLoaderUrl.password = loaderConfig.password;
     }
 
     // Load Oxian configuration if not cached
     const requestOrigin = new URL(req.url).origin;
-    let oxianConfig: OxianConfig = oxianConfigs.get(requestOrigin) || {};
+    let localOxianConfig: OxianConfig = oxianConfigs.get(requestOrigin) || {};
 
-    if (!Object.keys(oxianConfig).length) {
+    if (!Object.keys(localOxianConfig).length) {
       try {
         const response = await fetch(new URL('oxian.config.json', fileLoaderUrl).href);
-        oxianConfig = await response.json();
+        localOxianConfig = await response.json();
       } catch {
-        oxianConfig = {};
+        localOxianConfig = {};
       }
-      
-      oxianConfigs.set(requestOrigin, oxianConfig);
+
+      oxianConfigs.set(requestOrigin, localOxianConfig);
     }
 
     // Apply configuration
-    functionsDir = oxianConfig?.functionsDir || functionsDir;
+    functionsDir = localOxianConfig?.functionsDir || functionsDir;
 
     // Load Deno configuration if not cached
     let denoConfig = denoConfigs.get(requestOrigin);
@@ -231,20 +327,20 @@ function createRequestHandler(env: EnvVars): RequestHandler {
     if (!denoConfig) {
       // Initialize empty config
       denoConfig = { imports: {}, scopes: {} };
-      
+
       // Try to load deno.json or deno.jsonc
       let denoConfigLoaded = false;
-      
+
       // First try deno.json
       try {
         const response = await fetch(new URL('deno.json', fileLoaderUrl).href);
         if (response.ok) {
           const loadedConfig = await response.json();
-          
+
           // Ensure imports and scopes exist
           denoConfig.imports = loadedConfig.imports || {};
           denoConfig.scopes = loadedConfig.scopes || {};
-          
+
           // Copy other properties
           Object.assign(denoConfig, loadedConfig);
           denoConfigLoaded = true;
@@ -253,7 +349,7 @@ function createRequestHandler(env: EnvVars): RequestHandler {
       } catch (err) {
         logDebug('Error loading deno.json:', err instanceof Error ? err.message : String(err));
       }
-      
+
       // If deno.json failed, try deno.jsonc
       if (!denoConfigLoaded) {
         try {
@@ -265,13 +361,13 @@ function createRequestHandler(env: EnvVars): RequestHandler {
             const jsonWithoutComments = jsonText
               .replace(/\/\/.*$/gm, '') // Remove single line comments
               .replace(/\/\*[\s\S]*?\*\//g, ''); // Remove multi-line comments
-            
+
             const loadedConfig = JSON.parse(jsonWithoutComments);
-            
+
             // Ensure imports and scopes exist
             denoConfig.imports = loadedConfig.imports || {};
             denoConfig.scopes = loadedConfig.scopes || {};
-            
+
             // Copy other properties
             Object.assign(denoConfig, loadedConfig);
             denoConfigLoaded = true;
@@ -281,22 +377,22 @@ function createRequestHandler(env: EnvVars): RequestHandler {
           logDebug('Error loading deno.jsonc:', err instanceof Error ? err.message : String(err));
         }
       }
-      
+
       // Try to load package.json for Node.js dependencies
       try {
         const response = await fetch(new URL('package.json', fileLoaderUrl).href);
         if (response.ok) {
           const nodeConfig = await response.json();
-          
+
           // Convert Node.js dependencies to Deno imports
           if (nodeConfig.dependencies) {
             Object.entries(nodeConfig.dependencies).forEach(([key, value]) => {
               const depValue = String(value);
-              
-              if (depValue.startsWith('http') || 
-                  depValue.startsWith('file') || 
-                  depValue.startsWith('npm:') || 
-                  depValue.startsWith('node:')) {
+
+              if (depValue.startsWith('http') ||
+                depValue.startsWith('file') ||
+                depValue.startsWith('npm:') ||
+                depValue.startsWith('node:')) {
                 denoConfig!.imports[key] = depValue;
               } else {
                 denoConfig!.imports[key] = `npm:${key}@${depValue}`;
@@ -308,16 +404,17 @@ function createRequestHandler(env: EnvVars): RequestHandler {
       } catch (err) {
         logDebug('Error loading package.json:', err instanceof Error ? err.message : String(err));
       }
-      
+
       // Cache the config
       denoConfigs.set(requestOrigin, denoConfig);
     }
 
     // Merge with Oxian's default Deno config
-    denoConfig.imports = { ...oxianDenoConfig.imports, ...denoConfig.imports };
-    
+    // @ts-ignore: defaultDenoConfig.imports exists
+    denoConfig.imports = { ...defaultDenoConfig.imports, ...denoConfig.imports };
+
     // Merge scopes if they exist
-    const oxianScopes = (oxianDenoConfig as any).scopes;
+    const oxianScopes = (defaultDenoConfig as any).scopes;
     if (oxianScopes && denoConfig.scopes) {
       denoConfig.scopes = { ...oxianScopes, ...denoConfig.scopes };
     } else if (oxianScopes) {
@@ -331,9 +428,9 @@ function createRequestHandler(env: EnvVars): RequestHandler {
         loaderUrl: fileLoaderUrl.href,
         dirEntrypoint: env.DIR_ENTRYPOINT || "index",
         functionsDir,
-        ...oxianConfig,
+        ...localOxianConfig,
         denoConfig,
-        ...adaptersData,
+        ...restOxianConfigData,
       },
       modules: {
         path: { SEPARATOR, basename, extname, join, dirname },

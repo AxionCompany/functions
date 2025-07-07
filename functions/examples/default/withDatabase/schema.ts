@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, boolean } from "npm:drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, integer, boolean as pgBoolean } from "npm:drizzle-orm/pg-core";
 
 /**
  * Example schema definition using Drizzle ORM
@@ -10,7 +10,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").unique(),
-  active: boolean("active").default(true),
+  active: pgBoolean("active").default(true),
   updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -20,7 +20,7 @@ export const posts = pgTable("posts", {
   title: text("title").notNull(),
   content: text("content"),
   userId: integer("user_id").references(() => users.id),
-  published: boolean("published").default(false),
+  published: pgBoolean("published").default(false),
   updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -66,25 +66,6 @@ export const schemaDDL = [
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
 
-  // Create sync triggers for all tables
-  // `DO $$
-  // DECLARE
-  //   table_name TEXT;
-  // BEGIN
-  //   FOR table_name IN 
-  //     SELECT tablename FROM pg_tables 
-  //     WHERE schemaname = 'public' 
-  //     AND tablename NOT LIKE '_%'
-  //   LOOP
-  //     -- Create trigger for each table
-  //     EXECUTE format('
-  //       DROP TRIGGER IF EXISTS %I_sync_trigger ON %I;
-  //       CREATE TRIGGER %I_sync_trigger
-  //         AFTER INSERT OR UPDATE OR DELETE ON %I
-  //         FOR EACH ROW EXECUTE FUNCTION outbox_trigger_fn();
-  //     ', table_name, table_name, table_name, table_name);
-  //   END LOOP;
-  // END $$`,
 ];
 
 /**

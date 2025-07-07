@@ -115,13 +115,14 @@ async function bundleModule(
  * Dynamically bundles and imports a list of files and returns their default exports.
  * Falls back to regular imports if bundling fails.
  */
-async function dynamicImportBundledModules(
+export async function dynamicImportBundledModules(
   files: FileData[],
   moduleType: string,
   importUrl: string,
   baseSearch: string,
   importMap?: any,
-  bustCache = false
+  bustCache = false,
+  returnDefault = true
 ): Promise<any[]> {
   return Promise.all(
     files.map(async (file) => {
@@ -135,7 +136,7 @@ async function dynamicImportBundledModules(
         // Import from the data URL with enhanced error handling
         try {
           const mod = await import(dataUrl);
-          return mod.default;
+          return returnDefault ? mod.default : mod;
         } catch (importError) {
           // Enhance error with source map information
           const enhancedError = enhanceErrorWithSourceMap(
@@ -152,7 +153,7 @@ async function dynamicImportBundledModules(
         try {
           const mod = await import(fileUrl.href);
           console.log(`[Regular Import] Successfully imported ${moduleType} module: ${file?.matchPath}`);
-          return mod.default;
+          return returnDefault ? mod.default : mod;
         } catch (importErr) {
           const errorMessage = `Error importing ${moduleType} Module \`${file?.matchPath}\` (both bundling and regular import failed): ${importErr instanceof Error ? importErr.message : String(importErr)}`;
           console.error(errorMessage);

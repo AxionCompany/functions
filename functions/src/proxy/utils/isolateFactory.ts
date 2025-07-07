@@ -75,7 +75,7 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
   
   // Determine isolate script based on JSX support
   const isolateScript = new URL(
-    `../../isolate/adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, 
+    `../../isolate-v2/main.ts`, 
     import.meta.url
   ).href;
   
@@ -83,6 +83,7 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
   const isolateConfig = JSON.stringify({
     isolateId,
     projectId,
+    projectPath,
     isJSX,
     ...restConfig,
     env,
@@ -129,7 +130,7 @@ function createWebWorkerIsolate(config: IsolateFactoryConfig): Worker {
   
   // Determine isolate script based on JSX support
   const workerScript = new URL(
-    `../../isolate/adapters/${isJSX ? 'jsx-' : ''}isolate.ts`, 
+    `../../isolate-v2/main.ts`, 
     import.meta.url
   ).href;
  

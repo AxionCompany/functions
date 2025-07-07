@@ -414,7 +414,7 @@ export default async function createModuleExecutor(
       moduleExports.config = moduleExports.config || {};
 
       // Map HTTP methods to corresponding module exports
-      const methodModules: Record<string, ModuleFunction> = { GET, POST, PUT, DELETE };
+      const methodModules: Record<string, ModuleFunction | undefined> = { GET, POST, PUT, DELETE };
       const normalizedMethod = method.toUpperCase();
       const selectedModule = methodModules[normalizedMethod] || defaultModule;
 

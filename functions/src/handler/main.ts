@@ -64,8 +64,6 @@ interface RequestData {
   method: string;
   /** Query parameters */
   queryParams: Record<string, string>;
-  /** Parsed request body */
-  data: any;
   /** Raw request body */
   body: string;
   /** Form data from multipart requests */
@@ -102,9 +100,9 @@ interface ResponseFunction {
  * @returns Stream buffer controller
  */
 function createStreamBuffer(
-  highWaterMark: number = 1, 
-  { processData, sendOptions }: { 
-    processData: (data: DataChunk) => DataChunk; 
+  highWaterMark: number = 1,
+  { processData, sendOptions }: {
+    processData: (data: DataChunk) => DataChunk;
     sendOptions: (options: Record<string, any>) => void;
   }
 ) {
@@ -169,7 +167,7 @@ function createStreamBuffer(
       const chunk = buffer.shift();
       controller.enqueue(chunk!);
     }
-    
+
     if (shouldClose && buffer.length === 0) {
       controller.close();
     }
@@ -206,11 +204,11 @@ export default function createRequestHandler(config: HandlerConfig) {
     try {
       // Generate a unique request ID
       const requestId = crypto.randomUUID();
-      
+
       // Parse request headers
       const headers = Object.fromEntries(req.headers.entries());
       const contentType = headers?.["content-type"] || headers?.["Content-Type"] || "";
-      
+
       // Parse form data for multipart requests
       const formData: Record<string, any> = {};
       if (contentType.includes("multipart/form-data")) {
@@ -220,7 +218,7 @@ export default function createRequestHandler(config: HandlerConfig) {
             if (value instanceof File) {
               // Transform file to base64
               const base64data = await fileToBase64(value);
-              
+
               if (!formData[key]) {
                 formData[key] = base64data;
               } else if (Array.isArray(formData[key])) {
@@ -244,13 +242,14 @@ export default function createRequestHandler(config: HandlerConfig) {
 
       // Parse request body
       let body = "";
-      let data = null;
+      // let data;
       try {
         body = await req.text();
         try {
-          data = JSON.parse(body);
+          body = JSON.parse(body);
+          // body = data;
         } catch {
-          data = { data: body };
+          // do nothing
         }
       } catch (error) {
         console.error("Error parsing request body:", error);
@@ -261,7 +260,7 @@ export default function createRequestHandler(config: HandlerConfig) {
       const subdomain = getSubdomain(req.url);
       const queryParams = Object.fromEntries(url.searchParams.entries());
       const method = req.method;
-      
+
       // Get path name and find matching handler
       let pathname = url.pathname;
       let matchedHandler: RouteHandler | undefined;
@@ -271,7 +270,7 @@ export default function createRequestHandler(config: HandlerConfig) {
       for (const routePattern in handlers) {
         const routeHandler = new URLPattern({ pathname: routePattern });
         const match = routeHandler.exec(url);
-        
+
         if (match?.pathname?.groups) {
           const pathGroups = match.pathname.groups;
           const pathPart = pathGroups["0"] ? pathGroups["0"] : '';
@@ -327,9 +326,9 @@ export default function createRequestHandler(config: HandlerConfig) {
       };
 
       // Create stream buffer
-      const { getStream, enqueue } = createStreamBuffer(1, { 
-        processData, 
-        sendOptions: sendOptionsFunction! 
+      const { getStream, enqueue } = createStreamBuffer(1, {
+        processData,
+        sendOptions: sendOptionsFunction!
       });
 
       // Create response callback
@@ -343,7 +342,6 @@ export default function createRequestHandler(config: HandlerConfig) {
         pathParams,
         method,
         queryParams,
-        data,
         body,
         formData,
         headers,
@@ -357,7 +355,7 @@ export default function createRequestHandler(config: HandlerConfig) {
 
       // Wait for response options
       const options = await responseOptionsPromise;
-      
+
       // Return streaming response
       return new Response(getStream(), options);
     } catch (error) {
@@ -365,7 +363,7 @@ export default function createRequestHandler(config: HandlerConfig) {
       // const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
       const errorStatus = error instanceof Error && 'status' in error ? Number((error as any).status) : 500;
       const errorStatusText = error instanceof Error ? error.message : "Internal Server Error";
-      
+
       // Create error response
       const options = {
         status: errorStatus,

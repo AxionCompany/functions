@@ -2,15 +2,30 @@
   "name": "@oxian/oxian-js",
   "version": "0.2.0",
   "license": "MIT",
-  "exports": "./main.ts",
-  "tasks": {
-    "start": "DENO_DIR=./data/local/cache/.deno ENV=development deno run --unstable-ffi --unstable-kv --unstable-sloppy-imports --unstable-worker-options --allow-env --allow-net --allow-read --allow-write --allow-run main.ts",
-    "dev": "DENO_DIR=./data/local/cache/.deno ENV=development WATHC=true deno run --unstable-ffi --unstable-kv --unstable-sloppy-imports --unstable-worker-options -A -r --no-lock main.ts",
-    "file-loader": "ENV=production deno run -A --reload=http://local@localhost:9000 --no-lock --unstable --unstable-kv --unstable-sloppy-imports file-loader.ts",
-    "api": "ENV=production deno run -A --reload=http://localhost:9000 --no-lock --unstable --unstable-kv --unstable-sloppy-imports api.ts"
+  "exports": {
+    ".": "./main.ts",
+    "./init": "./init.ts",
+    "./config": "./config.ts"
   },
-  "imports": {
-    "drizzle-orm/node-postgres": "npm:drizzle-orm/node-postgres",
-    "pg": "npm:pg"
-  }
+  "unstable": [
+    "bare-node-builtins",
+    "detect-cjs",
+    "node-globals",
+    "unstable-sloppy-imports",
+    "unsafe-proto",
+    "webgpu",
+    "broadcast-channel",
+    "worker-options",
+    "cron",
+    "kv",
+    "net",
+    "otel"
+  ],
+  "tasks": {
+    "start": "ENV=development deno run --unstable-* -A --env -r main.ts",
+    "dev": "ENV=development WATCH=true deno run -A --env main.ts",
+    "file-loader": "ENV=production deno run -A --env --reload=http://local@localhost:9000 file-loader.ts",
+    "api": "ENV=production deno run -A --env --reload=http://localhost:9000 api.ts"
+  },
+  "lock": false
 }

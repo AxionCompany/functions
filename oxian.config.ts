@@ -8,12 +8,13 @@
  * - Upgrade management
  */
 
-import type { AdapterConfig } from "./src/utils/adapters.ts";
+import type { OxianConfig as BaseOxianConfig } from "./functions/src/utils/config.ts";
+
 
 /**
  * Enhanced adapter configuration with isolate settings
  */
-export interface IsolateAdapterConfig extends AdapterConfig {
+export interface IsolateAdapterConfig extends BaseOxianConfig {
   /** Function to map file paths to isolate IDs */
   mapFilePathToIsolateId?: ((params: { formattedFileUrl: string, fileUrl?: string }) => string) | null;
   /** Maximum idle time for isolates in milliseconds */
@@ -28,6 +29,8 @@ export interface IsolateAdapterConfig extends AdapterConfig {
     edgeId?: string;
   };
 }
+
+export type { BaseOxianConfig as OxianConfig };
 
 /**
  * Maximum number of isolates to create
@@ -91,16 +94,16 @@ function getIsolateIdForRequest(adapterData: any): string {
  */
 function getDatabaseConfig(isolateId: string, env: Record<string, string> = {}) {
   // Example: Only enable database for API isolates
-  if (!isolateId.startsWith('api_')) {
-    return {
-      enabled: false
-    };
-  }
+  // if (!isolateId.startsWith('api_')) {
+  //   return {
+  //     enabled: false
+  //   };
+  // }
 
   return {
     enabled: true,
     // url: env.DATABASE_URL,
-    syncUrl: env.DATABASE_URL,
+    // syncUrl: env.DATABASE_URL,
     lwwColumn: 'updated_at',
     edgeId: `${isolateId}_${env.INSTANCE_ID || 'local'}`,
   };

@@ -1,7 +1,7 @@
 import isolateFactory, { IsolateFactoryConfig, IsolateInstance } from "./utils/isolateFactory.ts";
 import { PermissionsConfig } from "./utils/runOptions.ts";
 import { logDebugWithConfig, logError, logInfo, logWarning, setLogConfig, LogConfig } from "../utils/logger.ts";
-import { shouldUpgradeNow, clearUpgradeFlag } from "../utils/upgradeManager.ts";
+import { shouldUpgradeNow, clearUpgradeFlag, clearGlobalUpgradeFlag } from "../utils/upgradeManager.ts";
 
 // ===== Type Definitions =====
 /**
@@ -1161,7 +1161,14 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
         // 8. Clear upgrade flag after successful upgrade
         if (bustCache) {
             clearUpgradeFlag(isolateId);
-            logDebugWithConfig(config, `Cleared upgrade flag for isolate ${isolateId}`);
+            // Also clear the global upgrade flag to prevent continuous reloads
+            // Only in development mode - in production, each isolate manages its own flag
+            if (config.env?.ENV === 'development') {
+                clearGlobalUpgradeFlag();
+                logDebugWithConfig(config, `Cleared upgrade flags for isolate ${isolateId} and global flag (dev mode)`);
+            } else {
+                logDebugWithConfig(config, `Cleared upgrade flag for isolate ${isolateId}`);
+            }
         }
 
         // 9. Process the request with the newly created/updated isolate
