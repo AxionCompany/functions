@@ -1,5 +1,3 @@
-/// <reference lib="deno.unstable" />
-
 import server from "../../server/main.ts";
 import RequestHandler from "../../handler/main.ts";
 import ModuleExecution from "../main.ts";

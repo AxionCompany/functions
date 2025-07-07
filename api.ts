@@ -12,8 +12,6 @@
  * - WATCH: Enable file watching in development mode
  */
 
-/// <reference lib="deno.unstable" />
-
 import { SEPARATOR, basename, extname, join, dirname } from "jsr:@std/path@1.1.0";
 import { ensureDir } from "jsr:@std/fs@1.0.18";
 

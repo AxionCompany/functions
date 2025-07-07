@@ -7,7 +7,7 @@
 
 import FileLoader from "./adapters/loaders/main.ts";
 import bundler, { terminateWorker } from './adapters/bundler/esbuild.js';
-import mime from 'npm:mime/lite';
+import mime from 'npm:mime@4.0.7/lite';
 import { logDebug, logError, logInfo, logWarning } from "../utils/logger.ts";
 
 // Constants for configuration

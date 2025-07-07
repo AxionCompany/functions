@@ -290,7 +290,7 @@ export default function createFileLoader({
         
         // Recursively find the file
         const recursiveResult = await findFile({
-          path: join(...pathSegments),
+          path: pathSegments.join('/'),
           currentPath: nextPath,
           params: updatedParams,
           fullPath: join(fullPath || '', currentSegment || '')

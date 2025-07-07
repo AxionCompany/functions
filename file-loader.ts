@@ -12,8 +12,6 @@
  * - ENV: Environment mode ('development' or 'production')
  */
 
-/// <reference lib="deno.unstable" />
-
 import FileLoader from "./functions/src/file-loader/main.ts";
 import createServer from "./functions/src/server/main.ts";
 import getEnv, { EnvVars } from "./functions/src/utils/environmentVariables.ts";
