@@ -1,6 +1,5 @@
-
-import { dirname, resolve } from "https://deno.land/std@0.177.0/path/mod.ts";
-import { ModuleLoader } from "../loader.ts";
+import { dirname, resolve } from "jsr:@std/path@1.1.1";
+import type { ModuleLoader } from "../loader.ts";
 
 export interface FileSearchResult {
     path: string;
@@ -56,7 +55,7 @@ export async function findContextualModules(importUrl: string, loader: ModuleLoa
         currentPath = parentPath;
         currentUrlDir = isRemote ? new URL("..", currentUrlDir).href : `file://${dirname(currentPath)}/`;
     }
-    
+
     // The order is important: shared should be first, then middleware, etc.
     // The traversal finds files from deepest to shallowest, so we reverse.
     return modules.reverse();

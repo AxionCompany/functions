@@ -1,11 +1,13 @@
 {
   "name": "@oxian/oxian-js",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "license": "MIT",
   "exports": {
     ".": "./main.ts",
     "./init": "./init.ts",
-    "./config": "./config.ts"
+    "./config": "./config.ts",
+    "./api": "./api.ts",
+    "./file-loader": "./file-loader.ts"
   },
   "unstable": [
     "bare-node-builtins",
