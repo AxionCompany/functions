@@ -1,5 +1,5 @@
 
-import { bundle } from "jsr:@deno/emit";
+import { bundle } from "jsr:@deno/emit@0.46.0";
 import { enhanceErrorWithSourceMap } from "./utils/sourceMapSupport.ts";
 
 // A simple in-memory cache for bundled code to avoid redundant work.
