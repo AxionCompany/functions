@@ -10,6 +10,7 @@
 
 import { eq, desc } from "npm:drizzle-orm";
 import type { OxianContext } from "../../../src/isolate-v2/types.ts";
+import { drizzle } from 'npm:drizzle-orm/pg-proxy';
 
 // GET /api/users - List users with optional filtering
 export async function GET(_: any, context?: OxianContext) {
@@ -17,7 +18,9 @@ export async function GET(_: any, context?: OxianContext) {
 
   const { dependencies, response } = context || {};
 
-  const { db, schema } = dependencies || {};
+  const { schema, withDrizzle } = dependencies?.ominipg || {};
+
+  const db = await withDrizzle(drizzle);
 
   if (!db) {
     response?.status(500);
@@ -41,13 +44,9 @@ export async function GET(_: any, context?: OxianContext) {
       .orderBy(desc(users.updated_at))
       .limit(50);
 
-    // Optional: Manual sync to get latest data from remote
-    // const syncResult = await db.sync();
-
     return {
       users: activeUsers,
       count: activeUsers.length
-      // sync: { pushed: syncResult.pushed }
     };
 
   } catch (error) {
@@ -60,7 +59,10 @@ export async function GET(_: any, context?: OxianContext) {
 // POST /api/users - Create a new user  
 export async function POST(data: Record<string, any>, context?: OxianContext) {
   const { dependencies, response } = context || {};
-  const { db, schema } = dependencies || {};
+
+  const { schema, withDrizzle } = dependencies?.ominipg || {};
+
+  const db = await withDrizzle(drizzle);
 
   if (!db) {
     response?.status(500);

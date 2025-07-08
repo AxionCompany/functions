@@ -220,7 +220,7 @@ export default function createFileLoader({
 
     // add export with file path to eof:
     if (matchPath?.endsWith('.tsx') || matchPath?.endsWith('.jsx') || matchPath?.endsWith('.ts') || matchPath?.endsWith('.js')) {
-      const extendedContent = content + `\nexport const __path__ = "${matchPath}";`;
+      const extendedContent = content + `\nexport const matchedPath_${crypto.randomUUID().replace(/-/g, '_')} = "${matchPath}";`;
       return extendedContent;
     }
     return content;

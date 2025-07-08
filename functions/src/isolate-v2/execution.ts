@@ -32,7 +32,7 @@ export class ModuleExecutor {
         }
     }
 
-    private async getDbDependencies(schemaSQL: string[] = []) {
+    private async getDbDependencies(schemaSQL: string[] = [], schema: Record<string, any> = {}) {
         // If the database connection already exists, we might just need to update schemas
         if (this.dbDependencies?.db) {
             // If new SQL is provided, you might want to execute it against the existing connection.
@@ -46,6 +46,7 @@ export class ModuleExecutor {
             projectPath: this.config.projectPath || Deno.cwd(),
             isolateId: this.config.isolateId || 'default',
             schemaSQL,
+            schema,
         });
 
         return this.dbDependencies;
@@ -62,10 +63,10 @@ export class ModuleExecutor {
             throw new Error(`[IsolateV2] Frontend modules are not supported.`);
         }
 
-        const reqContext = await buildRequestContext(importUrl, this.moduleLoader, { env: this.config.env });
+        const reqContext = await buildRequestContext(importUrl, this.moduleLoader, { env: this.config.env }, this.config);
 
         // now that we have the schemas, we can connect to the database
-        const dbDeps = await this.getDbDependencies(reqContext.schemaSQL);
+        const dbDeps = await this.getDbDependencies(reqContext.schemaSQL, reqContext.dependencies.schema);
 
         reqContext.dependencies = { ...dbDeps, ...reqContext.dependencies };
 
@@ -141,13 +142,9 @@ export class ModuleExecutor {
             (next, middleware) => (data, context) => {
                 // A middleware can optionally return a new data object to be passed down the chain.
                 const nextData = middleware(data, context);
-                console.log('Original Data', data)
-                console.log('Middleware Output', nextData)
                 if (nextData && typeof (nextData as any).then === 'function') {
                     return (nextData as Promise<any>).then(resolvedData => next(resolvedData || data, context));
                 }
-                console.log('Running', next.name, 'with', nextData)
-
                 return next(nextData || data, context);
             },
             withHooks(targetFn, reqContext.interceptor)

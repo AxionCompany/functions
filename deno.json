@@ -25,7 +25,7 @@
   ],
   "tasks": {
     "start": "ENV=development deno run --unstable-* -A --env -r main.ts",
-    "dev": "ENV=development WATCH=true deno run -A --env main.ts",
+    "dev": "ENV=development WATCH=true deno run -A -r --env main.ts",
     "file-loader": "ENV=production deno run -A --env --reload=http://local@localhost:9000 file-loader.ts",
     "api": "ENV=production deno run -A --env --reload=http://localhost:9000 api.ts"
   },

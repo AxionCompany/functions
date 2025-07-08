@@ -1,6 +1,7 @@
 import type { ModuleLoader } from "./loader.ts";
 import { findContextualModules } from "./utils/finder.ts";
 import type { OxianContext, Handler } from "./types.ts";
+import type { OxianConfig } from "../../../api.ts";
 
 /**
  * Defines the structure for the processed contextual modules.
@@ -19,20 +20,31 @@ export interface RequestContext {
     env: any;
 }
 
+export const CONTEXTUAL_MODULE_NAMES = ["shared", "dependencies", "middleware", "interceptor", "schema"];
+
+
 /**
  * Builds the request-specific context by finding, loading, and processing
  * all relevant shared, middleware, and interceptor modules.
  * @param importUrl The URL of the target function module for the current request.
  * @param moduleLoader An instance of the ModuleLoader to use for importing.
  * @param initialDependencies The base dependencies (e.g., from withDatabase).
+ * @param config The Oxian config.
  * @returns A promise that resolves to the fully built RequestContext.
  */
 export async function buildRequestContext(
     importUrl: string,
     moduleLoader: ModuleLoader,
-    initialDependencies: any
+    initialDependencies: any,
+    config: OxianConfig
 ): Promise<RequestContext> {
-    const foundFiles = await findContextualModules(importUrl, moduleLoader);
+
+    if (!config.database?.enabled) {
+        CONTEXTUAL_MODULE_NAMES.splice(CONTEXTUAL_MODULE_NAMES.indexOf("schema"), 1);
+    }
+    console.log('CONTEXTUAL_MODULE_NAMES', CONTEXTUAL_MODULE_NAMES)
+
+    const foundFiles = await findContextualModules(importUrl, moduleLoader, CONTEXTUAL_MODULE_NAMES);
 
     const { env, ...rest } = initialDependencies;
     const context: RequestContext = {
@@ -62,16 +74,20 @@ export async function buildRequestContext(
             continue;
         }
 
+        const getMatchedPath = (modules: Record<string, any>) => {
+            return Object.keys(modules)?.find(key => key.startsWith('matchedPath_'));
+        }
+
         switch (file.name) {
             case "dependencies":
                 // Shared modules are factories that augment the dependencies object
-                if (modules.default && modules?.['__path__']?.split('/').pop()?.includes('dependencies')) {
+                if (modules.default && getMatchedPath(modules)?.split('/').pop()?.includes('dependencies')) {
                     context.dependencies = await modules.default({ ...context.dependencies, env: context.env });
                 }
                 break;
             case "shared":
                 // Shared modules are factories that augment the dependencies object
-                if (modules.default && modules?.['__path__']?.split('/').pop()?.includes('shared')) {
+                if (modules.default && getMatchedPath(modules)?.split('/').pop()?.includes('shared')) {
                     context.dependencies = await modules.default({ ...context.dependencies, env: context.env });
                     if (context.dependencies.isFactory) {
                         context.isFactory = true;
@@ -84,13 +100,13 @@ export async function buildRequestContext(
                 }
                 break;
             case "middleware":
-                if (modules.default && modules?.['__path__']?.split('/').pop()?.includes('middleware')) {
+                if (modules.default && getMatchedPath(modules)?.split('/').pop()?.includes('middleware')) {
                     context.middlewares.push(modules.default);
                 }
                 break;
             case "interceptor":
                 // An interceptor module exports beforeRun and/or afterRun directly
-                if ((modules.beforeRun || modules.afterRun) && modules?.['__path__']?.split('/').pop()?.includes('interceptor')) {
+                if ((modules.beforeRun || modules.afterRun) && getMatchedPath(modules)?.split('/').pop()?.includes('interceptor')) {
                     context.interceptor = {
                         ...context.interceptor,
                         beforeRun: modules.beforeRun as Handler || context.interceptor.beforeRun,
@@ -107,7 +123,7 @@ export async function buildRequestContext(
                 // Collect all other exports as the schema
                 const schemaExports: Record<string, any> = {};
                 Object.keys(modules).forEach((key) => {
-                    if (key !== 'schemaDDL' && key !== 'default' && key !== '__path__') {
+                    if (key !== 'schemaDDL' && key !== 'default' && key !== getMatchedPath(modules)) {
                         schemaExports[key] = modules[key];
                     }
                 });

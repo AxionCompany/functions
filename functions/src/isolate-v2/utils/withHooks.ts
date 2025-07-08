@@ -1,4 +1,4 @@
-import { Handler, OxianContext } from '../types.ts';
+import type { Handler, OxianContext } from '../types.ts';
 
 
 /**

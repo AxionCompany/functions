@@ -6,13 +6,11 @@ export interface FileSearchResult {
     name: string;
 }
 
-const CONTEXTUAL_MODULE_NAMES = ["shared", "dependencies", "middleware", "interceptor", "schema"];
-
 /**
  * Finds contextual modules by walking up the directory tree from a starting path.
  * This supports both local file paths and remote URLs.
  */
-export async function findContextualModules(importUrl: string, loader: ModuleLoader): Promise<FileSearchResult[]> {
+export async function findContextualModules(importUrl: string, loader: ModuleLoader, contextualModuleNames: string[]): Promise<FileSearchResult[]> {
     const isRemote = importUrl.startsWith('http');
     const modules: FileSearchResult[] = [];
     const seen = new Set<string>();
@@ -22,7 +20,7 @@ export async function findContextualModules(importUrl: string, loader: ModuleLoa
 
     // Walk up the directory tree
     while (currentPath && currentPath !== '/') {
-        for (const name of CONTEXTUAL_MODULE_NAMES) {
+        for (const name of contextualModuleNames) {
             // Construct the full path for the potential module
             const potentialModulePath = isRemote
                 ? new URL(`${name}.ts`, currentUrlDir).href

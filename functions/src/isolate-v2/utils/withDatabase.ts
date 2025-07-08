@@ -1,5 +1,5 @@
 
-import { Ominipg } from "jsr:@oxian/ominipg@0.0.6";
+import { Ominipg, withDrizzle } from "jsr:@oxian/ominipg@0.1.1";
 
 // Basic dependency structure, can be extended if needed
 export interface Dependencies {
@@ -13,6 +13,7 @@ export interface DatabaseConfig {
     edgeId?: string;
     enabled: boolean;
     schemaSQL?: string[];
+    schema?: Record<string, any>;
 }
 
 export interface DatabaseDependencies extends Dependencies {
@@ -27,6 +28,7 @@ export interface WithDatabaseConfig {
     isolateId: string;
     loaderUrl?: string;
     schemaSQL?: string[];
+    schema?: Record<string, any>;
 }
 
 /**
@@ -37,6 +39,7 @@ export async function withDatabase(
     dependencies: Dependencies,
     config: WithDatabaseConfig
 ): Promise<DatabaseDependencies> {
+
     if (!config.database?.enabled) {
         return dependencies;
     }
@@ -62,18 +65,17 @@ export async function withDatabase(
         const db = await Ominipg.connect({
             ...dbConfig,
             url: url,
-            // In this version, we assume schema objects are not dynamically loaded.
-            // They would need to be passed in `dependencies` if required.
-            schema: dependencies.schema
         });
 
         console.log(`[IsolateV2] Database connection established for isolate ${config.isolateId}`);
-
         return {
             ...dependencies,
-            db,
-            dbConfig,
-            schema: dependencies.schema
+            ominipg: {
+                ...dbConfig,
+                db,
+                withDrizzle: async (drizzleProxy: any) => await withDrizzle(db, drizzleProxy, config.schema),
+                schema: config.schema,
+            }
         };
     } catch (error) {
         console.error(`[IsolateV2] Failed to connect to database for isolate ${config.isolateId}:`, error);

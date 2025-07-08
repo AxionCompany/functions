@@ -14,7 +14,6 @@ import type { OxianContext } from "../../src/isolate-v2/types.ts";
  */
 
 export default function basicEndpoint(data: any, ctx: OxianContext) {
-    console.log(data); 
     return {
         data: data, // data is the data (Json composed of query params, path params, form data and body) of the request
         ctx: Object.keys(ctx), // ctx is the complete context of the request
