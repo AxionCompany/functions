@@ -22,6 +22,7 @@ import getEnv, { type EnvVars } from "./functions/src/utils/environmentVariables
 import replaceTemplate from "./functions/src/utils/template.ts";
 import { logDebug, logError, logInfo, setLogConfig } from "./functions/src/utils/logger.ts";
 import { initializeUpgradeManager } from "./functions/src/utils/upgradeManager.ts";
+import { ModuleLoader } from "./functions/src/isolate-v2/loader.ts";
 import defaultDenoConfig from "./deno.json" with { type: "json" };
 import type { PermissionsConfig } from "./functions/src/proxy/utils/runOptions.ts";
 
@@ -232,16 +233,28 @@ function createRequestHandler(env: EnvVars): RequestHandler {
 
       try {
         console.log('Loading Oxian Config', new URL(`./oxian.config.ts`, fileLoaderUrl).href);
+        
+        // Create ModuleLoader instance for handling remote imports
+        const moduleLoader = new ModuleLoader({
+          projectPath: functionsDir,
+          loaderUrl: fileLoaderUrl.href
+        });
+
         const [
           _oxianConfigJson,
           oxianConfigESModule,
           legacyOxianConfigESModule
         ] = await Promise.all([
-          import(new URL(`oxian.config.json`, fileLoaderUrl).href, {
-            with: { type: 'json' }
-          }),
-          import(new URL(`oxian.config.ts`, fileLoaderUrl).href),
-          import(new URL(`${functionsDir}/adapters`, fileLoaderUrl).href)
+          // Load JSON config using fetch (ModuleLoader doesn't handle JSON)
+          fetch(new URL(`oxian.config.json`, fileLoaderUrl).href)
+            .then(res => res.json())
+            .then(json => ({ default: json }))
+            .catch(() => ({ default: {} })),
+          // Load TypeScript config using ModuleLoader
+          moduleLoader.load(new URL(`oxian.config.ts`, fileLoaderUrl).href),
+          // Load legacy adapters using ModuleLoader
+          moduleLoader.load(new URL(`${functionsDir}/adapters`, fileLoaderUrl).href)
+            .catch(() => ({ default: null })) // Graceful fallback for missing adapters
         ]);
 
         oxianConfigJson = _oxianConfigJson.default || {};
@@ -249,7 +262,7 @@ function createRequestHandler(env: EnvVars): RequestHandler {
         if (legacyOxianConfigESModule.default) {
           console.warn('[WARNING] Adapters are deprecated and going to be removed in version 1.0.0. Please use `oxian.config.ts` at the root of your project instead.');
         }
-        oxianConfigModule = oxianConfigESModule.default || legacyOxianConfigESModule.default;
+        oxianConfigModule = oxianConfigESModule.default || legacyOxianConfigESModule.default || oxianConfigModule;
       } catch (err) {
         logError(
           `Error trying to load oxian config: ${err instanceof Error ? err.message : String(err)}`
