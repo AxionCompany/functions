@@ -22,11 +22,12 @@ export const beforeRun = (data: any, context: OxianContext) => {
         '| ExecutionId:', context.executionId,
         '| Timestamp:', context.timestamp,
         '| Dependencies:', context.dependencies ? JSON.stringify(Object.keys(context.dependencies)) : null,
-        '| Request URL:', context.request?.url,
+        '| Request URL:', new URL(context.request?.url).href,
         '| Request Method:', context.request?.method,
         '| Request Headers:', context.request?.headers ? JSON.stringify(context.request.headers) : null,
         '| Request Body:', context.request?.body ? JSON.stringify(context.request.body) : null,
         '| Request Query Params:', context.request?.queryParams ? JSON.stringify(context.request.queryParams) : null,
+        '| Path Params:', context.request?.params ? JSON.stringify(context.request.params) : null,
         '| Input:', JSON.stringify(data)
     );
     return data;

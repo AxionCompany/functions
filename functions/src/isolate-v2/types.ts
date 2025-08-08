@@ -8,6 +8,93 @@ export interface RequestData {
   headers: Record<string, string>;
   body: any; // Could be parsed JSON, raw text, FormData, etc.
   queryParams: Record<string, string>;
+  params?: Record<string, string>;
+  [key: string]: any;
+}
+
+/**
+ * Database configuration for isolate-v2
+ */
+export interface DatabaseConfig {
+  enabled: boolean;
+  remoteURL?: string;
+  lwwColumn?: string;
+  edgeId?: string;
+  url?: string;
+  schemaSQL?: string[];
+  schema?: Record<string, any>;
+}
+
+/**
+ * File loader configuration for isolate-v2
+ */
+export interface FileLoaderConfig {
+  loaderType: string;
+  debug?: boolean;
+  verbose?: boolean;
+  useCache?: boolean;
+  bustCache?: boolean;
+  environment?: string;
+  dirEntrypoint?: string;
+  [key: string]: any;
+}
+
+/**
+ * Comprehensive configuration for isolate-v2
+ * Extends the base OxianConfig with isolate-specific properties
+ */
+export interface IsolateConfig {
+  // Core isolate properties
+  projectId: string;
+  projectPath: string;
+  isolateId?: string;
+  
+  // Root of functions for in-process loader
+  functionsDir?: string;
+  
+  // Environment and request context
+  env: Record<string, string>;
+  url?: string;
+  headers?: Headers;
+  
+  // Import URL configuration (from environment or proxy headers)
+  importUrl?: string;
+  loaderUrl?: string;
+  
+  // Database configuration
+  database?: DatabaseConfig;
+  
+  // File loader configuration
+  fileLoader?: FileLoaderConfig;
+  
+  // Caching and performance
+  bustCache?: boolean;
+  
+  // Loader configuration
+  loaderConfig?: {
+    username?: string;
+    password?: string;
+    [key: string]: any;
+  };
+  
+  // Logging configuration
+  debugLogs?: boolean;
+  errorLogs?: boolean;
+  infoLogs?: boolean;
+  warningLogs?: boolean;
+  
+  // Schema configuration
+  schemaSQL?: string[];
+  schema?: Record<string, any>;
+  
+  // Deno configuration for bundling
+  denoConfig?: {
+    imports?: Record<string, string>;
+    scopes?: Record<string, Record<string, string>>;
+    [key: string]: any;
+  };
+  
+  // Any additional properties from base OxianConfig
   [key: string]: any;
 }
 

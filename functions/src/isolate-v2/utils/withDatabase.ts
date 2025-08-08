@@ -1,5 +1,6 @@
 
 import { Ominipg, withDrizzle } from "jsr:@oxian/ominipg@0.1.1";
+import type { DatabaseConfig as IsolateV2DatabaseConfig } from "../types.ts";
 
 // Basic dependency structure, can be extended if needed
 export interface Dependencies {
@@ -23,7 +24,7 @@ export interface DatabaseDependencies extends Dependencies {
 }
 
 export interface WithDatabaseConfig {
-    database?: DatabaseConfig;
+    database?: IsolateV2DatabaseConfig;
     projectPath: string;
     isolateId: string;
     loaderUrl?: string;
@@ -46,8 +47,8 @@ export async function withDatabase(
 
     const dbConfig: DatabaseConfig = {
         ...config.database,
-        lwwColumn: config.database.lwwColumn || 'updated_at',
-        edgeId: config.database.edgeId || `${config.isolateId}_${crypto.randomUUID().slice(0, 8)}`,
+        lwwColumn: config.database?.lwwColumn || 'updated_at',
+        edgeId: config.database?.edgeId || `${config.isolateId}_${crypto.randomUUID().slice(0, 8)}`,
         enabled: true,
         schemaSQL: config.schemaSQL || [],
     };

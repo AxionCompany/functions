@@ -41,9 +41,9 @@ export function extractSourceMap(code: string): SourceMap | null {
  * Enhanced error with source map information
  */
 export class SourceMappedError extends Error {
-    public originalStack?: string;
     public mappedStack?: string;
     public sourceMap?: SourceMap;
+    private hasMapped = false;
 
     private constructor(
         originalError: Error,
@@ -51,18 +51,20 @@ export class SourceMappedError extends Error {
     ) {
         super(originalError.message);
         this.name = 'SourceMappedError';
-        this.originalStack = originalError.stack;
         this.sourceMap = sourceMap;
-        this.stack = originalError.stack; // Default stack
+        this.stack = originalError.stack; // Default stack until mapping
     }
 
     /**
      * Asynchronously creates and applies a mapped stack trace.
+     * Idempotent: returns immediately if already mapped.
      */
     public async applyMappedStack(moduleUrl?: string): Promise<void> {
-        if (this.sourceMap && this.originalStack) {
-            this.mappedStack = await this.createMappedStack(this.originalStack, this.sourceMap, moduleUrl);
+        if (this.hasMapped) return;
+        if (this.sourceMap && this.stack) {
+            this.mappedStack = await this.createMappedStack(this.stack, this.sourceMap, moduleUrl);
             this.stack = this.mappedStack;
+            this.hasMapped = true;
         }
     }
 
@@ -72,15 +74,32 @@ export class SourceMappedError extends Error {
             const lines = originalStack.split('\n');
             const mappedLines: string[] = [lines[0]]; // Keep the error message line
 
-            const stackLines = lines.slice(1);
+            // Limit number of stack frames to prevent excessively large stacks
+            const MAX_FRAMES = 200;
+            const stackLines = lines.slice(1, 1 + MAX_FRAMES);
+
+            // Two common patterns: with function and parentheses, and bare URL frames
+            const withFuncRe = /at (.*?) \((?:data:text\/javascript[^:]*|[^)]*):(\d+):(\d+)\)/;
+            const bareRe = /at (?:data:text\/javascript[^:]*|[^\s]+):(\d+):(\d+)/;
 
             for (const line of stackLines) {
-                const match = line.match(/at (.*?) \((?:data:text\/javascript[^:]*|[^)]*):(\d+):(\d+)\)/);
+                let match = line.match(withFuncRe);
+                let functionName = '';
+                let generatedLine: number | null = null;
+                let generatedColumn: number | null = null;
                 if (match) {
-                    const functionName = match[1];
-                    const generatedLine = parseInt(match[2], 10);
-                    const generatedColumn = parseInt(match[3], 10);
+                    functionName = match[1] || '';
+                    generatedLine = parseInt(match[2], 10);
+                    generatedColumn = parseInt(match[3], 10);
+                } else {
+                    const m2 = line.match(bareRe);
+                    if (m2) {
+                        generatedLine = parseInt(m2[1], 10);
+                        generatedColumn = parseInt(m2[2], 10);
+                    }
+                }
 
+                if (generatedLine != null && generatedColumn != null) {
                     const originalPos = consumer.originalPositionFor({
                         line: generatedLine,
                         column: generatedColumn,
@@ -88,9 +107,9 @@ export class SourceMappedError extends Error {
                     });
 
                     if (originalPos.source) {
-                        const sourcePath = originalPos.source.replace("file://", "").replace("https://", "");
-                        const posName = originalPos.name || functionName || '';
-                        mappedLines.push(`    at ${posName} (${sourcePath}:${originalPos.line}:${originalPos.column})`);
+                        const sourcePath = String(originalPos.source).replace('file://', '').replace('https://', '');
+                        const posName = (originalPos.name || functionName || '').trim();
+                        mappedLines.push(`    at ${posName || '<anonymous>'} (${sourcePath}:${originalPos.line}:${originalPos.column})`);
                     } else {
                         mappedLines.push(line); // Failed to map, use original line
                     }
@@ -98,10 +117,17 @@ export class SourceMappedError extends Error {
                     mappedLines.push(line); // Not a stack line we can map
                 }
             }
+
+            if (lines.length - 1 > MAX_FRAMES) {
+                mappedLines.push(`    ... ${lines.length - 1 - MAX_FRAMES} more frame(s) ...`);
+            }
+
             return mappedLines.join('\n');
         } catch (err) {
             console.warn('[SourceMap] Failed to create mapped stack trace:', err);
             return originalStack; // Fallback to original stack on error
+        } finally {
+            try { (consumer as any).destroy?.(); } catch {}
         }
     }
 }
@@ -116,6 +142,9 @@ export function enhanceErrorWithSourceMap(
     moduleUrl?: string
 ): Error {
     try {
+        // If error is already a SourceMappedError, return it as-is
+        if (error instanceof SourceMappedError) return error;
+
         const sourceMap = extractSourceMap(code);
         if (sourceMap) {
             // This is a bit of a trick to create an async-initialized error
@@ -137,11 +166,9 @@ export function installSourceMapSupport(): void {
   globalThis.addEventListener?.('unhandledrejection', (event) => {
     if (event.reason instanceof Error) {
       console.error('[SourceMap] Unhandled promise rejection:', event.reason);
-      
-      // Try to enhance the error if it came from a bundled module
       const stack = event.reason.stack;
       if (stack && stack.includes('data:text/javascript;base64,')) {
-        console.log('[SourceMap] Detected bundled module error, attempting source map enhancement');
+        console.log('[SourceMap] Detected bundled module error, consider mapping with source maps');
       }
     }
   });
@@ -150,11 +177,9 @@ export function installSourceMapSupport(): void {
   globalThis.addEventListener?.('error', (event) => {
     if (event.error instanceof Error) {
       console.error('[SourceMap] Global error:', event.error);
-      
-      // Try to enhance the error if it came from a bundled module
       const stack = event.error.stack;
       if (stack && stack.includes('data:text/javascript;base64,')) {
-        console.log('[SourceMap] Detected bundled module error, attempting source map enhancement');
+        console.log('[SourceMap] Detected bundled module error, consider mapping with source maps');
       }
     }
   });

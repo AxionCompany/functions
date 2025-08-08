@@ -240,6 +240,15 @@ function createRequestHandler(env: EnvVars): RequestHandler {
           loaderUrl: fileLoaderUrl.href
         });
 
+        // Create minimal config for ModuleLoader calls
+        const minimalConfig = {
+          projectId: 'api',
+          projectPath: functionsDir,
+          isolateId: 'api',
+          env: {},
+          loaderUrl: fileLoaderUrl.href,
+        };
+
         const [
           _oxianConfigJson,
           oxianConfigESModule,
@@ -251,9 +260,9 @@ function createRequestHandler(env: EnvVars): RequestHandler {
             .then(json => ({ default: json }))
             .catch(() => ({ default: {} })),
           // Load TypeScript config using ModuleLoader
-          moduleLoader.load(new URL(`oxian.config.ts`, fileLoaderUrl).href),
+          moduleLoader.load(new URL(`oxian.config.ts`, fileLoaderUrl).href, false, minimalConfig),
           // Load legacy adapters using ModuleLoader
-          moduleLoader.load(new URL(`${functionsDir}/adapters`, fileLoaderUrl).href)
+          moduleLoader.load(new URL(`${functionsDir}/adapters`, fileLoaderUrl).href, false, minimalConfig)
             .catch(() => ({ default: null })) // Graceful fallback for missing adapters
         ]);
 

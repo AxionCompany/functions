@@ -29,5 +29,5 @@ export default ({ id }: Params): Result => {
     if (numId > 100) {
         throw new Error('Id must be less than 100');
     }
-    return { id: numId };
+    return { id: numId, };
 }

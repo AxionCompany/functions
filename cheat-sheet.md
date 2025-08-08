@@ -145,7 +145,7 @@ const middlewares = async (req) => {
 
 ## Interceptors
 
-Interceptors will run in every function execution that has `__requestId__`
+Interceptors will run in every function execution that has `requestId`
 passed as a property. Does not performs any mutations.
 
 ```javascript

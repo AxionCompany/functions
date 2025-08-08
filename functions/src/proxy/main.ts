@@ -535,23 +535,23 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
             isolateManager.incrementActiveRequests(isolateId);
 
             // Prepare request to the isolate
-            const requestUrl = new URL(
-                `${url.pathname}?${new URLSearchParams({
-                    ...queryParams,
-                    ...(metadata.params || {}),
-                    "__importUrl__": btoa(importUrl.href),
-                    "__isJSX__": String(isJSX), // Convert boolean to string
-                    "__proxyUrl__": btoa(url.href),
-                })}`,
-                `http://localhost:${port}`
-            );
+            const requestUrl = new URL(`${url.pathname}`, `http://localhost:${port}`);
+            // Preserve original query params
+            requestUrl.search = url.search;
 
             logDebugWithConfig(config, `Forwarding request to isolate at: ${requestUrl.href}`);
+
+            // Prepare headers with isolate-specific information
+            const isolateHeaders = new Headers(req.headers);
+            isolateHeaders.set('x-import-url', importUrl.href);
+            isolateHeaders.set('x-proxy-url', url.href);
+            isolateHeaders.set('x-isolate-id', isolateId);
+            isolateHeaders.set('x-project-id', config.projectId || 'default');
 
             const moduleResponse = await fetch(requestUrl, {
                 method: req.method,
                 redirect: "manual",
-                headers: req.headers,
+                headers: isolateHeaders,
                 body: req.body
             });
 
@@ -663,6 +663,8 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
             // Prepare project directory
             const projectId = config.projectId || new URL(formattedImportUrl).username;
             config.projectId = projectId;
+            // Keep isolateId stable
+            isolateId = isolateId || derivedIsolateId;
 
             try {
                 await modules.fs.ensureDir(`${Deno.env.get('DENO_DIR')}/../${projectId}`);
@@ -678,6 +680,11 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
                     status: 500,
                     headers: { 'content-type': 'application/json' }
                 });
+            }
+
+            // Ensure fileLoaderUrl is defined; in simplified flow, default to importUrl
+            if (!fileLoaderUrl) {
+                fileLoaderUrl = new URL(importUrl.href);
             }
 
             // Create the isolate
@@ -744,15 +751,14 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
             }
 
             // Update isolate metadata based on type
-            if (config.isolateType === 'subprocess') {
-                // Clean up existing isolate if needed
-                const currentMetadata = isolateManager.getIsolate(isolateId);
-                if (currentMetadata?.pid) {
-                    logDebugWithConfig(config, `Cleaning up existing subprocess isolate ${isolateId}`);
-                    await isolateManager.cleanupIsolate(isolateId);
-                }
+            const currentMetadata = isolateManager.getIsolate(isolateId);
+            if (currentMetadata?.pid || currentMetadata?.worker) {
+                logDebugWithConfig(config, `Cleaning up existing isolate ${isolateId}`);
+                await isolateManager.cleanupIsolate(isolateId);
+            }
 
-                // Set new isolate metadata
+            // Set new isolate metadata
+            if (config.isolateType === 'subprocess') {
                 const pid = (isolateInstance as Deno.ChildProcess).pid;
                 logInfo(`Setting subprocess isolate metadata for ${isolateId} with pid ${pid}`);
                 isolateManager.setIsolate(isolateId, {
@@ -764,14 +770,6 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
                     loadedAt: Date.now()
                 });
             } else {
-                // Clean up existing isolate if needed
-                const currentMetadata = isolateManager.getIsolate(isolateId);
-                if (currentMetadata?.worker) {
-                    logDebugWithConfig(config, `Cleaning up existing worker isolate ${isolateId}`);
-                    await isolateManager.cleanupIsolate(isolateId);
-                }
-
-                // Set new isolate metadata
                 logInfo(`Setting worker isolate metadata for ${isolateId}`);
                 isolateManager.setIsolate(isolateId, {
                     ...metadata,
@@ -1019,63 +1017,28 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
 
     logInfo(`Processing import URL: ${importUrl.href}`);
 
+    // Simplified: derive isolate id directly from the request URL, and initialize metadata
+    const derivedIsolateId = mapFilePathToIsolateId(importUrl);
+    let isolateId: string | undefined = derivedIsolateId;
+    let isolateMetadata: IsolateMetadata | undefined = isolateId ? isolateManager.getIsolate(isolateId) : undefined;
+    if (!isolateMetadata) {
+        isolateMetadata = { activeRequests: 0, status: 'down' } as IsolateMetadata;
+    }
+    let formattedImportUrl: string = importUrl.href;
+    let isExactMatch = true;
+
     // Initialize variables
-    let isolateId: string | undefined;
     let isJSX = false;
-    let isolateMetadata: IsolateMetadata | undefined;
     let bustCache = false;
     let fileLoaderUrl: URL;
-    let formattedImportUrl: string;
-    let isExactMatch = false;
 
     // Sort cached URLs by number of path parameters (more specific routes first)
     const matchesParams = (url: string) => url.split('/').filter((part) => part.startsWith(':')).length;
     const sortedFileUrls = isolateManager.getCachedFileUrls()?.sort((a, b) => matchesParams(b) - matchesParams(a));
 
     // ===== URL Matching and Isolate Identification =====
-    logDebugWithConfig(config, `Searching for matching URL in ${sortedFileUrls.length} cached URLs`);
-
-    // Try to find a matching URL in the cache
-    for (const fileUrl of sortedFileUrls) {
-        const { pathname, hostname, username } = new URL(fileUrl);
-        const pattern = new URLPattern({ username, pathname, hostname });
-
-        logDebugWithConfig(config, `Testing pattern ${pathname} against ${importUrl.href}`);
-
-        if (pattern.test(importUrl.href)) {
-            const cachedData = isolateManager.getCachedFileUrl(fileUrl);
-            if (!cachedData) {
-                logDebugWithConfig(config, `No cached data for ${fileUrl}`);
-                continue;
-            }
-
-            // Get isolate ID from the matched URL
-            const matchUrl = new URL(importUrl.href);
-            matchUrl.pathname = cachedData.matchPath;
-            isolateId = mapFilePathToIsolateId(matchUrl);
-
-            // Check if this is an exact match
-            isExactMatch = cachedData.path === importUrl.pathname;
-
-            logInfo(`Found matching URL: ${fileUrl}, isolateId: ${isolateId}, exactMatch: ${isExactMatch}`);
-
-            // Get isolate metadata
-            const existingMetadata = isolateManager.getIsolate(isolateId);
-            if (existingMetadata) {
-                isolateMetadata = existingMetadata;
-                logDebugWithConfig(config, `Found existing isolate metadata with status: ${existingMetadata.status}`);
-            } else {
-                isolateMetadata = { activeRequests: 0, status: 'down' };
-                logDebugWithConfig(config, `No existing isolate metadata, creating default`);
-            }
-
-            // If exact match, we're done
-            if (isExactMatch) {
-                logInfo(`Exact match found, using isolate: ${isolateId}`);
-                break;
-            }
-        }
-    }
+    // Simplified: rely on isolate-v2 loader+file-loader to handle dynamic routing and redirects.
+    // We still keep the cache map if needed for future optimizations, but avoid pre-matching here.
 
     try {
         // 1. Check if this is a public file request
@@ -1093,18 +1056,18 @@ export default ({ config, modules }: ProxyParams) => async (req: Request): Promi
         }
 
         // Ensure we have an isolateId at this point
-        if (!isolateId || !isolateMetadata) {
-            logError(`Missing isolateId or isolateMetadata after loading metadata`);
-            return new Response(JSON.stringify({
-                error: {
-                    message: 'Bad Request. Invalid isolate configuration.',
-                    details: `isolateId: ${isolateId ? 'defined' : 'undefined'}, isolateMetadata: ${isolateMetadata ? 'defined' : 'undefined'}`
-                }
-            }), {
-                status: 500,
-                headers: { 'content-type': 'application/json' }
-            });
-        }
+                    if (!isolateId) {
+                logError(`Missing isolateId after loading metadata`);
+                return new Response(JSON.stringify({
+                    error: {
+                        message: 'Bad Request. Invalid isolate configuration.',
+                        details: `isolateId: undefined`
+                    }
+                }), {
+                    status: 500,
+                    headers: { 'content-type': 'application/json' }
+                });
+            }
 
         // 3. Clear any existing timer
         const existingIsolate = isolateManager.getIsolate(isolateId);

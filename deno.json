@@ -1,13 +1,17 @@
 {
   "name": "@oxian/oxian-js",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "license": "MIT",
   "exports": {
     ".": "./main.ts",
     "./init": "./init.ts",
     "./config": "./config.ts",
     "./api": "./api.ts",
-    "./file-loader": "./file-loader.ts"
+    "./file-loader": "./file-loader.ts",
+    "./start/isolate": "./bin/start-isolate.ts",
+    "./start/cluster": "./bin/start-cluster.ts",
+    "./dev/isolate": "./bin/dev-isolate.ts",
+    "./dev/cluster": "./bin/dev-cluster.ts"
   },
   "unstable": [
     "bare-node-builtins",
@@ -27,7 +31,11 @@
     "start": "ENV=development deno run --unstable-* -A --env -r main.ts",
     "dev": "ENV=development WATCH=true deno run -A -r --env main.ts",
     "file-loader": "ENV=production deno run -A --env --reload=http://local@localhost:9000 file-loader.ts",
-    "api": "ENV=production deno run -A --env --reload=http://localhost:9000 api.ts"
+    "api": "ENV=production deno run -A --env --reload=http://localhost:9000 api.ts",
+    "start:isolate": "ENV=production deno run -A --env functions/src/isolate-v2/main.ts",
+    "start:cluster": "ENV=production deno run -A --env api.ts",
+    "dev:isolate": "ENV=development WATCH=true deno run -A -r --env functions/src/isolate-v2/main.ts",
+    "dev:cluster": "ENV=development WATCH=true deno run -A -r --env api.ts"
   },
   "lock": false
 }

@@ -30,55 +30,55 @@ export type IsolateInstance = Deno.ChildProcess | Worker;
  * @returns A Deno child process
  */
 async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<Deno.ChildProcess> {
-  const { 
-    isolateId, 
-    projectId = isolateId, 
-    reload, 
-    modules, 
-    port, 
-    isJSX, 
-    env, 
-    ...restConfig 
+  const {
+    isolateId,
+    projectId = isolateId,
+    reload,
+    modules,
+    port,
+    isJSX,
+    env,
+    ...restConfig
   } = config;
 
   // Set up project path
-  const projectPath = `${Deno.cwd()}/data/${projectId}`;
+  const projectPath = restConfig.projectPath || './';
 
   // Parse import URL for authentication
   const importURL = new URL(env.IMPORT_URL);
   const { username, password, hostname, port: fileLoaderPort } = importURL;
-  
+
   // Log subprocess creation
   console.log(`Creating subprocess isolate ${isolateId} on port ${port}`);
-  
+
   // Prepare environment variables
-  const envVars = { 
-    DENO_DIR: restConfig.cacheDir || `${Deno.cwd()}/data/${projectId}/cache/.deno`, 
-    DENO_AUTH_TOKENS: `${username}:${password}@${hostname}:${fileLoaderPort}` 
+  const envVars = {
+    DENO_DIR: restConfig.cachePath || Deno.env.get('DENO_DIR'),
+    DENO_AUTH_TOKENS: `${username}:${password}@${hostname}:${fileLoaderPort}`
   };
 
-  
+
   // Prepare run options
-  const options = runOptions(restConfig.permissions, 
-    { 
-      config: { 
+  const options = runOptions(restConfig.permissions,
+    {
+      config: {
         isolateType: 'worker',
-        projectId, 
-        projectPath, 
-        ...restConfig 
-      }, 
-      modules, 
-      variables: env 
+        projectId,
+        projectPath,
+        ...restConfig
+      },
+      modules,
+      variables: env
     }
   ) as string[];
 
-  
+
   // Determine isolate script based on JSX support
   const isolateScript = new URL(
-    `../../isolate-v2/main.ts`, 
+    `../../isolate-v2/main.ts`,
     import.meta.url
   ).href;
-  
+
   // Prepare isolate configuration
   const isolateConfig = JSON.stringify({
     isolateId,
@@ -88,11 +88,11 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
     ...restConfig,
     env,
   });
-  
+
   // Create and spawn the subprocess
   const command = new Deno.Command(Deno.execPath(), {
     env: envVars,
-    cwd: `${Deno.cwd()}/data/${projectId}`,
+    // cwd: `${Deno.cwd()}/data/${projectId}`,
     args: [
       'run',
       ...options,
@@ -112,43 +112,43 @@ async function createSubprocessIsolate(config: IsolateFactoryConfig): Promise<De
  * @returns A web worker
  */
 function createWebWorkerIsolate(config: IsolateFactoryConfig): Worker {
-  const { 
-    isolateId, 
-    projectId = isolateId, 
-    modules, 
-    port, 
-    isJSX, 
-    env, 
-    ...restConfig 
+  const {
+    isolateId,
+    projectId = isolateId,
+    modules,
+    port,
+    isJSX,
+    env,
+    ...restConfig
   } = config;
 
   // Set up project path
-  const projectPath = `${Deno.cwd()}/data/${projectId}`;
-  
+  const projectPath = restConfig.projectPath;
+
   // Log worker creation
   console.log(`Creating web worker isolate ${isolateId} on port ${port}`);
-  
+
   // Determine isolate script based on JSX support
   const workerScript = new URL(
-    `../../isolate-v2/main.ts`, 
+    `../../isolate-v2/main.ts`,
     import.meta.url
   ).href;
- 
+
   // Prepare run options for worker
   const runOptionsObj = !restConfig?.permissions?.['allow-all']
     ? runOptions(
-      restConfig.permissions, 
-        { 
-          config: { 
-            isolateType: 'worker',
-            projectId, 
-            projectPath, 
-            ...restConfig 
-          }, 
-          modules, 
-          variables: env 
-        }
-      )
+      restConfig.permissions,
+      {
+        config: {
+          isolateType: 'worker',
+          projectId,
+          projectPath,
+          ...restConfig
+        },
+        modules,
+        variables: env
+      }
+    )
     : undefined;
 
   // Create the worker
@@ -180,8 +180,8 @@ function createWebWorkerIsolate(config: IsolateFactoryConfig): Worker {
 export default async function isolateFactory(config: IsolateFactoryConfig): Promise<IsolateInstance> {
   try {
 
-    if (!config.isolateType)  config.isolateType = 'subprocess'
-    
+    if (!config.isolateType) config.isolateType = 'subprocess'
+
     if (config.isolateType === 'subprocess') {
       return await createSubprocessIsolate(config);
     } else {

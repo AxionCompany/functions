@@ -1,5 +1,6 @@
 import { dirname, resolve } from "jsr:@std/path@1.1.1";
 import type { ModuleLoader } from "../loader.ts";
+import type { IsolateConfig } from "../types.ts";
 
 export interface FileSearchResult {
     path: string;
@@ -10,7 +11,7 @@ export interface FileSearchResult {
  * Finds contextual modules by walking up the directory tree from a starting path.
  * This supports both local file paths and remote URLs.
  */
-export async function findContextualModules(importUrl: string, loader: ModuleLoader, contextualModuleNames: string[]): Promise<FileSearchResult[]> {
+export async function findContextualModules(importUrl: string, loader: ModuleLoader, contextualModuleNames: string[], config: IsolateConfig): Promise<FileSearchResult[]> {
     const isRemote = importUrl.startsWith('http');
     const modules: FileSearchResult[] = [];
     const seen = new Set<string>();
@@ -29,19 +30,27 @@ export async function findContextualModules(importUrl: string, loader: ModuleLoa
             if (!seen.has(potentialModulePath)) {
                 try {
                     // Probe for the file's existence by trying to bundle it without caching the result.
-                    const bundleResult = await loader.bundle(potentialModulePath, true, false);
+                    const bundleResult = await loader.bundle(potentialModulePath, true, false, config);
                     if (!bundleResult.code) {
                         seen.add(potentialModulePath);
                         continue;
                     }
                     modules.push({ path: potentialModulePath, name });
                 } catch (e: unknown) {
-                    // It's okay if the file doesn't exist, just ignore the error.
-                    // A 404 or "Not Found" error is the expected outcome for non-existent files.
-                    if (e instanceof Deno.errors.NotFound || (e as Error).message?.includes('404')) {
-                        // ignore
-                    } else {
-                        console.warn(`[Finder] Error probing for ${potentialModulePath}:`, (e as Error).message);
+                    // It's okay if the file doesn't exist; ignore common bundler probe failures
+                    const msg = (e as Error)?.message || "";
+                    const isNotFound = e instanceof Deno.errors.NotFound || msg.includes('404');
+                    const isBundlerMissing =
+                        msg.includes('unexpectedly missing when bundling') ||
+                        msg.includes('Unable to output during bundling') ||
+                        msg.includes('Bundler.loader.load') ||
+                        msg.includes('failed to analyze module') ||
+                        msg.includes('Cannot resolve');
+
+                    if (isNotFound || isBundlerMissing) {
+                        // ignore silently during probe
+                    } else if ((config as any)?.debugLogs) {
+                        console.warn(`[Finder] Error probing for ${potentialModulePath}:`, msg);
                     }
                 }
             }

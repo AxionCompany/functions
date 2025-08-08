@@ -1,7 +1,7 @@
 {
   "dirEntrypoint": "index",
   "functionsDir": "functions",
-  "isolateType": "subprocess",
+  "isolateType": "worker",
   "isolateMaxIdleTime": 300000,
   "permissions":{
    "unstable-worker-options": true

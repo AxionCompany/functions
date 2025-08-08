@@ -54,14 +54,14 @@ export interface RunOptionsContext {
 function getUserCacheDirectories(): string[] {
   const platform = Deno.build.os;
   const homeDir = Deno.env.get("HOME") || Deno.env.get("USERPROFILE") || ".";
-  
+
   switch (platform) {
     case "darwin": // macOS
       return [
         `${homeDir}/Library/Application Support/deno-wasmbuild`,
         `${homeDir}/Library/Caches/deno-wasmbuild`,
       ];
-    case "linux":{
+    case "linux": {
       const xdgCacheHome = Deno.env.get("XDG_CACHE_HOME");
       const xdgDataHome = Deno.env.get("XDG_DATA_HOME");
       return [
@@ -69,7 +69,7 @@ function getUserCacheDirectories(): string[] {
         xdgDataHome ? `${xdgDataHome}/deno-wasmbuild` : `${homeDir}/.local/share/deno-wasmbuild`,
       ];
     }
-    case "windows":{
+    case "windows": {
       const appData = Deno.env.get("APPDATA");
       const localAppData = Deno.env.get("LOCALAPPDATA");
       return [
@@ -94,26 +94,20 @@ function getUserCacheDirectories(): string[] {
  * @returns Formatted permissions for subprocess or worker
  */
 const runOptions = (
-  customPermissions: Partial<PermissionsConfig> = {}, 
+  customPermissions: Partial<PermissionsConfig> = {},
   context: RunOptionsContext
 ): string[] | Record<string, boolean | string[]> => {
   const { config, variables, modules } = context;
 
   // Determine read/write permissions based on isolate type
-  const readWritePermissions = config.isolateType === 'subprocess'
-    ? ['.']
-    : [
-        `${config.projectPath}`, 
-        `${config.projectPath}/../node_modules`, 
-        `${config.projectPath}/../../node_modules`
-      ];
+  const readWritePermissions = [config.projectPath]
 
   // Get platform-specific cache directories for @deno/emit WebAssembly caching
   const cacheDirectories = getUserCacheDirectories();
-  
+
   // Add Deno executable path for worker creation (required for database workers)
   const execPath = Deno.execPath();
-  
+
   // Combine base read permissions with cache directories and exec path
   const readPermissions = [...readWritePermissions, ...cacheDirectories, execPath];
 
@@ -134,10 +128,10 @@ const runOptions = (
     "no-lock": true,
     "no-prompt": true,
     "import-map": `data:application/json,${modules.template(
-      JSON.stringify({ 
-        imports: config?.denoConfig?.imports, 
-        scope: config?.denoConfig?.scope 
-      }), 
+      JSON.stringify({
+        imports: config?.denoConfig?.imports,
+        scope: config?.denoConfig?.scope
+      }),
       variables
     )}`,
   };
@@ -154,37 +148,37 @@ const runOptions = (
     return Object.entries(mergedPermissions)
       .map(([key, value]) => {
         if (typeof value === 'undefined') return null;
-        
+
         if (typeof value === 'boolean') {
           return value === true ? `--${key}` : null;
         }
-        
+
         if (Array.isArray(value)) {
           return `--${key}=${value.join(",")}`;
         }
-        
+
         if (typeof value === 'string') {
           return `--${key}=${value}`;
         }
-        
+
         return null;
       })
       .filter(Boolean) as string[];
   } else {
     // For worker, convert to worker permissions object
     const workerPermissions: Record<string, boolean | string[]> = {};
-    
+
     Object.entries(mergedPermissions).forEach(([key, value]) => {
       if (typeof value === 'undefined') return;
-      
+
       const [concession, type] = key.split('-');
       if (concession === 'allow' && type) {
         workerPermissions[type] = value as boolean | string[];
       }
-     
+
       // Note: deny-{...} permission is not yet implemented in Deno webworkers permissions (as of v1.44.5)
     });
-    
+
     return workerPermissions;
   }
 };

@@ -17,10 +17,10 @@ export interface LogConfig {
 
 // Default global config
 let globalConfig: LogConfig = { 
-  debugLogs: true, 
-  errorLogs: true, 
-  infoLogs: true, 
-  warningLogs: true 
+  debugLogs: false, 
+  errorLogs: false, 
+  infoLogs: false, 
+  warningLogs: false 
 };
 
 /**

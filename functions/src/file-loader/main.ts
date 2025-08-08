@@ -6,7 +6,6 @@
  */
 
 import FileLoader from "./adapters/loaders/main.ts";
-import bundler, { terminateWorker } from './adapters/bundler/esbuild.js';
 import mime from 'npm:mime@4.0.7/lite';
 import { logDebug, logError, logInfo, logWarning } from "../utils/logger.ts";
 
@@ -181,28 +180,6 @@ export default function createFileLoader({
     // Extract file data
     const { content, redirect: shouldRedirect, params, path, variables, matchPath } = fileData;
 
-    // Handle bundling if requested
-    if (shouldBundle && false) {
-      const bundledContent = await handleBundling({
-        bundleUrl: new URL(url.href),
-        useCache: config.useCache || false,
-        bustCache,
-        shared: shared?.split(','),
-        variables,
-        data,
-        params,
-        environment: config.environment
-      }, modules, matchPath || pathname);
-
-      if (bundledContent) {
-        return {
-          content: bundledContent,
-          params,
-          path,
-          matchPath
-        };
-      }
-    }
 
     // Handle redirects if needed and not bundling
     const shouldPerformRedirect = shouldRedirect && !shouldBundle;
@@ -220,16 +197,17 @@ export default function createFileLoader({
 
     // add export with file path to eof:
     if (matchPath?.endsWith('.tsx') || matchPath?.endsWith('.jsx') || matchPath?.endsWith('.ts') || matchPath?.endsWith('.js')) {
-      const extendedContent = content + `\nexport const matchedPath_${crypto.randomUUID().replace(/-/g, '_')} = "${matchPath}";`;
+      let extendedContent = content + `\nexport const matchedPath_${crypto.randomUUID().replace(/-/g, '_')} = "${matchPath}";`;
+      extendedContent += `\nexport const pathParams_${crypto.randomUUID().replace(/-/g, '_')} = ${JSON.stringify(params)};`;
       return extendedContent;
     }
+
     return content;
   };
 
   // Add a cleanup method to the loader function
   (loader as any).cleanup = () => {
-    logInfo("Cleaning up file loader resources");
-    terminateWorker();
+    logInfo("Cleaning up file loader resources");;
   };
 
   return loader;
@@ -286,64 +264,6 @@ function handleNotFound(response: FileLoaderResponse, pathname: string): undefin
   response.status(404);
   response.statusText(`No path found for ${pathname}`);
   return undefined;
-}
-
-/**
- * Handles bundling of file content
- * 
- * @param options - Bundle options
- * @param modules - Available modules
- * @param pathForBundle - Path to use for bundling
- * @returns Bundled content or undefined if bundling fails
- */
-async function handleBundling(
-  options: BundleOptions,
-  modules: FileLoaderModules,
-  pathForBundle: string
-): Promise<string | undefined> {
-  logDebug("Bundling requested for:", pathForBundle);
-
-  if (!modules.withCache) {
-    logError('Bundling requested but withCache module is not available');
-    return undefined;
-  }
-
-  try {
-    // Configure bundle URL
-    const bundleUrl = options.bundleUrl;
-    bundleUrl.pathname = pathForBundle;
-    bundleUrl.search = '';
-
-    // Bundle the content
-    const bundleContent = await modules.withCache(
-      bundler,
-      {
-        useCache: options.useCache,
-        bustCache: options.bustCache,
-        keys: [bundleUrl.href],
-        cachettl: ONE_DAY_IN_MS
-      },
-      bundleUrl,
-      {
-        shared: options.shared,
-        ...options.variables,
-        ...options.data,
-        ...options.params,
-        environment: options.environment
-      }
-    );
-
-    if (bundleContent) {
-      logInfo("Bundling successful");
-      return bundleContent;
-    }
-
-    logWarning("Bundling returned no content");
-    return undefined;
-  } catch (err) {
-    logError("Error bundling file:", err instanceof Error ? err.message : String(err));
-    return undefined;
-  }
 }
 
 /**
