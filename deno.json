@@ -17,7 +17,7 @@
     "bare-node-builtins",
     "detect-cjs",
     "node-globals",
-    "unstable-sloppy-imports",
+    "sloppy-imports",
     "unsafe-proto",
     "webgpu",
     "broadcast-channel",

@@ -36,7 +36,7 @@ async function main() {
       projectPath: Deno.env.get('PROJECT_PATH') || Deno.cwd(),
       isolateId: Deno.env.get('ISOLATE_ID') || 'default',
       env: Object.fromEntries(
-        Object.entries(Deno.env.toObject()).filter(([key]) => 
+        Object.entries(Deno.env.toObject()).filter(([key]) =>
           !['PORT', 'PROJECT_ID', 'PROJECT_PATH', 'ISOLATE_ID'].includes(key)
         )
       ),
@@ -54,9 +54,10 @@ async function main() {
         useCache: Deno.env.get('FILE_LOADER_USE_CACHE') !== 'false',
         bustCache: Deno.env.get('FILE_LOADER_BUST_CACHE') === 'true',
         environment: Deno.env.get('FILE_LOADER_ENVIRONMENT'),
+        functionsDir: Deno.env.get('FUNCTIONS_DIR') || Deno.env.get('OXIAN_FUNCTIONS_DIR'),
         dirEntrypoint: Deno.env.get('FILE_LOADER_DIR_ENTRYPOINT') || 'index',
       },
-      functionsDir: Deno.env.get('FUNCTIONS_DIR') || Deno.env.get('OXIAN_FUNCTIONS_DIR') || `functions`,
+      functionsDir: Deno.env.get('FUNCTIONS_DIR') || Deno.env.get('OXIAN_FUNCTIONS_DIR'),
       denoConfig: {
         imports: Deno.env.get('DENO_IMPORTS') ? JSON.parse(Deno.env.get('DENO_IMPORTS')!) : undefined,
         scopes: Deno.env.get('DENO_SCOPES') ? JSON.parse(Deno.env.get('DENO_SCOPES')!) : undefined,
@@ -108,7 +109,7 @@ async function main() {
             moduleExecutor["config"].bustCache = true;
             return { reloaded: true };
           }
-          
+
           return await moduleExecutor.execute(data, response);
 
         } catch (err) {
@@ -116,7 +117,7 @@ async function main() {
           if (e?.stack && typeof e.stack === 'string') {
             console.error(e.stack);
           } else {
-            console.error("[IsolateV2] Request execution error:", e?.message || e);
+            console.error("[IsolateV2] Request execution error:", e?.message || e, JSON.stringify(data));
           }
           return response.error(err);
         }
@@ -125,15 +126,14 @@ async function main() {
   };
 
   // 4. Start the server
-  console.log(`[Isolate] Starting server on port ${port}`);
   server({ port, requestHandler: RequestHandler(handlerConfig), config });
 }
 
 main().catch(err => {
-    console.error("[IsolateV2] Critical error during startup:", err);
-    // In a worker context, we might need to notify the parent
-    if (typeof self !== 'undefined') {
-        self.postMessage({ error: 'critical_startup_failure' });
-    }
-    Deno.exit(1);
+  console.error("[IsolateV2] Critical error during startup:", err);
+  // In a worker context, we might need to notify the parent
+  if (typeof self !== 'undefined') {
+    self.postMessage({ error: 'critical_startup_failure' });
+  }
+  Deno.exit(1);
 }); 

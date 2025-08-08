@@ -69,6 +69,24 @@ export class ModuleExecutor {
             importUrl = this.config.env.IMPORT_URL || this.config.env.IMPORT_PATH;
         }
 
+        // If importUrl is only an origin (no meaningful pathname), reconstruct from request pathname
+        try {
+            if (importUrl) {
+                const parsed = new URL(importUrl);
+                const hasMeaningfulPath = parsed.pathname && parsed.pathname !== "/";
+                if (!hasMeaningfulPath) {
+                    const urlObj = typeof (rawRequestData.url as any)?.href === 'string' ? (rawRequestData.url as any) : new URL(String(rawRequestData.url));
+                    const routePath = (rawRequestData as any).pathname || urlObj.pathname || '/';
+                    if (this.config.loaderUrl) {
+                        importUrl = new URL(routePath, this.config.loaderUrl).href;
+                    } else {
+                        const base = (this.config.functionsDir || this.config.projectPath).replace(/\/$/, '');
+                        importUrl = `file://${base}${routePath}`;
+                    }
+                }
+            }
+        } catch {}
+
         // Final fallback: derive from request pathname
         if (!importUrl) {
             const urlObj = typeof (rawRequestData.url as any)?.href === 'string' ? (rawRequestData.url as any) : new URL(String(rawRequestData.url));

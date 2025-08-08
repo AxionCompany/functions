@@ -176,7 +176,12 @@ export default function defaultAdapters(baseAdapters: any): IsolateAdapterConfig
       // For production with remote repos:
       // username: `github--owner--repo--branch--${isolateId}`, // Include isolate context
       // password: 'github_token_or_api_key'
-    }
+    },
+
+    debugLogs: true,
+    errorLogs: true,
+    infoLogs: true,
+    warningLogs: true
   };
 }
 

@@ -81,7 +81,7 @@ async function loadViaFileLoaderMain(config: IsolateConfig, specifier: string): 
   const functionsDir = (config.functionsDir || config.projectPath || Deno.cwd()).replace(/\/$/, "");
   const functionsRel = functionsDir.startsWith(projectPath)
     ? functionsDir.slice(projectPath.length).replace(/^\/+/, "")
-    : "functions";
+    : "";
 
   // Build file-loader main instance
   const fileLoader = createFileLoader({
@@ -123,6 +123,7 @@ async function loadViaFileLoaderMain(config: IsolateConfig, specifier: string): 
     const raw = specifier.startsWith("/") ? specifier : `/${specifier}`;
     pathname = `/${functionsRel}${raw}`.replace(/\/+/g, "/");
   }
+
 
   // Follow redirect logic up to a few times
   let attempts = 0;
@@ -169,7 +170,15 @@ async function createCustomLoader(config: IsolateConfig, collector: Set<string>,
     return async (specifier: string): Promise<{ kind: "module"; specifier: string; content: string } | undefined> => {
         try {
             // Bypass bundling for special schemes; they are suppressed from parent sources
-            if (specifier.startsWith("node:") || specifier.startsWith("npm:") || specifier.startsWith("jsr:")) {
+            if (
+                specifier.startsWith("node:") ||
+                specifier.startsWith("npm:") ||
+                specifier.startsWith("jsr:") ||
+                // Let deno_emit handle import maps and other non-code data/blobs
+                specifier.startsWith("data:") ||
+                specifier.startsWith("blob:")
+
+            ) {
                 return undefined;
             }
 
